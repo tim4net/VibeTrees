@@ -66,6 +66,21 @@ export class StateManager {
       CREATE INDEX IF NOT EXISTS idx_checkpoints_session
         ON checkpoints(session_id);
     `);
+
+    // Migration: Add idempotency_key column if it doesn't exist
+    this.migrateSchema();
+  }
+
+  migrateSchema() {
+    // Check if idempotency_key column exists
+    const columns = this.db.prepare("PRAGMA table_info(tasks)").all();
+    const hasIdempotencyKey = columns.some(col => col.name === 'idempotency_key');
+
+    if (!hasIdempotencyKey) {
+      console.log('Migrating database: Adding idempotency_key column...');
+      this.db.exec('ALTER TABLE tasks ADD COLUMN idempotency_key TEXT UNIQUE');
+      console.log('Migration complete.');
+    }
   }
 
   createSession({ model, startPhase = 1 }) {
