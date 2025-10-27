@@ -21,7 +21,7 @@ export class ClaudeCLI {
 
       args.push(prompt);
 
-      const child = spawn('claude', args, {
+      const child = spawn('npx', ['@anthropic-ai/claude-code', ...args], {
         cwd: this.workingDir,
         stdio: ['ignore', 'pipe', 'pipe']
       });
@@ -109,29 +109,18 @@ export class ClaudeCLI {
 
   async testConnection() {
     try {
-      // Quick check: just verify the claude command exists
-      const { stdout } = await execAsync('which claude', {
-        timeout: 2000
-      });
-
-      // Check if this is Claude Code (recursive situation)
-      const { stdout: version } = await execAsync('claude --version', {
-        timeout: 2000
-      });
-
-      if (version.includes('Claude Code')) {
-        console.log('⚠️  Warning: Running inside Claude Code - using in-process execution instead of spawning new instances');
-        // Return true to allow orchestrator to continue
-        // Tasks will need to use Task tool or similar instead
-        return true;
-      }
-
-      // For standalone Claude CLI, do a real test
+      // Test with a simple command
       const result = await this.execute({
-        prompt: 'Respond with: Claude CLI is working',
+        prompt: 'Respond with just: OK',
         model: 'claude-sonnet-4.5',
         timeout: 10000
       });
+
+      if (result.success && result.output.includes('OK')) {
+        console.log('⚠️  Note: Using Claude Code via npx');
+        return true;
+      }
+
       return result.success;
     } catch (error) {
       return false;
