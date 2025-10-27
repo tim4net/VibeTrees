@@ -112,7 +112,7 @@ export class ClaudeCLI {
       // Test with a simple command - use longer timeout for npx first-run
       const result = await this.execute({
         prompt: 'Respond with just: OK',
-        model: 'claude-sonnet-4.5',
+        model: 'sonnet', // Use alias instead of version
         timeout: 30000 // 30 seconds for npx download
       });
 

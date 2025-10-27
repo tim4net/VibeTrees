@@ -210,7 +210,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   const config = {
     workingDir: process.cwd(),
-    model: 'claude-sonnet-4.5',
+    model: 'sonnet', // Use model alias
     dbPath: '.orchestrator-state/state.db',
     dashboardPort: 3334,
     enableDashboard: true,
