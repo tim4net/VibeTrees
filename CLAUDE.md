@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Vibe Worktrees** is a standalone application for orchestrating multiple git worktrees with AI agents (Claude Code, Codex), tmux multiplexing, and isolated Docker services. It enables parallel development across feature branches with each worktree having its own AI assistant, terminal environment, and service ports.
+**VibeTrees** is a standalone application for orchestrating multiple git worktrees with AI agents (Claude Code, Codex), tmux multiplexing, and isolated Docker services. It enables parallel development across feature branches with each worktree having its own AI assistant, terminal environment, and service ports.
 
 ## Core Values
 

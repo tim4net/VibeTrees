@@ -1,6 +1,6 @@
-# Vibe Worktrees
+# VibeTrees
 
-**Orchestrate multiple git worktrees with AI agents and isolated containers**
+**Manage multiple git worktrees with AI agents and isolated containers**
 
 > ⚠️ **Status**: Planning Phase - Not yet ready for use
 
@@ -8,7 +8,7 @@
 
 ## What is this?
 
-Vibe Worktrees is a developer tool that enables **parallel feature development** with:
+VibeTrees is a developer tool that enables **parallel feature development** with:
 - 🌳 Multiple git worktrees (work on multiple features simultaneously)
 - 🤖 AI coding assistants per worktree (Claude, Codex, Gemini)
 - 🐳 Isolated Docker/Podman containers (unique ports, no conflicts)
@@ -26,7 +26,7 @@ As a solo developer or small team, you want to:
 
 **Traditional approach**: Manual worktree management, port conflicts, no AI integration
 
-**Vibe Worktrees**: One-click worktree creation with AI agent, isolated services, automatic sync
+**VibeTrees**: One-click worktree creation with AI agent, isolated services, automatic sync
 
 ---
 
@@ -186,10 +186,10 @@ This project follows **clean coding standards** as core values:
 
 ```bash
 # This will work once implementation is complete:
-npm install -g vibe-worktrees
+npm install -g vibetrees
 
 # Or run directly:
-npx vibe-worktrees
+npx vibetrees
 ```
 
 ---

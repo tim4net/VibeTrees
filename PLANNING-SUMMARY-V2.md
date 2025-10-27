@@ -1,4 +1,4 @@
-# Vibe Worktrees: Planning Summary v2.0
+# VibeTrees: Planning Summary v2.0
 
 **Complete Planning Documentation - UPDATED**
 **Date**: 2025-10-27

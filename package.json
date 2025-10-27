@@ -1,8 +1,8 @@
 {
-  "name": "vibe-worktrees",
-  "version": "1.0.0",
+  "name": "vibetrees",
+  "version": "0.1.0",
   "type": "module",
-  "description": "Orchestrate multiple git worktrees with AI agents, tmux, and isolated Docker services",
+  "description": "Manage multiple git worktrees with AI agents and isolated containers",
   "scripts": {
     "start": "node scripts/worktree-manager.mjs",
     "attach": "node scripts/worktree-manager.mjs attach",
