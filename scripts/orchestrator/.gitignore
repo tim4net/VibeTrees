@@ -1,0 +1,6 @@
+node_modules/
+*.db
+*.db-journal
+.orchestrator-state/
+logs/
+.DS_Store
