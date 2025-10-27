@@ -1,0 +1,33 @@
+{
+  "name": "vibe-worktrees",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Orchestrate multiple git worktrees with AI agents, tmux, and isolated Docker services",
+  "scripts": {
+    "start": "node scripts/worktree-manager.mjs",
+    "attach": "node scripts/worktree-manager.mjs attach",
+    "manage": "node scripts/worktree-manager.mjs manage",
+    "kill": "node scripts/worktree-manager.mjs kill",
+    "web": "node scripts/worktree-web/server.mjs",
+    "test": "vitest run scripts/worktree-manager.test.mjs",
+    "test:watch": "vitest scripts/worktree-manager.test.mjs",
+    "test:coverage": "vitest run scripts/worktree-manager.test.mjs --coverage"
+  },
+  "keywords": [
+    "git",
+    "worktree",
+    "tmux",
+    "docker",
+    "ai",
+    "claude",
+    "development"
+  ],
+  "devDependencies": {
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "ws": "^8.14.0",
+    "node-pty": "^1.0.0"
+  }
+}

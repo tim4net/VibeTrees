@@ -1,0 +1,295 @@
+/* Sidebar Styles - Sidebar layout, worktree cards, status indicators */
+
+/* Sidebar */
+.sidebar {
+  width: 320px;
+  min-width: 200px;
+  max-width: 800px;
+  background: #0d1117;
+  border-right: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar.collapsed {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+}
+
+.sidebar-header {
+  padding: 12px;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sidebar-actions { display: flex; gap: 6px; }
+.sidebar-actions button { padding: 0; width: 28px; height: 28px; min-width: 28px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.sidebar.collapsed .sidebar-header { flex-direction: column; padding: 8px 4px; gap: 8px; }
+.sidebar.collapsed .sidebar-title { display: none; }
+.sidebar.collapsed .sidebar-actions { flex-direction: column; width: 100%; gap: 8px; }
+.sidebar.collapsed .sidebar-actions button { width: 100%; height: 36px; padding: 0; font-size: 0; }
+.sidebar.collapsed .sidebar-actions button i { margin: 0; font-size: 16px; }
+.sidebar.collapsed .sidebar-content { padding: 0; display: flex; flex-direction: column; }
+
+/* Resize Handle */
+.resize-handle { position: absolute; top: 0; right: 0; width: 4px; height: 100%; cursor: col-resize; background: transparent; z-index: 10; transition: background 0.2s; }
+.sidebar.collapsed .resize-handle { display: none; }
+.resize-handle:hover, .resize-handle.dragging { background: #58a6ff; }
+.resize-handle::before { content: ''; position: absolute; top: 0; left: -4px; right: -4px; height: 100%; }
+
+/* Worktree Cards */
+.worktree-card {
+  background: linear-gradient(135deg, #161b22 0%, #1a1f26 100%);
+  border: 1px solid #30363d;
+  border-left: 3px solid #30363d;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.worktree-card:hover {
+  border-color: #58a6ff;
+  border-left-color: #58a6ff;
+  box-shadow: 0 2px 8px rgba(88, 166, 255, 0.15);
+}
+
+.worktree-card.active {
+  background: linear-gradient(135deg, #1c2128 0%, #21262d 100%);
+  border-color: #58a6ff;
+  border-left-color: #58a6ff;
+  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.25);
+}
+
+/* Git Status Colors */
+.worktree-card.git-clean { border-left-color: #2ea043; }
+.worktree-card.git-uncommitted { border-left-color: #e5a935; }
+.worktree-card.git-unpushed { border-left-color: #58a6ff; }
+.worktree-card.git-clean:hover { border-left-color: #2ea043; box-shadow: 0 2px 8px rgba(46, 160, 67, 0.2); }
+.worktree-card.git-uncommitted:hover { border-left-color: #e5a935; box-shadow: 0 2px 8px rgba(229, 169, 53, 0.2); }
+.worktree-card.git-unpushed:hover { border-left-color: #58a6ff; box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2); }
+
+.worktree-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 8px;
+}
+
+.worktree-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #79c0ff;
+  text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+}
+
+.worktree-branch {
+  font-size: 10px;
+  color: #8b949e;
+  margin-top: 2px;
+}
+
+.worktree-branch.clickable {
+  cursor: pointer;
+  color: #58a6ff;
+  transition: color 0.2s;
+}
+
+.worktree-branch.clickable:hover {
+  color: #79c0ff;
+  text-decoration: underline;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.status-badge:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.status-badge:active {
+  transform: translateY(0);
+}
+
+.status-badge-chevron {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.status-running {
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(35, 134, 54, 0.3);
+}
+
+.status-stopped {
+  background: linear-gradient(135deg, #6e7681 0%, #8b949e 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(110, 118, 129, 0.2);
+}
+
+.status-mixed {
+  background: linear-gradient(135deg, #d29922 0%, #e5a935 100%);
+  color: #000;
+  box-shadow: 0 2px 8px rgba(210, 153, 34, 0.3);
+}
+
+.ports {
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.port {
+  background: linear-gradient(135deg, #21262d 0%, #2d333b 100%);
+  border: 1px solid #30363d;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.port.clickable {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.port.clickable:hover {
+  background: linear-gradient(135deg, #30363d 0%, #3c444d 100%);
+  border-color: #58a6ff;
+  box-shadow: 0 2px 6px rgba(88, 166, 255, 0.2);
+}
+
+.port-label {
+  color: #8b949e;
+  margin-right: 4px;
+}
+
+.port-value {
+  color: #79c0ff;
+  font-weight: 600;
+}
+
+.worktree-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.worktree-actions button {
+  flex: 1;
+  min-width: 60px;
+}
+
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-indicator.running {
+  background: #2ea043;
+  box-shadow: 0 0 6px rgba(46, 160, 67, 0.6);
+}
+
+.status-indicator.exited {
+  background: #6e7681;
+  box-shadow: 0 0 4px rgba(110, 118, 129, 0.4);
+}
+
+.status-indicator.restarting {
+  background: #e5a935;
+  box-shadow: 0 0 6px rgba(229, 169, 53, 0.6);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+/* Vertical Tabs (Collapsed Sidebar) */
+.vertical-tabs { display: flex; flex-direction: column; flex: 1; overflow-y: auto; }
+
+.vertical-tab {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  padding: 12px 6px;
+  min-height: 44px;
+  max-height: 160px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  color: #8b949e;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.vertical-tab > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.vertical-tab:hover {
+  background: linear-gradient(135deg, #21262d 0%, #2d333b 100%);
+  color: #c9d1d9;
+}
+
+.vertical-tab.active {
+  background: linear-gradient(135deg, #1c2128 0%, #21262d 100%);
+  color: #79c0ff;
+  border-left: 3px solid #58a6ff;
+  box-shadow: inset 0 0 20px rgba(88, 166, 255, 0.15);
+}
+
+.vertical-tab .status-indicator {
+  writing-mode: horizontal-tb;
+}

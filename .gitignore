@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+*.log
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Testing
+coverage/
+.nyc_output/
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Vibe-specific runtime (user data, not code)
+.worktrees/
+!.worktrees/.gitkeep
+
+# User-specific Claude settings (keep settings.local.json for this repo only)
+# .claude/settings.local.json is tracked for project-specific permissions
+
+# OS files
+Thumbs.db

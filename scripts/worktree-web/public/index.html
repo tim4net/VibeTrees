@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worktree Manager</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#161b22">
+  <meta name="description" content="Git worktree management with integrated terminals and services">
+
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Worktrees">
+
+  <!-- xterm.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Application Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/sidebar.css">
+  <link rel="stylesheet" href="/css/terminals.css">
+  <link rel="stylesheet" href="/css/components.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar: Worktree Manager -->
+    <div class="sidebar" id="sidebar">
+      <div class="resize-handle" id="resize-handle"></div>
+      <div class="sidebar-header">
+        <div class="sidebar-title"><i data-lucide="trees" class="lucide"></i> Worktrees</div>
+        <div class="sidebar-actions">
+          <button id="collapse-sidebar-btn" title="Collapse sidebar"><i id="collapse-icon" data-lucide="panel-left-close" class="lucide-sm"></i></button>
+          <button onclick="refreshWorktrees()" title="Refresh"><i data-lucide="rotate-cw" class="lucide-sm"></i></button>
+          <button class="primary" onclick="showCreateModal()" title="Create new worktree"><i data-lucide="sprout" class="lucide-sm"></i></button>
+        </div>
+      </div>
+      <div class="sidebar-content" id="worktrees-container">
+        <div class="loading">
+          <div class="spinner"></div>
+          <div>Loading worktrees...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terminal Area -->
+    <div class="terminal-area">
+      <div class="terminal-tabs" id="terminal-tabs">
+        <!-- Tabs will be added here dynamically -->
+      </div>
+      <div class="terminal-panels" id="terminal-panels">
+        <div class="empty-terminal">
+          <div class="empty-terminal-header">
+            <div class="empty-terminal-icon"><i data-lucide="monitor" style="width: 64px; height: 64px;"></i></div>
+            <h3>Open a Terminal</h3>
+            <p>Select an option to get started</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Worktree Modal -->
+  <div id="create-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">Create New Worktree</h2>
+      <form onsubmit="createWorktree(event)">
+        <div class="form-group">
+          <label for="branch-name">Branch Name</label>
+          <input
+            type="text"
+            id="branch-name"
+            placeholder="feature/my-feature"
+            required
+          />
+        </div>
+        <div class="form-group">
+          <label for="from-branch">Create From</label>
+          <input
+            type="text"
+            id="from-branch"
+            placeholder="main"
+            value="main"
+          />
+        </div>
+        <div style="margin-top: 8px; padding: 12px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; font-size: 12px; color: #8b949e;">
+          <strong style="color: #c9d1d9;"><i data-lucide="info" class="lucide-sm"></i> Note:</strong> All services will be included and the database will be copied from the main worktree.
+        </div>
+        <div id="create-progress" class="progress-container">
+          <div class="progress-header">
+            <div class="progress-spinner"></div>
+            <div class="progress-header-text" id="progress-header-text">Creating worktree...</div>
+          </div>
+          <div class="progress-steps">
+            <div class="progress-step pending" data-step="git">
+              <div class="progress-step-icon"></div>
+              <div class="progress-step-label">Create git worktree</div>
+              <div class="progress-step-status" id="status-git"></div>
+            </div>
+            <div class="progress-step pending" data-step="database">
+              <div class="progress-step-icon"></div>
+              <div class="progress-step-label">Copy database</div>
+              <div class="progress-step-status" id="status-database"></div>
+            </div>
+            <div class="progress-step pending" data-step="ports">
+              <div class="progress-step-icon"></div>
+              <div class="progress-step-label">Allocate ports & configure env</div>
+              <div class="progress-step-status" id="status-ports"></div>
+            </div>
+            <div class="progress-step pending" data-step="containers">
+              <div class="progress-step-icon"></div>
+              <div class="progress-step-label">Start containers</div>
+              <div class="progress-step-status" id="status-containers"></div>
+            </div>
+            <div class="progress-step pending" data-step="complete">
+              <div class="progress-step-icon"></div>
+              <div class="progress-step-label">Complete</div>
+              <div class="progress-step-status" id="status-complete"></div>
+            </div>
+          </div>
+          <div id="progress-output" class="progress-output"></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" onclick="hideCreateModal()" id="cancel-button">Cancel</button>
+          <button type="submit" class="primary" id="create-button">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Close Worktree Modal -->
+  <div id="close-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">Close Worktree</h2>
+
+      <!-- Loading State -->
+      <div id="close-loading" class="loading-state">
+        <div class="spinner"></div>
+        <div>Checking worktree status...</div>
+      </div>
+
+      <!-- Main Content (hidden until loaded) -->
+      <div id="close-content" style="display: none;">
+        <p>Worktree: <strong id="close-worktree-name"></strong></p>
+        <p>Branch: <strong id="close-branch-name"></strong></p>
+
+        <!-- Merge Status -->
+        <div id="merge-status-container" class="status-box">
+          <div id="merge-status" class="status-badge"></div>
+        </div>
+
+        <!-- Workflow Guide -->
+        <div class="workflow-guide">
+          <div class="workflow-title">📋 Recommended workflow:</div>
+          <div class="workflow-steps">
+            <div class="workflow-step">✓ Create PR with code changes</div>
+            <div class="workflow-step" id="workflow-merge">Merge PR → migrations run on main</div>
+            <div class="workflow-step">▶ Import test data to main</div>
+          </div>
+        </div>
+
+        <!-- Close Options -->
+        <form id="close-form">
+          <div class="form-group">
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="close-action" value="no" checked>
+                <div class="radio-content">
+                  <div class="radio-title">Just close the worktree</div>
+                  <div class="radio-description">
+                    Your test data will be discarded. Your code changes are safe in your branch.
+                  </div>
+                </div>
+              </label>
+
+              <label class="radio-label" id="import-option">
+                <input type="radio" name="close-action" value="yes">
+                <div class="radio-content">
+                  <div class="radio-title">Import test data to main</div>
+                  <div class="radio-description">
+                    Your worktree has test data that you created during development. Import it to main so you can continue using it.
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Database Preview -->
+          <div id="database-preview" class="database-preview" style="display: none;">
+            <div class="preview-title">📊 Data in worktree:</div>
+            <div id="table-stats-list" class="table-stats-list"></div>
+          </div>
+
+          <!-- Update Main Option -->
+          <div id="update-main-option" class="update-main-option" style="display: none;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="update-main-checkbox" checked>
+              <div class="checkbox-content">
+                <div class="checkbox-title">Pull latest changes to main first</div>
+                <div class="checkbox-description">
+                  Recommended: Ensures main has your merged migrations before importing data.
+                </div>
+              </div>
+            </label>
+            <div id="main-status-warning" class="warning-box" style="display: none;">
+              ⚠️ Main worktree has uncommitted changes. Commit or stash them before proceeding.
+            </div>
+          </div>
+
+          <!-- Warning for Not Merged -->
+          <div id="not-merged-warning" class="warning-box" style="display: none;">
+            ⚠️ Your branch hasn't been merged to main yet. We recommend merging your PR first, then closing the worktree to import your test data safely.
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" onclick="hideCloseModal()" id="close-cancel-button">Cancel</button>
+        <button type="button" onclick="executeClose()" class="primary" id="close-execute-button">
+          Close Worktree
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div id="context-menu" class="context-menu">
+    <div class="context-menu-item" onclick="contextMenuAction('viewLogs')">
+      <i data-lucide="file-text" class="lucide-sm"></i>
+      <span>View Logs</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextMenuAction('restart')">
+      <i data-lucide="rotate-cw" class="lucide-sm"></i>
+      <span>Restart Service</span>
+    </div>
+    <div class="context-menu-item" onclick="contextMenuAction('rebuild')">
+      <i data-lucide="hammer" class="lucide-sm"></i>
+      <span>Rebuild Service</span>
+    </div>
+  </div>
+
+  <!-- Worktree Context Menu -->
+  <div id="worktree-context-menu" class="context-menu">
+    <div class="context-menu-item" onclick="worktreeContextMenuAction('viewAllLogs')">
+      <i data-lucide="file-text" class="lucide-sm"></i>
+      <span>View All Logs</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" onclick="worktreeContextMenuAction('close')">
+      <i data-lucide="x-circle" class="lucide-sm"></i>
+      <span>Close Worktree</span>
+    </div>
+  </div>
+
+  <!-- Status Context Menu -->
+  <div id="status-context-menu" class="context-menu">
+    <div class="context-menu-item" onclick="statusContextMenuAction('start')">
+      <i data-lucide="play" class="lucide-sm"></i>
+      <span>Start All Services</span>
+    </div>
+    <div class="context-menu-item" onclick="statusContextMenuAction('stop')">
+      <i data-lucide="square" class="lucide-sm"></i>
+      <span>Stop All Services</span>
+    </div>
+    <div class="context-menu-item" onclick="statusContextMenuAction('restart')">
+      <i data-lucide="rotate-cw" class="lucide-sm"></i>
+      <span>Restart All Services</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="statusContextMenuAction('viewAllLogs')">
+      <i data-lucide="file-text" class="lucide-sm"></i>
+      <span>View All Logs</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" onclick="statusContextMenuAction('close')">
+      <i data-lucide="x-circle" class="lucide-sm"></i>
+      <span>Close Worktree</span>
+    </div>
+  </div>
+
+  <!-- Tab Context Menu -->
+  <div id="tab-context-menu" class="context-menu">
+    <div class="context-menu-item" onclick="tabContextMenuAction('refresh')">
+      <i data-lucide="rotate-cw" class="lucide-sm"></i>
+      <span>Refresh</span>
+    </div>
+    <div class="context-menu-item" onclick="tabContextMenuAction('clone')">
+      <i data-lucide="copy" class="lucide-sm"></i>
+      <span>Clone Tab</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" onclick="tabContextMenuAction('close')">
+      <span>×</span>
+      <span>Close Tab</span>
+    </div>
+  </div>
+
+  <!-- Application JavaScript (ES6 Module) -->
+  <script type="module" src="/js/main.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then((registration) => {
+            console.log('Service Worker registered:', registration.scope);
+          })
+          .catch((error) => {
+            console.error('Service Worker registration failed:', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
