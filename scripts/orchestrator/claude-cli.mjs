@@ -1,8 +1,5 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import path from 'path';
-
-const execAsync = promisify(exec);
 
 export class ClaudeCLI {
   constructor(workingDir) {
@@ -11,34 +8,73 @@ export class ClaudeCLI {
   }
 
   async execute({ prompt, model, useContinuation = false, timeout = null }) {
-    const cmd = this.buildCommand({ prompt, model, useContinuation });
+    return new Promise((resolve, reject) => {
+      const args = ['--print'];
 
-    try {
-      const { stdout, stderr } = await execAsync(cmd, {
+      if (model) {
+        args.push('--model', model);
+      }
+
+      if (useContinuation) {
+        args.push('--continue');
+      }
+
+      args.push(prompt);
+
+      const child = spawn('claude', args, {
         cwd: this.workingDir,
-        timeout: timeout || this.timeout,
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-        shell: '/bin/bash',
-        stdio: ['ignore', 'pipe', 'pipe'] // Close stdin, pipe stdout/stderr
+        stdio: ['ignore', 'pipe', 'pipe']
       });
 
-      const output = stdout + stderr;
-      const sessionId = this.extractSessionId(output);
+      let stdout = '';
+      let stderr = '';
 
-      return {
-        success: true,
-        output,
-        sessionId,
-        stderr
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        output: error.stdout || '',
-        stderr: error.stderr || ''
-      };
-    }
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      const timer = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error('Timeout exceeded'));
+      }, timeout || this.timeout);
+
+      child.on('close', (code) => {
+        clearTimeout(timer);
+
+        const output = stdout + stderr;
+        const sessionId = this.extractSessionId(output);
+
+        if (code === 0) {
+          resolve({
+            success: true,
+            output,
+            sessionId,
+            stderr
+          });
+        } else {
+          resolve({
+            success: false,
+            error: `Process exited with code ${code}`,
+            output,
+            stderr
+          });
+        }
+      });
+
+      child.on('error', (error) => {
+        clearTimeout(timer);
+        resolve({
+          success: false,
+          error: error.message,
+          output: stdout,
+          stderr
+        });
+      });
+    });
   }
 
   buildCommand({ prompt, model, useContinuation }) {
