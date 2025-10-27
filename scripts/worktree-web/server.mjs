@@ -1084,9 +1084,14 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   ws.on('message', (data) => {
     try {
       const msg = JSON.parse(data.toString());
-      if (msg.type === 'resize' && msg.cols && msg.rows) {
+      // Only treat as control message if it's an object with a type field
+      if (typeof msg === 'object' && msg !== null && msg.type === 'resize' && msg.cols && msg.rows) {
         terminal.resize(msg.cols, msg.rows);
         console.log(`Resized PTY for ${worktreeName} to ${msg.cols}x${msg.rows}`);
+      } else {
+        // Valid JSON but not a control message (e.g., single digits "1", "2")
+        // Treat as terminal input
+        terminal.write(data.toString());
       }
     } catch (e) {
       // Not JSON, treat as terminal input
