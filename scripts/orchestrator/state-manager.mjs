@@ -78,8 +78,35 @@ export class StateManager {
 
     if (!hasIdempotencyKey) {
       console.log('Migrating database: Adding idempotency_key column...');
-      this.db.exec('ALTER TABLE tasks ADD COLUMN idempotency_key TEXT UNIQUE');
-      console.log('Migration complete.');
+
+      // Add column without UNIQUE constraint first (SQLite limitation)
+      this.db.exec('ALTER TABLE tasks ADD COLUMN idempotency_key TEXT');
+
+      // Populate idempotency keys for existing tasks
+      const existingTasks = this.db.prepare(`
+        SELECT t.id, t.task_number, t.description, p.phase_number
+        FROM tasks t
+        JOIN phases p ON t.phase_id = p.id
+      `).all();
+
+      for (const task of existingTasks) {
+        const idempotencyKey = this.generateIdempotencyKey(
+          task.phase_number,
+          task.task_number,
+          task.description
+        );
+        this.db.prepare('UPDATE tasks SET idempotency_key = ? WHERE id = ?')
+          .run(idempotencyKey, task.id);
+      }
+
+      // Create unique index for constraint
+      try {
+        this.db.exec('CREATE UNIQUE INDEX idx_tasks_idempotency ON tasks(idempotency_key)');
+      } catch (error) {
+        // Index might already exist, ignore
+      }
+
+      console.log(`Migration complete. Updated ${existingTasks.length} existing tasks.`);
     }
   }
 
