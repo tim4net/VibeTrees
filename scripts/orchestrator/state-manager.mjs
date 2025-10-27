@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 
 export class StateManager {
   constructor(dbPath = '.orchestrator-state/state.db') {
@@ -42,6 +42,7 @@ export class StateManager {
         continuation_id TEXT,
         error TEXT,
         retry_count INTEGER DEFAULT 0,
+        idempotency_key TEXT UNIQUE,
         FOREIGN KEY (phase_id) REFERENCES phases(id)
       );
 
@@ -114,12 +115,14 @@ export class StateManager {
     `).run(status, error, phaseId);
   }
 
-  createTask(phaseId, taskNumber, description) {
+  createTask(phaseId, taskNumber, description, phaseNumber) {
     const id = randomUUID();
+    const idempotencyKey = this.generateIdempotencyKey(phaseNumber, taskNumber, description);
+
     this.db.prepare(`
-      INSERT INTO tasks (id, phase_id, task_number, description)
-      VALUES (?, ?, ?, ?)
-    `).run(id, phaseId, taskNumber, description);
+      INSERT INTO tasks (id, phase_id, task_number, description, idempotency_key)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, phaseId, taskNumber, description, idempotencyKey);
     return id;
   }
 
@@ -186,6 +189,35 @@ export class StateManager {
     };
 
     return summary;
+  }
+
+  // Idempotency helpers
+  generateIdempotencyKey(phaseNumber, taskNumber, description) {
+    const hash = createHash('sha256');
+    hash.update(`${phaseNumber}:${taskNumber}:${description}`);
+    return hash.digest('hex').substring(0, 16);
+  }
+
+  findTaskByIdempotencyKey(key) {
+    return this.db.prepare(
+      'SELECT * FROM tasks WHERE idempotency_key = ?'
+    ).get(key);
+  }
+
+  getActiveSessions() {
+    return this.db.prepare(`
+      SELECT * FROM sessions
+      WHERE status IN ('active', 'paused')
+      ORDER BY created_at DESC
+    `).all();
+  }
+
+  getIncompletePhases(sessionId) {
+    return this.db.prepare(`
+      SELECT * FROM phases
+      WHERE session_id = ? AND status != 'completed'
+      ORDER BY phase_number
+    `).all(sessionId);
   }
 
   close() {

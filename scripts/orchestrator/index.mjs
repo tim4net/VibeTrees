@@ -70,9 +70,69 @@ export class Orchestrator {
     }
     console.log(chalk.green('✓ Claude CLI connected\n'));
 
+    // Check for existing active/paused sessions
+    const activeSessions = this.stateManager.getActiveSessions();
+    let resumeSession = null;
+
+    if (activeSessions.length > 0 && !this.currentSessionId) {
+      console.log(chalk.yellow(`Found ${activeSessions.length} incomplete session(s):`));
+      activeSessions.forEach((session, idx) => {
+        const created = new Date(session.created_at * 1000).toLocaleString();
+        console.log(chalk.yellow(`  ${idx + 1}. Session ${session.id.substring(0, 8)}... (Phase ${session.current_phase}, ${session.status}, created ${created})`));
+      });
+
+      if (!this.config.skipApprovals) {
+        const { action } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: 'What would you like to do?',
+            choices: [
+              { name: 'Resume most recent session', value: 'resume' },
+              { name: 'Start new session', value: 'new' }
+            ]
+          }
+        ]);
+
+        if (action === 'resume') {
+          resumeSession = activeSessions[0]; // Most recent
+        }
+      } else {
+        // In --no-approval mode, always resume most recent
+        console.log(chalk.cyan('→ Auto-resuming most recent session (--no-approval mode)\n'));
+        resumeSession = activeSessions[0];
+      }
+    }
+
     // Create or resume session
-    if (!this.currentSessionId) {
+    if (resumeSession) {
+      this.currentSessionId = resumeSession.id;
+      startPhase = resumeSession.current_phase;
+      console.log(chalk.green(`✓ Resuming session ${this.currentSessionId.substring(0, 8)}... from phase ${startPhase}\n`));
+
+      // Mark session as active
+      this.stateManager.db.prepare(
+        "UPDATE sessions SET status = 'active' WHERE id = ?"
+      ).run(this.currentSessionId);
+
+      // Mark incomplete phases as pending to restart them
+      const incompletePhases = this.stateManager.getIncompletePhases(this.currentSessionId);
+      if (incompletePhases.length > 0) {
+        console.log(chalk.cyan(`Resetting ${incompletePhases.length} incomplete phase(s)...\n`));
+        incompletePhases.forEach(phase => {
+          this.stateManager.db.prepare(
+            "UPDATE phases SET status = 'pending' WHERE id = ?"
+          ).run(phase.id);
+        });
+      }
+    } else if (!this.currentSessionId) {
       this.currentSessionId = this.createSession({ startPhase });
+      console.log(chalk.green(`✓ Created new session ${this.currentSessionId.substring(0, 8)}...\n`));
+
+      // Mark session as active
+      this.stateManager.db.prepare(
+        "UPDATE sessions SET status = 'active' WHERE id = ?"
+      ).run(this.currentSessionId);
     }
 
     // Execute phases

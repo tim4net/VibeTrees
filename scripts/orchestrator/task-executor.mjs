@@ -84,11 +84,34 @@ export class TaskExecutor {
     const results = [];
 
     for (const taskConfig of tasks) {
-      const taskId = this.stateManager.createTask(
-        phaseId,
+      // Check for existing task by idempotency key
+      const idempotencyKey = this.stateManager.generateIdempotencyKey(
+        phase.phase_number,
         taskConfig.taskNumber,
         taskConfig.description
       );
+
+      let existingTask = this.stateManager.findTaskByIdempotencyKey(idempotencyKey);
+
+      let taskId;
+      if (existingTask && existingTask.status === 'completed') {
+        // Task already completed, skip
+        console.log(chalk.yellow(`⏭  Skipping completed task: ${taskConfig.description}`));
+        results.push({ success: true, skipped: true });
+        continue;
+      } else if (existingTask) {
+        // Task exists but not completed, resume
+        taskId = existingTask.id;
+        console.log(chalk.cyan(`↻  Resuming task: ${taskConfig.description}`));
+      } else {
+        // Create new task
+        taskId = this.stateManager.createTask(
+          phaseId,
+          taskConfig.taskNumber,
+          taskConfig.description,
+          phase.phase_number
+        );
+      }
 
       const result = await this.executeTask(taskId, {
         prompt: taskConfig.prompt,
@@ -110,6 +133,16 @@ export class TaskExecutor {
           failedTask: taskConfig.taskNumber,
           results
         };
+      }
+
+      // Optional: Verify git changes after task
+      if (taskConfig.verifyChanges) {
+        const hasChanges = await this.verifyGitChanges();
+        if (!hasChanges) {
+          console.log(chalk.yellow(`⚠️  Warning: No git changes detected after task ${taskConfig.taskNumber}`));
+          console.log(chalk.yellow(`    Task: ${taskConfig.description}`));
+          // Don't fail the task, but warn the user
+        }
       }
 
       // Optional: Run tests after each task
@@ -136,6 +169,23 @@ export class TaskExecutor {
       results,
       sessionId: currentSessionId
     };
+  }
+
+  async verifyGitChanges() {
+    try {
+      const { execSync } = await import('child_process');
+
+      // Check for both staged and unstaged changes
+      const status = execSync('git status --porcelain', {
+        cwd: this.cli.workingDir,
+        encoding: 'utf8'
+      });
+
+      return status.trim().length > 0;
+    } catch (error) {
+      console.log(chalk.red(`Error checking git status: ${error.message}`));
+      return false;
+    }
   }
 
   async runTests() {
