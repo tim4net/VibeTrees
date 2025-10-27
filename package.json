@@ -11,7 +11,9 @@
     "web": "node scripts/worktree-web/server.mjs",
     "test": "vitest run scripts/worktree-manager.test.mjs",
     "test:watch": "vitest scripts/worktree-manager.test.mjs",
-    "test:coverage": "vitest run scripts/worktree-manager.test.mjs --coverage"
+    "test:coverage": "vitest run scripts/worktree-manager.test.mjs --coverage",
+    "orchestrator": "./scripts/start-orchestrator.sh",
+    "orchestrator:test": "cd scripts/orchestrator && npm test"
   },
   "keywords": [
     "git",
