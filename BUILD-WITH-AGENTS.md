@@ -32,6 +32,10 @@ The original `build-with-agents.sh` script (755 lines) **will not work** because
 3. **Git** configured with GitHub authentication
 4. **30-60 minutes per day** for check-ins
 
+⚠️ **Important:** If you're running the orchestrator from within Claude Code itself (like this session), it will detect the recursive situation and warn you. The orchestrator was designed to spawn separate Claude CLI instances, but when run inside Claude Code, it would create infinite recursion. Currently, it will start but needs modification to use the Task tool or MCP integration instead of spawning external processes.
+
+**Recommended:** Run the orchestrator from a regular terminal (not inside Claude Code) for the intended experience.
+
 ---
 
 ## Quick Start
