@@ -10,13 +10,14 @@ import fs from 'fs';
 import path from 'path';
 
 export class Orchestrator {
-  constructor({ workingDir, model, dbPath = '.orchestrator-state/state.db', dashboardPort = 3334, enableDashboard = true }) {
+  constructor({ workingDir, model, dbPath = '.orchestrator-state/state.db', dashboardPort = 3334, enableDashboard = true, skipApprovals = false }) {
     this.config = {
       workingDir,
       model,
       dbPath,
       dashboardPort,
-      enableDashboard
+      enableDashboard,
+      skipApprovals
     };
 
     // Ensure state directory exists
@@ -114,7 +115,7 @@ export class Orchestrator {
 
           this.dashboard?.broadcast?.('checkpoint_created', { checkpointId, checkpoint: phase.checkpoint });
 
-          if (phase.checkpoint.requiresApproval) {
+          if (phase.checkpoint.requiresApproval && !this.config.skipApprovals) {
             const approved = await this.waitForApproval(checkpointId, phase.checkpoint.message);
 
             if (!approved) {
@@ -124,6 +125,9 @@ export class Orchestrator {
               ).run(this.currentSessionId);
               return;
             }
+          } else if (this.config.skipApprovals) {
+            console.log(chalk.yellow('\n⚠️  Checkpoint skipped (--no-approval mode)\n'));
+            this.stateManager.approveCheckpoint(checkpointId);
           }
         }
       } else {
@@ -214,7 +218,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     dbPath: '.orchestrator-state/state.db',
     dashboardPort: 3334,
     enableDashboard: true,
-    startPhase: 1
+    startPhase: 1,
+    skipApprovals: false
   };
 
   // Parse CLI args
@@ -227,6 +232,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       i++;
     } else if (args[i] === '--no-dashboard') {
       config.enableDashboard = false;
+    } else if (args[i] === '--no-approval') {
+      config.skipApprovals = true;
     }
   }
 
