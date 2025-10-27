@@ -17,7 +17,9 @@ export class ClaudeCLI {
       const { stdout, stderr } = await execAsync(cmd, {
         cwd: this.workingDir,
         timeout: timeout || this.timeout,
-        maxBuffer: 10 * 1024 * 1024 // 10MB
+        maxBuffer: 10 * 1024 * 1024, // 10MB
+        shell: '/bin/bash',
+        stdio: ['ignore', 'pipe', 'pipe'] // Close stdin, pipe stdout/stderr
       });
 
       const output = stdout + stderr;
