@@ -109,20 +109,23 @@ export class ClaudeCLI {
 
   async testConnection() {
     try {
-      // Test with a simple command
+      // Test with a simple command - use longer timeout for npx first-run
       const result = await this.execute({
         prompt: 'Respond with just: OK',
         model: 'claude-sonnet-4.5',
-        timeout: 10000
+        timeout: 30000 // 30 seconds for npx download
       });
 
-      if (result.success && result.output.includes('OK')) {
-        console.log('⚠️  Note: Using Claude Code via npx');
+      if (result.success) {
         return true;
       }
 
-      return result.success;
+      // Log error for debugging
+      console.error('Connection test failed:', result.error);
+      console.error('Output:', result.output?.substring(0, 200));
+      return false;
     } catch (error) {
+      console.error('Connection test exception:', error.message);
       return false;
     }
   }
