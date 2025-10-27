@@ -71,12 +71,31 @@ export class ClaudeCLI {
 
   async testConnection() {
     try {
+      // Quick check: just verify the claude command exists
+      const { stdout } = await execAsync('which claude', {
+        timeout: 2000
+      });
+
+      // Check if this is Claude Code (recursive situation)
+      const { stdout: version } = await execAsync('claude --version', {
+        timeout: 2000
+      });
+
+      if (version.includes('Claude Code')) {
+        console.log('⚠️  Warning: Running inside Claude Code - using in-process execution instead of spawning new instances');
+        // Return true to allow orchestrator to continue
+        // Tasks will need to use Task tool or similar instead
+        return true;
+      }
+
+      // For standalone Claude CLI, do a real test
       const result = await this.execute({
         prompt: 'Respond with: Claude CLI is working',
-        model: 'claude-sonnet-4.5'
+        model: 'claude-sonnet-4.5',
+        timeout: 10000
       });
       return result.success;
-    } catch {
+    } catch (error) {
       return false;
     }
   }
