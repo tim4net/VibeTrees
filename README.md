@@ -1,236 +1,220 @@
 # VibeTrees
 
-**Work on multiple features at the same time. Each with its own AI assistant and isolated services.**
+**Stop switching branches. Start switching contexts.**
 
-No more switching branches. No more port conflicts. No more "stashing" work.
+Work on multiple features simultaneously—each with its own AI assistant, isolated Docker services, and persistent terminals. No more port conflicts, no more stashing work, no more losing your place.
+
+---
+
+## Why VibeTrees?
+
+Ever had to:
+- Pause work on a feature to fix an urgent bug?
+- Switch branches and lose your terminal history?
+- Fight Docker port conflicts between branches?
+- Juggle multiple feature branches in your head?
+
+**VibeTrees solves all of this.** Each git worktree gets:
+- ✅ Its own AI agent (Claude Code, Codex, or Gemini)
+- ✅ Isolated Docker ports (auto-assigned, no conflicts)
+- ✅ Persistent terminal sessions (survive browser refresh)
+- ✅ Independent services (databases, APIs, etc.)
+
+Switch between worktrees with one click. Work on 5 features in parallel. Your context stays intact.
 
 ---
 
 ## Quick Start
 
-### 1. Install
+### Option 1: Try with npx (No Install!)
 
 ```bash
-git clone https://github.com/tim4net/VibeTrees.git
-cd VibeTrees
-npm install
-npm link
+cd ~/your-project
+npx github:tim4net/VibeTrees
 ```
 
-### 2. Launch
+Opens at **http://localhost:3335**
+
+### Option 2: Global Install (Recommended)
 
 ```bash
+npm install -g github:tim4net/VibeTrees
 cd ~/your-project
 vibe
 ```
 
-### 3. Open Browser
+### Option 3: Clone for Development
 
-Open **http://localhost:3335**
-
-That's it! 🎉
+```bash
+git clone https://github.com/tim4net/VibeTrees.git
+cd VibeTrees
+npm install && npm link
+cd ~/your-project
+vibe
+```
 
 ---
 
 ## What You Get
 
-- **Multiple worktrees** - Work on `feature-a` and `bugfix-b` simultaneously
-- **AI assistants** - Claude Code, Codex, or Gemini in each worktree
-- **Isolated services** - Each worktree gets unique ports (no conflicts!)
-- **Browser terminals** - Full terminal access in your browser
-- **Persistent sessions** - Terminal history survives browser refresh
+| Feature | What It Does |
+|---------|--------------|
+| **Multi-Worktree** | Work on `feature-a`, `bugfix-b`, and `main` simultaneously |
+| **AI Agents** | Claude Code, Codex, or Gemini running in each worktree's terminal |
+| **Port Isolation** | Auto-assigned unique ports per worktree (3000 → 3001 → 3002...) |
+| **Terminal Persistence** | Close browser, come back later—history is still there |
+| **Branch Selector** | Browse and search all git branches (local + remote) |
+| **Service Management** | Docker Compose per worktree with one-click start/stop |
+| **Diagnostics** | 10 health checks with auto-fix for common issues |
+| **Network Mode** | Share with your team on LAN with `--listen` |
 
 ---
 
-## Usage
+## Features
+
+### Terminal Persistence
+Your terminal sessions survive browser crashes. Even system reboots. State is saved every 5 seconds.
+
+### Smart Port Management
+VibeTrees automatically assigns unique ports to each worktree's services. No more `EADDRINUSE` errors.
+
+```
+main:           API=3000 DB=5432 Console=3001
+feature-auth:   API=3002 DB=5433 Console=3003
+bugfix-login:   API=3004 DB=5434 Console=3005
+```
+
+### Multi-Agent Support
+Choose your AI assistant per worktree:
+- **Claude Code** - Best for complex refactoring and architecture
+- **Codex** - Fast code generation with OpenAI
+- **Gemini** - Google's multimodal AI
+- **Shell** - Just a terminal, no AI
+
+### Branch Management
+- Create worktrees from new or existing branches
+- Import worktrees created outside VibeTrees
+- Safe branch deletion with merge detection
+- Sync with remote and auto-reload services
+
+### Network Sharing
+```bash
+vibe --listen  # Share with team on your network
+```
+
+Shows all IPs to connect from:
+```
+🌐 http://192.168.1.100:3335  (en0)
+🌐 http://172.16.0.1:3335     (en1)
+```
+
+macOS firewall configuration handled automatically (or guided manual setup).
+
+---
+
+## Usage Examples
 
 ### Start VibeTrees
-
 ```bash
-# Local only (default)
+# Local only (default, secure)
 vibe
 
-# Allow network access (share with team)
+# Network mode (team collaboration)
 vibe --listen
+
+# Custom port
+vibe --port 8080
 ```
 
-When using `--listen`, you'll see:
-```
-🚀 Worktree Manager is running!
+### Create Worktree
+1. Click "Create Worktree"
+2. Enter branch: `feature/user-auth`
+3. Select agent: Claude Code
+4. Click "Create"
 
-   📡 Network Mode: Listening on ALL interfaces (--listen)
+Done! Claude Code is running in an isolated environment with unique ports.
 
-   Connect from any device on your network:
+### Import Existing Worktree
+Already created a worktree with `git worktree add`?
 
-      🌐 http://192.168.1.100:3335  (en0)
-      🌐 http://172.16.0.1:3335     (en1)
-```
+1. Click "Import"
+2. Select your worktrees
+3. VibeTrees detects containers and assigns ports
 
-**Note**: On macOS, the first time you use `--listen` you may need to configure your firewall. VibeTrees will guide you through this automatically. See [Network Access Guide](docs/network-access.md) for details.
-
-### Create a Worktree
-
-1. Click **"Create Worktree"**
-2. Enter branch name: `feature/my-feature`
-3. Choose AI agent: Claude, Codex, Gemini, or Shell
-4. Click **"Create"**
-
-Done! Your worktree is ready with:
-- Isolated git branch
-- Unique Docker ports
-- AI agent in terminal
-- Services starting
-
-### Browse Existing Branches
-
-1. Click **"Create Worktree"**
-2. Switch to **"Existing Branch"** tab
-3. Search and select a branch
-4. Click **"Create"**
-
-### Import Existing Worktrees
-
-Have worktrees created outside VibeTrees?
-
-1. Click **"Import"** button
-2. Select worktrees to import
-3. Click **"Import"**
-
-VibeTrees automatically:
-- Detects running containers
-- Allocates ports
-- Registers worktrees
-
-### Close a Worktree
-
-1. Right-click worktree in sidebar
-2. Click **"Close Worktree"**
-3. Choose if you want to delete the branch too
-4. Confirm
-
-### Run Diagnostics
-
-Having issues?
-
-1. Right-click worktree
-2. Click **"Run Diagnostics"**
-3. Click **"Auto-Fix"** for fixable issues
-
-Or check system health:
-1. Click **"Diagnostics"** button in header
-2. View system-wide health
-3. Fix issues with one click
+### Close Worktree
+Right-click worktree → "Close Worktree" → Optionally delete branch
 
 ---
 
-## Update
+## Requirements
 
-### Option 1: Update Script (Easiest)
+- **Node.js** 18+ (20+ recommended)
+- **Git** 2.35+ (worktree support)
+- **Docker** or **Podman** (for service isolation)
+- **Optional**: Claude Code CLI, Codex CLI, or Gemini CLI for AI features
+
+---
+
+## Update to Latest
 
 ```bash
 cd VibeTrees
 ./update.sh
 ```
 
-### Option 2: Manual
-
+Or manually:
 ```bash
-cd VibeTrees
-git pull origin main
-npm install
+git pull origin main && npm install
+```
+
+Or with npx (always latest):
+```bash
+npx github:tim4net/VibeTrees@latest
 ```
 
 ---
 
-## Advanced Usage
+## Documentation
 
-### Custom Port
-
-```bash
-vibe --port 8080
-```
-
-### Help
-
-```bash
-vibe --help
-```
-
-### Version
-
-```bash
-vibe --version
-```
-
----
-
-## Requirements
-
-- **Node.js** 18+
-- **Git** 2.35+
-- **Docker** or **Podman**
-- **Optional**: Claude Code CLI, Codex CLI, or Gemini CLI for AI features
-
----
-
-## Features
-
-✅ **Terminal Persistence** - Sessions survive browser refresh
-✅ **Auto-Reconnection** - Recovers from network issues automatically
-✅ **Branch Selector** - Browse and search all branches
-✅ **Safe Branch Cleanup** - Delete branches with merge detection
-✅ **Import Worktrees** - Add existing worktrees seamlessly
-✅ **System Diagnostics** - 10 health checks with auto-fix
-✅ **Port Management** - No more port conflicts
-✅ **Multi-Agent Support** - Claude, Codex, Gemini, or custom agents
+- **[User Guide](USER-GUIDE.md)** - Complete manual with all features
+- **[Quick Start](QUICK-START.md)** - Detailed installation walkthrough
+- **[NPX Usage](NPX-USAGE.md)** - Using without installation
+- **[Network Access](docs/network-access.md)** - Firewall and security guide
+- **[Terminal Persistence](docs/terminal-persistence.md)** - How sessions work
 
 ---
 
 ## Troubleshooting
 
-**Port already in use?**
+**Port in use?**
 ```bash
 vibe --port 3336
 ```
 
 **Docker not running?**
 ```bash
-docker ps  # Check Docker is running
+docker ps
 ```
 
-**Can't run `vibe` command?**
-```bash
-# Re-link the package
-cd VibeTrees
-npm link
-```
+**Can't access from network?**
 
-**Need help?**
-- Check [QUICK-START.md](QUICK-START.md) for detailed guide
-- Check [TERMINAL-PERSISTENCE-TEST-PLAN.md](TERMINAL-PERSISTENCE-TEST-PLAN.md) for testing
-- Report issues: https://github.com/tim4net/VibeTrees/issues
+See [Network Access Guide](docs/network-access.md) for firewall setup.
 
----
+**More help?**
 
-## Documentation
-
-- [Quick Start Guide](QUICK-START.md) - Detailed installation and usage
-- [NPX Usage](NPX-USAGE.md) - Using with npx (no install needed)
-- [Phase Completion Status](PHASE-COMPLETION-STATUS.md) - Development progress
-- [Terminal Persistence](TERMINAL-PERSISTENCE-SUCCESS.md) - How terminals work
-- [Frontend Features](FRONTEND-IMPLEMENTATION-COMPLETE.md) - UI capabilities
+Check the [User Guide](USER-GUIDE.md) or [open an issue](https://github.com/tim4net/VibeTrees/issues).
 
 ---
 
 ## Contributing
 
-VibeTrees is actively developed. Pull requests welcome!
+Pull requests welcome! VibeTrees is actively developed.
 
-1. Fork the repository
-2. Create your feature branch
-3. Make your changes
-4. Test with `npm test`
-5. Submit a pull request
+1. Fork the repo
+2. Create feature branch
+3. Make changes
+4. Run `npm test` (468 tests must pass)
+5. Submit PR
 
 ---
 
