@@ -47,6 +47,44 @@ button.small {
   font-size: 11px;
 }
 
+/* Sync Button with Update Indicator */
+#sync-button.has-updates {
+  background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%);
+  border-color: #1f6feb;
+  box-shadow: 0 2px 8px rgba(31, 111, 235, 0.3);
+  position: relative;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+#sync-button.has-updates:hover {
+  background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+  box-shadow: 0 4px 12px rgba(31, 111, 235, 0.4);
+  transform: translateY(-1px);
+}
+
+#sync-button.has-updates::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: #f85149;
+  border-radius: 50%;
+  border: 2px solid #0d1117;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 2px 8px rgba(31, 111, 235, 0.3); }
+  50% { box-shadow: 0 2px 12px rgba(31, 111, 235, 0.5); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+
 /* New Tab Buttons */
 .new-tab-buttons {
   display: flex;

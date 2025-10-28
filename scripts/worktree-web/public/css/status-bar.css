@@ -1,0 +1,241 @@
+/**
+ * Status Bar Component
+ * Bottom-fixed status bar with responsive segments
+ */
+
+.status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: linear-gradient(180deg, #161b22 0%, #0d1117 100%);
+  border-top: 1px solid #30363d;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  font-size: 12px;
+  color: #8b949e;
+  z-index: 100;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+}
+
+.status-bar.hidden {
+  display: none;
+}
+
+/* Segments */
+.status-segment {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.status-segment.clickable {
+  cursor: pointer;
+}
+
+.status-segment.clickable:hover {
+  background: rgba(56, 139, 253, 0.1);
+  color: #58a6ff;
+}
+
+/* Icons */
+.status-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+/* Divider */
+.status-divider {
+  color: #30363d;
+  opacity: 0.5;
+  user-select: none;
+}
+
+/* Color states */
+.status-segment.clean {
+  color: #2ea043;
+}
+
+.status-segment.modified {
+  color: #e5a935;
+}
+
+.status-segment.ahead {
+  color: #2ea043;
+}
+
+.status-segment.behind {
+  color: #e5a935;
+}
+
+.status-segment.ahead-behind {
+  color: #f78166;
+}
+
+.status-segment.docker.running {
+  color: #2ea043;
+}
+
+.status-segment.docker.partial {
+  color: #e5a935;
+}
+
+.status-segment.docker.stopped {
+  color: #f85149;
+}
+
+.status-segment.docker.none {
+  color: #6e7681;
+}
+
+/* Count badges */
+.ahead-count,
+.behind-count,
+.change-count,
+.service-count {
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* Responsive text visibility - Narrow (< 1000px) */
+@media (max-width: 999px) {
+  .status-segment .text-full {
+    display: none;
+  }
+  .status-segment .text-short {
+    display: none;
+  }
+  .status-segment .text-minimal {
+    display: inline;
+  }
+
+  .status-bar {
+    gap: 8px;
+    padding: 0 12px;
+  }
+}
+
+/* Responsive text visibility - Medium (1000px - 1399px) */
+@media (min-width: 1000px) and (max-width: 1399px) {
+  .status-segment .text-full {
+    display: none;
+  }
+  .status-segment .text-short {
+    display: inline;
+  }
+  .status-segment .text-minimal {
+    display: none;
+  }
+}
+
+/* Responsive text visibility - Wide (>= 1400px) */
+@media (min-width: 1400px) {
+  .status-segment .text-full {
+    display: inline;
+  }
+  .status-segment .text-short {
+    display: none;
+  }
+  .status-segment .text-minimal {
+    display: none;
+  }
+}
+
+/* Adjust main content to avoid overlap with status bar */
+.app-container {
+  padding-bottom: 28px;
+}
+
+/* Tooltip enhancement */
+.status-segment[title] {
+  position: relative;
+}
+
+/* Loading state */
+.status-segment.loading {
+  opacity: 0.5;
+  animation: pulse-fade 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-fade {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Empty state when no worktree selected */
+.status-segment.empty {
+  color: #6e7681;
+  font-style: italic;
+}
+
+/* Branch name truncation for narrow screens */
+.branch-name-full {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch-name-short {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch-name-minimal {
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sync arrow spacing */
+.status-segment.ahead-behind .status-icon {
+  margin: 0 2px;
+}
+
+/* Docker icon specific styling */
+.status-segment.docker .status-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+/* Accessibility - Focus states */
+.status-segment.clickable:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .status-bar {
+    border-top-width: 2px;
+  }
+
+  .status-divider {
+    opacity: 1;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .status-segment,
+  .status-segment.loading {
+    transition: none;
+    animation: none;
+  }
+}

@@ -46,6 +46,7 @@
         <div class="sidebar-actions">
           <button id="collapse-sidebar-btn" title="Collapse sidebar"><i id="collapse-icon" data-lucide="panel-left-close" class="lucide-sm"></i></button>
           <button onclick="refreshWorktrees()" title="Refresh"><i data-lucide="rotate-cw" class="lucide-sm"></i></button>
+          <button onclick="window.diagnosticsModule?.showDiagnosticsModal()" title="Run system diagnostics"><i data-lucide="stethoscope" class="lucide-sm"></i></button>
           <button onclick="window.importWorktreeModule?.showImportModal()" title="Import existing worktree"><i data-lucide="download" class="lucide-sm"></i></button>
           <button class="primary" onclick="showCreateModal()" title="Create new worktree"><i data-lucide="sprout" class="lucide-sm"></i></button>
         </div>
@@ -78,8 +79,8 @@
           <button class="small" onclick="openLogsForSelected()" title="Open Combined Logs">
             <i data-lucide="scroll-text" class="lucide-sm"></i> Logs
           </button>
-          <button class="small" id="update-button" onclick="handleUpdateButtonClick(event)" oncontextmenu="handleUpdateButtonContextMenu(event); return false;" title="Check for updates (Right-click to change AI agent)" style="display: none;">
-            <i data-lucide="arrow-down-to-line" class="lucide-sm"></i> Update
+          <button class="small" id="sync-button" onclick="handleSyncButtonClick(event)" title="Sync worktree with remote" style="display: none;">
+            <i data-lucide="git-pull-request-arrow" class="lucide-sm"></i> Sync
           </button>
         </div>
         <div class="terminal-tabs" id="terminal-tabs">

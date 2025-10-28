@@ -42,9 +42,9 @@ export function initSyncUI() {
 function updateButtonForSelectedWorktree(worktreeName) {
   if (!worktreeName) {
     // Hide button if no worktree selected
-    const updateButton = document.getElementById('update-button');
-    if (updateButton) {
-      updateButton.style.display = 'none';
+    const syncButton = document.getElementById('sync-button');
+    if (syncButton) {
+      syncButton.style.display = 'none';
     }
     return;
   }
@@ -131,7 +131,7 @@ async function checkWorktreeForUpdates(worktreeName) {
 }
 
 /**
- * Update the update button in the toolbar
+ * Update the sync button in the sidebar
  */
 function updateWorktreeUpdateBadge(worktreeName, updateData) {
   // Only update button for currently selected worktree
@@ -140,32 +140,29 @@ function updateWorktreeUpdateBadge(worktreeName, updateData) {
     return;
   }
 
-  const updateButton = document.getElementById('update-button');
-  if (!updateButton) return;
+  const syncButton = document.getElementById('sync-button');
+  if (!syncButton) return;
 
   if (updateData.hasUpdates && updateData.commitCount > 0) {
-    // Show button with badge
-    updateButton.style.display = 'inline-flex';
-    updateButton.innerHTML = `
-      <i data-lucide="arrow-down-to-line" class="lucide-sm"></i>
-      Update <span class="update-count-badge">${updateData.commitCount}</span>
-    `;
-    updateButton.setAttribute('data-worktree', worktreeName);
-    updateButton.classList.add('has-updates');
+    // Show button with badge indicator
+    syncButton.style.display = 'inline-flex';
+    syncButton.setAttribute('data-worktree', worktreeName);
+    syncButton.classList.add('has-updates');
+    syncButton.title = `Sync worktree with remote (${updateData.commitCount} commit${updateData.commitCount !== 1 ? 's' : ''})`;
 
     // Re-initialize lucide icons
     if (window.lucide) window.lucide.createIcons();
   } else {
     // Hide button when no updates
-    updateButton.style.display = 'none';
-    updateButton.classList.remove('has-updates');
+    syncButton.style.display = 'none';
+    syncButton.classList.remove('has-updates');
   }
 }
 
 /**
- * Handle update button click - show sync dialog for selected worktree
+ * Handle sync button click - show sync dialog for selected worktree
  */
-window.handleUpdateButtonClick = function(event) {
+window.handleSyncButtonClick = function(event) {
   event.preventDefault();
   event.stopPropagation();
 
@@ -173,23 +170,6 @@ window.handleUpdateButtonClick = function(event) {
   if (selectedWorktree) {
     window.syncUI?.showSyncDialog(selectedWorktree);
   }
-};
-
-/**
- * Handle update button right-click - show agent selector
- */
-window.handleUpdateButtonContextMenu = function(event) {
-  event.preventDefault();
-  event.stopPropagation();
-
-  const selectedWorktree = window.appState?.selectedWorktreeId;
-  if (!selectedWorktree) return;
-
-  const worktrees = window.appState?.getWorktrees?.() || [];
-  const worktree = worktrees.find(w => w.name === selectedWorktree);
-  const currentAgent = worktree?.agent || 'claude';
-
-  window.showAgentSwitcher?.(selectedWorktree, currentAgent);
 };
 
 /**

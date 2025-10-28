@@ -381,6 +381,150 @@ class WorktreeManager {
     return statuses;
   }
 
+  /**
+   * Get ahead/behind counts relative to main branch
+   */
+  getAheadBehind(worktreePath, branchName) {
+    try {
+      // Skip if this is the main branch
+      if (branchName === 'main') {
+        return { ahead: 0, behind: 0 };
+      }
+
+      // Fetch latest from origin to ensure accurate comparison
+      try {
+        execSync('git fetch origin main', {
+          cwd: worktreePath,
+          stdio: 'pipe'
+        });
+      } catch {
+        // Ignore fetch errors
+      }
+
+      // Get ahead count (commits in current branch not in main)
+      const aheadOutput = execSync('git rev-list --count HEAD ^origin/main', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+      const ahead = parseInt(aheadOutput, 10) || 0;
+
+      // Get behind count (commits in main not in current branch)
+      const behindOutput = execSync('git rev-list --count origin/main ^HEAD', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+      const behind = parseInt(behindOutput, 10) || 0;
+
+      return { ahead, behind };
+    } catch (error) {
+      console.warn(`[getAheadBehind] Error for ${branchName}:`, error.message);
+      return { ahead: 0, behind: 0 };
+    }
+  }
+
+  /**
+   * Get file change counts (modified and untracked)
+   */
+  getFileChanges(worktreePath) {
+    try {
+      const statusOutput = execSync('git status --porcelain', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+
+      if (!statusOutput) {
+        return { modifiedFiles: 0, untrackedFiles: 0 };
+      }
+
+      const lines = statusOutput.split('\n');
+      let modifiedFiles = 0;
+      let untrackedFiles = 0;
+
+      for (const line of lines) {
+        const status = line.substring(0, 2);
+
+        // Modified files: M, A, D, R, C, U (in either column)
+        if (status[0] !== '?' && status[0] !== ' ' && status[0] !== '!') {
+          modifiedFiles++;
+        } else if (status[1] !== ' ' && status[1] !== '?' && status[1] !== '!') {
+          modifiedFiles++;
+        }
+
+        // Untracked files: ??
+        if (status === '??') {
+          untrackedFiles++;
+        }
+      }
+
+      return { modifiedFiles, untrackedFiles };
+    } catch (error) {
+      console.warn(`[getFileChanges] Error:`, error.message);
+      return { modifiedFiles: 0, untrackedFiles: 0 };
+    }
+  }
+
+  /**
+   * Get last commit information
+   */
+  getLastCommit(worktreePath) {
+    try {
+      // Get commit hash
+      const hash = execSync('git rev-parse --short HEAD', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+
+      // Get commit message (first line only)
+      const message = execSync('git log -1 --pretty=format:%s', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+
+      // Get author name
+      const author = execSync('git log -1 --pretty=format:%an', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+
+      // Get timestamp (ISO format)
+      const timestamp = execSync('git log -1 --pretty=format:%cI', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+
+      // Get relative time (e.g., "2 hours ago")
+      const relativeTime = execSync('git log -1 --pretty=format:%cr', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+
+      return {
+        hash,
+        message,
+        author,
+        timestamp,
+        relativeTime
+      };
+    } catch (error) {
+      console.warn(`[getLastCommit] Error:`, error.message);
+      return {
+        hash: '',
+        message: '',
+        author: '',
+        timestamp: '',
+        relativeTime: ''
+      };
+    }
+  }
+
   getGitStatus(worktreePath) {
     try {
       // Check for uncommitted changes
