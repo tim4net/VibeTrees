@@ -551,3 +551,74 @@ input:focus {
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* Database Operations Styles */
+.db-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
+.db-section:last-child {
+  margin-bottom: 0;
+}
+
+.db-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #c9d1d9;
+  font-size: 16px;
+}
+
+.db-section .form-group {
+  margin-bottom: 15px;
+}
+
+.db-section label {
+  display: block;
+  margin-bottom: 6px;
+  color: #8b949e;
+  font-size: 13px;
+}
+
+.db-section select,
+.db-section input[type="file"] {
+  width: 100%;
+  padding: 8px 12px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-size: 14px;
+}
+
+.db-section input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.db-section button {
+  margin-top: 10px;
+}
+
+.progress-container {
+  margin-top: 15px;
+  padding: 15px;
+  background: #161b22;
+  border-radius: 6px;
+}
+
+.progress-container progress {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.progress-container span {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+  color: #8b949e;
+  font-size: 12px;
+}
