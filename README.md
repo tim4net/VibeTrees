@@ -62,11 +62,11 @@ When using `--listen`, you'll see:
 
    Connect from any device on your network:
 
-      http://192.168.1.100:3335  (en0)
-      http://172.16.0.1:3335     (en1)
-
-   💡 Tip: Share any of these URLs with teammates!
+      🌐 http://192.168.1.100:3335  (en0)
+      🌐 http://172.16.0.1:3335     (en1)
 ```
+
+**Note**: On macOS, the first time you use `--listen` you may need to configure your firewall. VibeTrees will guide you through this automatically. See [Network Access Guide](docs/network-access.md) for details.
 
 ### Create a Worktree
 

@@ -60,7 +60,7 @@ export class FirewallHelper {
 
     try {
       console.log('\n   🔓 Configuring macOS firewall for network access...');
-      console.log('   ℹ️  This requires administrator privileges (sudo)');
+      console.log('   ℹ️  This requires administrator privileges (sudo)\n');
 
       // Get the path to node
       const nodePath = execSync('which node', { encoding: 'utf-8' }).trim();
@@ -77,11 +77,29 @@ export class FirewallHelper {
         { stdio: 'inherit' }
       );
 
-      console.log('   ✅ Firewall configured successfully!\n');
+      console.log('\n   ✅ Firewall configured successfully!\n');
       return true;
     } catch (error) {
-      console.log('   ⚠️  Could not configure firewall automatically');
-      console.log('   ℹ️  You may need to allow connections manually in System Preferences');
+      // Check if this is a managed Mac
+      const errorMessage = error.stderr?.toString() || error.message || '';
+      if (errorMessage.includes('managed') || errorMessage.includes('cannot be modified from command line')) {
+        console.log('\n   ⚠️  This Mac is managed by your organization');
+        console.log('   ℹ️  Firewall settings must be configured manually:\n');
+
+        const nodePath = execSync('which node', { encoding: 'utf-8' }).trim();
+        console.log('   1. Open System Preferences → Security & Privacy');
+        console.log('   2. Click the "Firewall" tab');
+        console.log('   3. Click the lock icon 🔒 and authenticate');
+        console.log('   4. Click "Firewall Options..."');
+        console.log('   5. Click the "+" button to add an application');
+        console.log(`   6. Navigate to: ${nodePath}`);
+        console.log('   7. Select "Allow incoming connections"');
+        console.log('   8. Click "OK"\n');
+        console.log('   💡 If you cannot modify firewall settings, contact your IT department\n');
+      } else {
+        console.log('\n   ⚠️  Could not configure firewall automatically');
+        console.log('   ℹ️  You may need to allow connections manually in System Preferences\n');
+      }
       return false;
     }
   }
@@ -92,11 +110,16 @@ export class FirewallHelper {
    */
   suggestManualConfig(port) {
     if (this.platform === 'darwin') {
-      console.log('\n   📝 Manual Firewall Configuration:');
-      console.log('   1. Open System Preferences → Security & Privacy → Firewall');
-      console.log('   2. Click "Firewall Options"');
-      console.log('   3. Click "+" and add "node" from /usr/local/bin/node');
-      console.log('   4. Set to "Allow incoming connections"\n');
+      const nodePath = execSync('which node', { encoding: 'utf-8' }).trim();
+      console.log('\n   📝 Manual Firewall Configuration (macOS):');
+      console.log('   1. Open System Preferences → Security & Privacy');
+      console.log('   2. Click the "Firewall" tab');
+      console.log('   3. Click the lock icon 🔒 and authenticate');
+      console.log('   4. Click "Firewall Options..."');
+      console.log('   5. Click the "+" button to add an application');
+      console.log(`   6. Navigate to: ${nodePath}`);
+      console.log('   7. Select "Allow incoming connections"');
+      console.log('   8. Click "OK"\n');
     } else if (this.platform === 'linux') {
       console.log('\n   📝 Manual Firewall Configuration (Linux):');
       console.log(`   sudo ufw allow ${port}/tcp`);
