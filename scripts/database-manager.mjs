@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import pg from 'pg';
 
 export class DatabaseManager {
   constructor(config) {
@@ -96,6 +97,42 @@ export class DatabaseManager {
         success: false,
         error: error.message
       };
+    }
+  }
+
+  /**
+   * Import SQL file with transaction safety
+   * @param {string} inputPath - Input SQL file path
+   * @returns {Promise<object>} Result with success status
+   */
+  async importWithTransaction(inputPath) {
+    const client = new pg.Client(this.config);
+
+    try {
+      await client.connect();
+      await client.query('BEGIN');
+
+      // Execute import (directly with execSync so errors propagate)
+      const command = `psql ${this.connectionString} -f ${inputPath}`;
+      execSync(command, { encoding: 'utf-8' });
+
+      await client.query('COMMIT');
+
+      return {
+        success: true,
+        path: inputPath,
+        rollback: false
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+
+      return {
+        success: false,
+        error: error.message,
+        rollback: true
+      };
+    } finally {
+      await client.end();
     }
   }
 }
