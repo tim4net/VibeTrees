@@ -14,6 +14,7 @@ import { createServer as createNetServer } from 'net';
 import { Profiler } from '../profiler.mjs';
 import { PerformanceOptimizer } from '../performance-optimizer.mjs';
 import { CacheManager } from '../cache-manager.mjs';
+import { FirewallHelper } from '../firewall-helper.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Use current working directory as project root (supports multiple instances)
@@ -2774,6 +2775,11 @@ async function startServer() {
 
       if (HOST === '0.0.0.0') {
         console.log(`   📡 Network Mode: Listening on ALL interfaces (--listen)\n`);
+
+        // Setup firewall for network mode
+        const firewall = new FirewallHelper();
+        await firewall.setupForNetworkMode(PORT);
+
         console.log(`   Connect from any device on your network:\n`);
 
         const addresses = getNetworkAddresses();
