@@ -9,6 +9,7 @@ import { initSidebar, renderWorktrees } from './sidebar.js';
 import { initContextMenus } from './context-menus.js';
 import { initTabFiltering } from './tabs.js';
 import { initTerminals } from './terminals.js';
+import { initPerformanceMetrics } from './performance-metrics.js';
 import './modals.js'; // Import for side effects (global exports)
 import './context-menu-actions.js'; // Import for side effects (global exports)
 import './service-actions.js'; // Import for side effects (global exports)
@@ -44,6 +45,7 @@ function initApp() {
   initSidebar();
   initTabFiltering();
   initTerminals();
+  initPerformanceMetrics();
 
   console.log('[main] All modules initialized');
 
