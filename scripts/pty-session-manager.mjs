@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import pty from 'node-pty';
 
 export class PTYSessionManager {
   constructor() {
@@ -72,6 +73,35 @@ export class PTYSessionManager {
       session.connected = false;
       session.disconnectedAt = new Date();
     }
+  }
+
+  /**
+   * Spawn PTY process for session
+   * @param {string} sessionId - Session ID
+   * @param {object} options - PTY spawn options
+   * @param {string} options.command - Command to run
+   * @param {string[]} options.args - Command arguments
+   * @param {number} options.cols - Terminal columns
+   * @param {number} options.rows - Terminal rows
+   */
+  spawnPTY(sessionId, options) {
+    const session = this._sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    const shell = process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || 'bash';
+
+    const ptyProcess = pty.spawn(options.command || shell, options.args || [], {
+      name: 'xterm-256color',
+      cols: options.cols || 80,
+      rows: options.rows || 24,
+      cwd: session.cwd,
+      env: process.env
+    });
+
+    session.pty = ptyProcess;
+    return ptyProcess;
   }
 
   /**
