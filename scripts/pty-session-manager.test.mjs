@@ -181,4 +181,41 @@ describe('PTYSessionManager', () => {
       expect(state).toBeNull();
     });
   });
+
+  describe('Orphaned Session Cleanup', () => {
+    it('should mark sessions for cleanup after 24 hours disconnected', () => {
+      vi.useFakeTimers();
+      const baseTime = new Date('2025-01-01T00:00:00Z');
+      vi.setSystemTime(baseTime);
+
+      const manager = new PTYSessionManager({ orphanTimeout: 24 * 60 * 60 * 1000 });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      manager.spawnPTY(sessionId, { command: 'bash', args: [], cols: 80, rows: 24 });
+      manager.attachClient(sessionId, 'ws-1');
+      manager.detachClient(sessionId);
+
+      // Fast-forward 24 hours + 1 second to ensure we exceed the threshold
+      const timeAdvance = 24 * 60 * 60 * 1000 + 1000;
+      vi.advanceTimersByTime(timeAdvance);
+      vi.setSystemTime(new Date(baseTime.getTime() + timeAdvance));
+
+      const orphans = manager.getOrphanedSessions();
+      expect(orphans).toContain(sessionId);
+
+      vi.useRealTimers();
+    });
+
+    it('should not mark recently disconnected sessions as orphaned', () => {
+      const manager = new PTYSessionManager({ orphanTimeout: 24 * 60 * 60 * 1000 });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      manager.spawnPTY(sessionId, { command: 'bash', args: [], cols: 80, rows: 24 });
+      manager.attachClient(sessionId, 'ws-1');
+      manager.detachClient(sessionId);
+
+      const orphans = manager.getOrphanedSessions();
+      expect(orphans).not.toContain(sessionId);
+    });
+  });
 });

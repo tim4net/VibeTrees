@@ -7,6 +7,12 @@ export class PTYSessionManager {
     this._sessions = new Map();
     this.serializer = options.serializer || new PTYStateSerializer();
     this.autoSaveInterval = options.autoSaveInterval || 5000; // 5 seconds default
+    this.orphanTimeout = options.orphanTimeout || 24 * 60 * 60 * 1000; // 24 hours
+
+    // Start cleanup check every hour
+    this._cleanupTimer = setInterval(() => {
+      this._cleanupOrphanedSessions();
+    }, 60 * 60 * 1000);
   }
 
   /**
@@ -142,6 +148,26 @@ export class PTYSessionManager {
   }
 
   /**
+   * Get list of orphaned session IDs
+   * @returns {string[]} Orphaned session IDs
+   */
+  getOrphanedSessions() {
+    const now = Date.now();
+    const orphans = [];
+
+    for (const [sessionId, session] of this._sessions) {
+      if (!session.connected && session.disconnectedAt) {
+        const disconnectedDuration = now - session.disconnectedAt.getTime();
+        if (disconnectedDuration > this.orphanTimeout) {
+          orphans.push(sessionId);
+        }
+      }
+    }
+
+    return orphans;
+  }
+
+  /**
    * Auto-save session state (private)
    * @param {string} sessionId - Session ID
    */
@@ -151,5 +177,16 @@ export class PTYSessionManager {
       const state = this.serializer.captureState(sessionId, session.pty);
       await this.serializer.saveState(state);
     }
+  }
+
+  /**
+   * Clean up orphaned sessions (private)
+   */
+  _cleanupOrphanedSessions() {
+    const orphans = this.getOrphanedSessions();
+    orphans.forEach(sessionId => {
+      console.log(`Cleaning up orphaned session: ${sessionId}`);
+      this.destroySession(sessionId);
+    });
   }
 }
