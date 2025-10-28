@@ -508,43 +508,23 @@ window.showServicesModal = function() {
     return;
   }
 
-  const services = worktree.dockerStatus || [];
+  const services = worktree.services || [];
 
   if (services.length === 0) {
     showToast('No Docker services configured', 'info');
     return;
   }
 
-  // Show the worktree card which has service controls
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar && !sidebar.classList.contains('collapsed')) {
-    const card = document.querySelector(`.worktree-card[data-worktree="${worktree.name}"]`);
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Briefly highlight the card
-      card.style.transition = 'box-shadow 0.3s';
-      card.style.boxShadow = '0 0 0 4px rgba(88, 166, 255, 0.4)';
-      setTimeout(() => {
-        card.style.boxShadow = '';
-      }, 1000);
-      return;
-    }
-  }
-
-  // Fallback: show context menu for services
-  const event = new MouseEvent('click', {
-    bubbles: true,
-    cancelable: true,
-    view: window
-  });
-
-  // Try to trigger status context menu
-  if (window.showStatusContextMenu) {
-    const running = services.filter(s => s.state === 'running').length;
-    const statusBadge = document.querySelector(`.worktree-card[data-worktree="${worktree.name}"] .status-badge`);
-    if (statusBadge) {
-      window.showStatusContextMenu(event, worktree.name, running, services.length);
-    }
+  // TODO: Implement proper modal with service controls
+  // For now, just show the worktree card which has service controls
+  const card = document.querySelector(`.worktree-card[data-worktree="${worktree.name}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    showToast('Service controls available in sidebar', 'info');
+  } else {
+    alert(`Services in ${worktree.name}:\n\n${services.map(s =>
+      `${s.name}: ${s.status}`
+    ).join('\n')}\n\nService controls modal coming soon...`);
   }
 };
 

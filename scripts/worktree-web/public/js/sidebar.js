@@ -206,6 +206,14 @@ function renderWorktreeCards(worktrees, container) {
             <div class="worktree-title" oncontextmenu="showWorktreeContextMenu(event, '${wt.name}', ${isMain}); event.stopPropagation();" style="cursor: context-menu;">
               ${iconHtml}<span>${wt.name}</span>
             </div>
+            <div class="agent-badge-container" style="margin-top: 6px; margin-left: 24px;">
+              <span class="agent-badge" title="${agentName}">
+                ${agentIcon} ${agentName}
+              </span>
+              <button class="agent-switch-button" onclick="event.stopPropagation(); window.showAgentSwitcher('${wt.name}', '${currentAgent}');" title="Switch Agent">
+                <i data-lucide="refresh-cw" class="lucide-sm"></i>
+              </button>
+            </div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
             ${statusBadge}
