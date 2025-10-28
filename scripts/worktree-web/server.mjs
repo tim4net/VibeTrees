@@ -2727,8 +2727,8 @@ async function startServer() {
 
     server.listen(PORT, HOST, async () => {
       // Get all network interfaces
+      const os = await import('os');
       const getNetworkAddresses = () => {
-        const os = await import('os');
         const interfaces = os.networkInterfaces();
         const addresses = [];
 
