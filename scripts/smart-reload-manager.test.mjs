@@ -727,9 +727,17 @@ describe('SmartReloadManager', () => {
         write: vi.fn()
       };
 
+      // Mock PTYSessionManager with _sessions Map
+      const mockSessionId = 'test-session-id';
       mockPtyManager = {
-        terminals: new Map([
-          ['test-worktree:claude', mockTerminal]
+        _sessions: new Map([
+          [mockSessionId, {
+            id: mockSessionId,
+            worktreeName: 'test-worktree',
+            agent: 'claude',
+            pty: mockTerminal,
+            connected: true
+          }]
         ])
       };
     });
@@ -865,7 +873,7 @@ describe('SmartReloadManager', () => {
 
     it('should handle no active terminal gracefully', async () => {
       const emptyPtyManager = {
-        terminals: new Map()
+        _sessions: new Map()
       };
 
       const analysis = {
@@ -887,9 +895,16 @@ describe('SmartReloadManager', () => {
         })
       };
 
+      const failingSessionId = 'failing-session-id';
       const failingPtyManager = {
-        terminals: new Map([
-          ['test-worktree:claude', failingTerminal]
+        _sessions: new Map([
+          [failingSessionId, {
+            id: failingSessionId,
+            worktreeName: 'test-worktree',
+            agent: 'claude',
+            pty: failingTerminal,
+            connected: true
+          }]
         ])
       };
 

@@ -5,7 +5,7 @@
 
 import { appState } from './state.js';
 import { showTabContextMenu } from './context-menus.js';
-import { setupLogsTerminal, setupPtyTerminal } from './terminal-setup.js';
+import { setupLogsTerminal, setupPtyTerminal, clearTerminalSession } from './terminal-setup.js';
 import { setupEmptyState } from './terminal-empty-state.js';
 import {
   openTerminal as _openTerminal,
@@ -51,6 +51,190 @@ export function initTerminals() {
 
   // Setup empty state with options
   setupEmptyState();
+
+  // Restore terminal tabs from previous session
+  restoreTerminalTabs();
+}
+
+/**
+ * Save terminal session to sessionStorage
+ */
+function saveTerminalSession(tabId, worktreeName, command, isWebUI, isLogs, isCombinedLogs, serviceName, uiPort) {
+  try {
+    const sessions = JSON.parse(sessionStorage.getItem('terminal-sessions') || '[]');
+
+    // Check if session already exists
+    const existingIndex = sessions.findIndex(s => s.tabId === tabId);
+    const sessionData = {
+      tabId,
+      worktreeName,
+      command,
+      isWebUI,
+      isLogs,
+      isCombinedLogs,
+      serviceName,
+      uiPort,
+      timestamp: Date.now()
+    };
+
+    if (existingIndex >= 0) {
+      sessions[existingIndex] = sessionData;
+    } else {
+      sessions.push(sessionData);
+    }
+
+    sessionStorage.setItem('terminal-sessions', JSON.stringify(sessions));
+  } catch (error) {
+    console.error('Failed to save terminal session:', error);
+  }
+}
+
+/**
+ * Remove terminal session from sessionStorage
+ */
+function removeTerminalSession(tabId) {
+  try {
+    const sessions = JSON.parse(sessionStorage.getItem('terminal-sessions') || '[]');
+    const filtered = sessions.filter(s => s.tabId !== tabId);
+    sessionStorage.setItem('terminal-sessions', JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Failed to remove terminal session:', error);
+  }
+}
+
+/**
+ * Save active tab to sessionStorage
+ */
+function saveActiveTab(tabId) {
+  try {
+    sessionStorage.setItem('active-terminal-tab', tabId);
+  } catch (error) {
+    console.error('Failed to save active tab:', error);
+  }
+}
+
+/**
+ * Restore terminal tabs from sessionStorage
+ */
+async function restoreTerminalTabs() {
+  try {
+    const sessionsJson = sessionStorage.getItem('terminal-sessions');
+    if (!sessionsJson) {
+      console.log('[restoreTerminalTabs] No saved sessions found');
+      return;
+    }
+
+    const sessions = JSON.parse(sessionsJson);
+    const activeTabId = sessionStorage.getItem('active-terminal-tab');
+    const now = Date.now();
+    const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+
+    console.log(`[restoreTerminalTabs] Found ${sessions.length} saved sessions`);
+
+    // Fetch current worktrees to validate sessions
+    const response = await fetch('/api/worktrees');
+    const worktrees = await response.json();
+    const worktreeNames = new Set(worktrees.map(wt => wt.name));
+
+    const validSessions = [];
+    const invalidSessions = [];
+
+    // Validate and restore each session
+    for (const session of sessions) {
+      // Check if session is expired
+      if (now - session.timestamp > SESSION_EXPIRY) {
+        console.log(`[restoreTerminalTabs] Session expired: ${session.tabId}`);
+        invalidSessions.push(session.tabId);
+        continue;
+      }
+
+      // Check if worktree still exists
+      if (!worktreeNames.has(session.worktreeName)) {
+        console.log(`[restoreTerminalTabs] Worktree no longer exists: ${session.worktreeName}`);
+        invalidSessions.push(session.tabId);
+        continue;
+      }
+
+      // For WebUI tabs, verify port is available
+      if (session.isWebUI && !session.uiPort) {
+        console.log(`[restoreTerminalTabs] WebUI session missing port: ${session.tabId}`);
+        invalidSessions.push(session.tabId);
+        continue;
+      }
+
+      validSessions.push(session);
+    }
+
+    // Restore valid sessions and track new tab IDs
+    const tabIdMapping = new Map(); // old -> new
+    const restoredTabs = [];
+
+    for (const session of validSessions) {
+      try {
+        console.log(`[restoreTerminalTabs] Restoring session: ${session.tabId} (${session.worktreeName})`);
+
+        const newTabId = `tab-${nextTabId}`;
+        tabIdMapping.set(session.tabId, newTabId);
+
+        createTerminalTab(
+          session.worktreeName,
+          session.command || 'claude',
+          session.isWebUI || false,
+          session.uiPort || null,
+          session.isLogs || false,
+          session.serviceName || null,
+          session.isCombinedLogs || false
+        );
+
+        restoredTabs.push(newTabId);
+        console.log(`[restoreTerminalTabs] ✓ Restored: ${session.tabId} -> ${newTabId}`);
+      } catch (error) {
+        console.error(`[restoreTerminalTabs] Failed to restore ${session.tabId}:`, error);
+        invalidSessions.push(session.tabId);
+      }
+    }
+
+    // Clean up invalid sessions
+    if (invalidSessions.length > 0) {
+      const validSessionData = validSessions.filter(s =>
+        !invalidSessions.includes(s.tabId)
+      ).map(s => ({
+        tabId: s.tabId,
+        worktreeName: s.worktreeName,
+        command: s.command,
+        isWebUI: s.isWebUI,
+        isLogs: s.isLogs,
+        isCombinedLogs: s.isCombinedLogs,
+        serviceName: s.serviceName,
+        uiPort: s.uiPort,
+        timestamp: s.timestamp
+      }));
+      sessionStorage.setItem('terminal-sessions', JSON.stringify(validSessionData));
+      console.log(`[restoreTerminalTabs] Cleaned up ${invalidSessions.length} invalid sessions`);
+    }
+
+    // Restore active tab if it was restored
+    const savedActiveTabId = sessionStorage.getItem('active-terminal-tab');
+    const newActiveTabId = tabIdMapping.get(savedActiveTabId);
+
+    if (newActiveTabId && terminals.has(newActiveTabId)) {
+      console.log(`[restoreTerminalTabs] Restoring active tab: ${savedActiveTabId} -> ${newActiveTabId}`);
+      switchToTab(newActiveTabId);
+    } else if (restoredTabs.length > 0) {
+      // Switch to first restored tab
+      const firstTabId = restoredTabs[0];
+      if (terminals.has(firstTabId)) {
+        switchToTab(firstTabId);
+      }
+    }
+
+    console.log(`[restoreTerminalTabs] Restoration complete: ${validSessions.length} tabs restored`);
+  } catch (error) {
+    console.error('[restoreTerminalTabs] Error:', error);
+    // Clear corrupted session data
+    sessionStorage.removeItem('terminal-sessions');
+    sessionStorage.removeItem('active-terminal-tab');
+  }
 }
 
 /**
@@ -153,6 +337,7 @@ export function createTerminalTab(worktreeName, command, isWebUI = false, uiPort
   if (isWebUI) {
     terminals.set(tabId, { isWebUI: true, worktree: worktreeName, uiPort });
     switchToTab(tabId);
+    saveTerminalSession(tabId, worktreeName, command, isWebUI, isLogs, isCombinedLogs, serviceName, uiPort);
     return;
   }
 
@@ -162,6 +347,9 @@ export function createTerminalTab(worktreeName, command, isWebUI = false, uiPort
   } else {
     setupPtyTerminal(tabId, panel, worktreeName, command, terminals, activeTabId, switchToTab);
   }
+
+  // Save terminal session to sessionStorage
+  saveTerminalSession(tabId, worktreeName, command, isWebUI, isLogs, isCombinedLogs, serviceName, uiPort);
 
   // Initialize Lucide icons in newly created tab
   if (window.lucide) {
@@ -187,6 +375,9 @@ export function switchToTab(tabId) {
 
   activeTabId = tabId;
 
+  // Save active tab to sessionStorage
+  saveActiveTab(tabId);
+
   // Fit the terminal
   const terminalInfo = terminals.get(tabId);
   if (terminalInfo && terminalInfo.fitAddon) {
@@ -207,6 +398,11 @@ export function closeTerminalTab(tabId, event) {
   if (terminalInfo) {
     // Skip cleanup for web UI tabs
     if (!terminalInfo.isWebUI) {
+      // Clear any pending reconnection timeouts
+      if (terminalInfo.reconnectState && terminalInfo.reconnectState.timeoutId) {
+        clearTimeout(terminalInfo.reconnectState.timeoutId);
+      }
+
       // Close WebSocket
       if (terminalInfo.socket) {
         terminalInfo.socket.close();
@@ -221,6 +417,12 @@ export function closeTerminalTab(tabId, event) {
       if (terminalInfo.resizeHandler) {
         window.removeEventListener('resize', terminalInfo.resizeHandler);
       }
+
+      // Clear session ID from sessionStorage for PTY terminals (not logs)
+      // This ensures explicitly closed terminals don't reconnect on page refresh
+      if (!terminalInfo.isLogs && terminalInfo.command && terminalInfo.worktree) {
+        clearTerminalSession(terminalInfo.worktree, terminalInfo.command);
+      }
     }
 
     terminals.delete(tabId);
@@ -228,6 +430,9 @@ export function closeTerminalTab(tabId, event) {
 
   // Remove from appState
   appState.removeTab(tabId);
+
+  // Remove from sessionStorage
+  removeTerminalSession(tabId);
 
   // Remove DOM elements
   document.getElementById(tabId)?.remove();
@@ -240,6 +445,7 @@ export function closeTerminalTab(tabId, event) {
       switchToTab(remainingTabs[0]);
     } else {
       activeTabId = null;
+      sessionStorage.removeItem('active-terminal-tab');
       const emptyState = document.querySelector('.empty-terminal');
       if (emptyState) {
         emptyState.style.display = 'flex';

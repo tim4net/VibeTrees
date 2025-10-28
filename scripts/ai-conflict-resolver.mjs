@@ -363,7 +363,14 @@ ${conflict.theirs.join('\n')}
    */
   async requestAIAssistance(conflict, ptyManager, worktreeName) {
     try {
-      const terminal = ptyManager.terminals.get(`${worktreeName}:claude`);
+      // Find the session for this worktree (claude agent)
+      let terminal = null;
+      for (const [sessionId, session] of ptyManager._sessions) {
+        if (session.worktreeName === worktreeName && session.agent === 'claude' && session.pty) {
+          terminal = session.pty;
+          break;
+        }
+      }
 
       if (!terminal) {
         return {

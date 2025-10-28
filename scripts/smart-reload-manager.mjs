@@ -378,8 +378,14 @@ export class SmartReloadManager {
    */
   async notifyAgent(analysis, ptyManager, worktreeName) {
     try {
-      // Get the terminal for this worktree
-      const terminal = ptyManager.terminals.get(`${worktreeName}:claude`);
+      // Find the session for this worktree (claude agent)
+      let terminal = null;
+      for (const [sessionId, session] of ptyManager._sessions) {
+        if (session.worktreeName === worktreeName && session.agent === 'claude' && session.pty) {
+          terminal = session.pty;
+          break;
+        }
+      }
 
       if (!terminal) {
         console.log('No active terminal to notify');

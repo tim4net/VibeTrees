@@ -521,8 +521,17 @@ host: localhost
         write: vi.fn()
       };
 
+      const mockSessionId = 'test-session-id';
       const mockPtyManager = {
-        terminals: new Map([['test-worktree:claude', mockTerminal]])
+        _sessions: new Map([
+          [mockSessionId, {
+            id: mockSessionId,
+            worktreeName: 'test-worktree',
+            agent: 'claude',
+            pty: mockTerminal,
+            connected: true
+          }]
+        ])
       };
 
       const conflict = {
@@ -561,8 +570,17 @@ host: localhost
         write: vi.fn()
       };
 
+      const mockSessionId = 'test-session-id-2';
       const mockPtyManager = {
-        terminals: new Map([['test-worktree:claude', mockTerminal]])
+        _sessions: new Map([
+          [mockSessionId, {
+            id: mockSessionId,
+            worktreeName: 'test-worktree',
+            agent: 'claude',
+            pty: mockTerminal,
+            connected: true
+          }]
+        ])
       };
 
       const conflict = {
@@ -591,7 +609,7 @@ host: localhost
 
     it('should return error when no AI agent is active', async () => {
       const mockPtyManager = {
-        terminals: new Map()
+        _sessions: new Map()
       };
 
       const conflict = {
@@ -618,8 +636,17 @@ host: localhost
         })
       };
 
+      const mockSessionId = 'test-session-id-3';
       const mockPtyManager = {
-        terminals: new Map([['test-worktree:claude', mockTerminal]])
+        _sessions: new Map([
+          [mockSessionId, {
+            id: mockSessionId,
+            worktreeName: 'test-worktree',
+            agent: 'claude',
+            pty: mockTerminal,
+            connected: true
+          }]
+        ])
       };
 
       const conflict = {
@@ -803,8 +830,17 @@ host: localhost
       expect(resolveResult.success).toBe(true);
 
       // Step 4: Request AI help for manual conflict
+      const mockSessionId = 'test-session-id-4';
       const mockPtyManager = {
-        terminals: new Map([['test:claude', { write: vi.fn() }]])
+        _sessions: new Map([
+          [mockSessionId, {
+            id: mockSessionId,
+            worktreeName: 'test',
+            agent: 'claude',
+            pty: { write: vi.fn() },
+            connected: true
+          }]
+        ])
       };
       const aiResult = await resolver.requestAIAssistance(
         conflicts[1],
