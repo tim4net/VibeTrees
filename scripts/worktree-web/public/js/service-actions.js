@@ -86,9 +86,89 @@ export async function closeWorktree(name) {
 }
 
 /**
+ * Fetch and display branch status for deletion
+ */
+async function fetchAndDisplayBranchStatus(worktreeName, branchName) {
+  try {
+    const response = await fetch(`/api/worktrees/${worktreeName}/branch-status`);
+    const branchStatus = await response.json();
+
+    if (!branchStatus) {
+      // No branch associated, hide branch deletion section
+      document.getElementById('branch-deletion-section').style.display = 'none';
+      return;
+    }
+
+    // Show branch deletion section
+    document.getElementById('branch-deletion-section').style.display = 'block';
+
+    // Populate branch status box
+    const statusBox = document.getElementById('branch-status-box');
+    if (branchStatus.isBaseBranch) {
+      statusBox.className = 'info-box info';
+      statusBox.innerHTML = `
+        <strong>ℹ️ Base branch (${branchStatus.branchName})</strong>
+        <p>This branch will be preserved.</p>
+      `;
+      // Disable deletion checkbox for base branch
+      document.getElementById('delete-branch-checkbox').disabled = true;
+    } else if (branchStatus.isMerged) {
+      statusBox.className = 'info-box success';
+      statusBox.innerHTML = `
+        <strong>✅ Branch is merged into main</strong>
+        <p>Safe to delete.</p>
+      `;
+      // Pre-check for merged branches
+      document.getElementById('delete-branch-checkbox').checked = true;
+      document.getElementById('delete-branch-checkbox').disabled = false;
+      toggleBranchDeletionOptions();
+    } else {
+      statusBox.className = 'info-box warning';
+      statusBox.innerHTML = `
+        <strong>⚠️ Branch is NOT merged</strong>
+        <p>This branch has ${branchStatus.unmergedCommits} unmerged commit(s).</p>
+      `;
+      // Don't pre-check for unmerged branches
+      document.getElementById('delete-branch-checkbox').checked = false;
+      document.getElementById('delete-branch-checkbox').disabled = false;
+    }
+
+    // Show/hide remote checkbox based on existence
+    const deleteRemoteCheckbox = document.getElementById('delete-remote-checkbox');
+    const deleteRemoteLabel = document.getElementById('delete-remote-label');
+    if (branchStatus.existsOnRemote) {
+      deleteRemoteCheckbox.disabled = false;
+      deleteRemoteLabel.textContent = 'Delete on GitHub';
+    } else {
+      deleteRemoteCheckbox.disabled = true;
+      deleteRemoteCheckbox.checked = false;
+      deleteRemoteLabel.textContent = 'Delete on GitHub (not on remote)';
+    }
+
+  } catch (error) {
+    console.error('Failed to fetch branch status:', error);
+    document.getElementById('branch-deletion-section').style.display = 'none';
+  }
+}
+
+/**
+ * Toggle branch deletion options visibility
+ */
+window.toggleBranchDeletionOptions = function() {
+  const checkbox = document.getElementById('delete-branch-checkbox');
+  const options = document.getElementById('branch-deletion-options');
+
+  if (checkbox.checked) {
+    options.style.display = 'block';
+  } else {
+    options.style.display = 'none';
+  }
+};
+
+/**
  * Populate close modal with worktree info
  */
-function showCloseModalWithInfo(name, info) {
+async function showCloseModalWithInfo(name, info) {
   // Hide loading, show content
   document.getElementById('close-loading').style.display = 'none';
   document.getElementById('close-content').style.display = 'block';
@@ -96,6 +176,9 @@ function showCloseModalWithInfo(name, info) {
   // Set names
   document.getElementById('close-worktree-name').textContent = name;
   document.getElementById('close-branch-name').textContent = info.branch;
+
+  // Fetch branch status
+  await fetchAndDisplayBranchStatus(name, info.branch);
 
   // Set merge status
   const mergeStatus = document.getElementById('merge-status');
@@ -164,6 +247,26 @@ window.executeClose = async function() {
 
   const action = document.querySelector('input[name="close-action"]:checked').value;
 
+  // Get branch deletion options
+  const deleteBranch = document.getElementById('delete-branch-checkbox')?.checked || false;
+  const deleteLocal = document.getElementById('delete-local-checkbox')?.checked || false;
+  const deleteRemote = document.getElementById('delete-remote-checkbox')?.checked || false;
+
+  // Check if branch is unmerged
+  const statusBox = document.getElementById('branch-status-box');
+  const isUnmerged = statusBox?.classList.contains('warning');
+
+  // Double confirmation for unmerged branches
+  if (deleteBranch && isUnmerged) {
+    const confirmDelete = confirm(
+      'Are you sure? This branch has unmerged commits. ' +
+      'Deleting it will permanently lose your work.'
+    );
+    if (!confirmDelete) {
+      return;
+    }
+  }
+
   // For now, just use simple delete
   // TODO: Implement data import functionality
   if (!confirm(`Close worktree "${name}"? This will stop services and remove the worktree.`)) {
@@ -171,13 +274,39 @@ window.executeClose = async function() {
   }
 
   try {
+    const payload = {};
+    if (deleteBranch) {
+      payload.deleteBranch = true;
+      payload.deleteLocal = deleteLocal;
+      payload.deleteRemote = deleteRemote;
+      payload.force = isUnmerged; // Force delete if unmerged
+    }
+
     const response = await fetch(`/api/worktrees/${name}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
 
     const result = await response.json();
 
     if (result.success) {
+      // Show success message with branch deletion results
+      let message = 'Worktree closed successfully.';
+      if (result.branchDeletion) {
+        const messages = [];
+        if (result.branchDeletion.local === 'deleted') {
+          messages.push('Local branch deleted');
+        }
+        if (result.branchDeletion.remote === 'deleted') {
+          messages.push('Remote branch deleted');
+        }
+        if (messages.length > 0) {
+          message += ' ' + messages.join('. ') + '.';
+        }
+      }
+      alert(message);
+
       window.hideCloseModal();
       window.refreshWorktrees?.();
     } else {

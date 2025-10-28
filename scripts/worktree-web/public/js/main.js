@@ -10,9 +10,13 @@ import { initContextMenus } from './context-menus.js';
 import { initTabFiltering } from './tabs.js';
 import { initTerminals } from './terminals.js';
 import { initPerformanceMetrics } from './performance-metrics.js';
+import { pollingManager } from './polling.js';
 import './modals.js'; // Import for side effects (global exports)
 import './context-menu-actions.js'; // Import for side effects (global exports)
 import './service-actions.js'; // Import for side effects (global exports)
+
+// Make appState globally available for synchronization
+window.appState = appState;
 
 /**
  * Fetch worktrees from API and update state
@@ -71,7 +75,69 @@ function initApp() {
   // Initial data load
   window.refreshWorktrees();
   console.log('[main] Initial data load complete');
+
+  // Start automatic polling
+  pollingManager.start();
+  console.log('[main] Automatic polling started');
 }
+
+// Helper functions for agent launch buttons
+window.openShellForSelected = function() {
+  const selected = window.selectionManager?.getSelected() || appState.selectedWorktreeId;
+  if (selected) {
+    window.openShell(selected);
+  } else {
+    console.error('[openShellForSelected] No worktree selected');
+    alert('Please select a worktree first');
+  }
+};
+
+window.openClaudeForSelected = function() {
+  const selected = window.selectionManager?.getSelected() || appState.selectedWorktreeId;
+  if (selected) {
+    window.openTerminal(selected, 'claude');
+  } else {
+    console.error('[openClaudeForSelected] No worktree selected');
+    alert('Please select a worktree first');
+  }
+};
+
+window.openCodexForSelected = function() {
+  const selected = window.selectionManager?.getSelected() || appState.selectedWorktreeId;
+  if (selected) {
+    window.openTerminal(selected, 'codex');
+  } else {
+    console.error('[openCodexForSelected] No worktree selected');
+    alert('Please select a worktree first');
+  }
+};
+
+window.openWebUIForSelected = function() {
+  const selected = window.selectionManager?.getSelected() || appState.selectedWorktreeId;
+  if (selected) {
+    // Get the worktree data to find console port
+    const worktrees = appState.worktrees;
+    const worktree = worktrees.find(wt => wt.name === selected);
+    if (worktree && worktree.ports && worktree.ports.console) {
+      window.openWebUI(selected, worktree.ports.console);
+    } else {
+      alert('Console port not available for this worktree');
+    }
+  } else {
+    console.error('[openWebUIForSelected] No worktree selected');
+    alert('Please select a worktree first');
+  }
+};
+
+window.openLogsForSelected = function() {
+  const selected = window.selectionManager?.getSelected() || appState.selectedWorktreeId;
+  if (selected) {
+    window.openCombinedLogs(selected);
+  } else {
+    console.error('[openLogsForSelected] No worktree selected');
+    alert('Please select a worktree first');
+  }
+};
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {

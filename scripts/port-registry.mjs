@@ -9,25 +9,46 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const PORT_REGISTRY_DIR = join(homedir(), '.claude-worktrees');
-const PORT_REGISTRY_FILE = join(PORT_REGISTRY_DIR, 'ports.json');
-
 export class PortRegistry {
-  constructor() {
+  /**
+   * @param {string} projectRoot - Project root directory (optional, uses cwd if not provided)
+   */
+  constructor(projectRoot = process.cwd()) {
+    this.projectRoot = projectRoot;
+    this.registryDir = this._getProjectConfigDir(projectRoot);
+    this.registryFile = join(this.registryDir, 'ports.json');
     this.ports = this.load();
   }
 
+  /**
+   * Get project-specific config directory in ~/.vibetrees/
+   * Uses parent-child naming to avoid collisions
+   * @param {string} projectRoot - Project root directory
+   * @returns {string} Config directory path
+   */
+  _getProjectConfigDir(projectRoot) {
+    const parts = projectRoot.split(/[\/\\]/).filter(Boolean);
+
+    // Use last two path components: parent-child
+    // ~/code/ecommerce-app → code-ecommerce-app
+    const projectName = parts.length >= 2
+      ? `${parts[parts.length - 2]}-${parts[parts.length - 1]}`
+      : parts[parts.length - 1];
+
+    return join(homedir(), '.vibetrees', projectName);
+  }
+
   load() {
-    if (!existsSync(PORT_REGISTRY_DIR)) {
-      mkdirSync(PORT_REGISTRY_DIR, { recursive: true });
+    if (!existsSync(this.registryDir)) {
+      mkdirSync(this.registryDir, { recursive: true });
     }
 
-    if (!existsSync(PORT_REGISTRY_FILE)) {
+    if (!existsSync(this.registryFile)) {
       return {};
     }
 
     try {
-      const data = readFileSync(PORT_REGISTRY_FILE, 'utf-8');
+      const data = readFileSync(this.registryFile, 'utf-8');
       return JSON.parse(data);
     } catch {
       return {};
@@ -35,7 +56,10 @@ export class PortRegistry {
   }
 
   save() {
-    writeFileSync(PORT_REGISTRY_FILE, JSON.stringify(this.ports, null, 2));
+    if (!existsSync(this.registryDir)) {
+      mkdirSync(this.registryDir, { recursive: true });
+    }
+    writeFileSync(this.registryFile, JSON.stringify(this.ports, null, 2));
   }
 
   allocate(worktreeName, service, basePort) {

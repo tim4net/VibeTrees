@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/css/sidebar.css">
   <link rel="stylesheet" href="/css/terminals.css">
   <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/branch-selector.css">
 </head>
 <body>
   <div class="app-container">
@@ -42,6 +43,7 @@
         <div class="sidebar-actions">
           <button id="collapse-sidebar-btn" title="Collapse sidebar"><i id="collapse-icon" data-lucide="panel-left-close" class="lucide-sm"></i></button>
           <button onclick="refreshWorktrees()" title="Refresh"><i data-lucide="rotate-cw" class="lucide-sm"></i></button>
+          <button onclick="window.importWorktreeModule?.showImportModal()" title="Import existing worktree"><i data-lucide="download" class="lucide-sm"></i></button>
           <button class="primary" onclick="showCreateModal()" title="Create new worktree"><i data-lucide="sprout" class="lucide-sm"></i></button>
         </div>
       </div>
@@ -52,38 +54,30 @@
         </div>
       </div>
 
-      <!-- Performance Metrics Section -->
-      <div class="performance-metrics" style="padding: 1rem; border-top: 1px solid var(--border); background: var(--bg-secondary);">
-        <h3 style="margin: 0 0 0.5rem 0; font-size: 0.875rem; color: var(--text-secondary);">Performance Metrics</h3>
-        <button id="refreshMetricsBtn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-bottom: 0.5rem;">Refresh Metrics</button>
-
-        <div id="metricsDisplay">
-          <p style="font-size: 0.75rem; margin: 0.25rem 0;">Average worktree creation: <span id="avgCreation" style="font-weight: bold;">-</span></p>
-          <details style="margin-top: 0.5rem;">
-            <summary style="font-size: 0.75rem; cursor: pointer; color: var(--text-secondary);">Operation Breakdown</summary>
-            <table id="operationsTable" style="width: 100%; font-size: 0.7rem; margin-top: 0.5rem; border-collapse: collapse;">
-              <thead>
-                <tr style="text-align: left; border-bottom: 1px solid var(--border);">
-                  <th style="padding: 0.25rem;">Operation</th>
-                  <th style="padding: 0.25rem;">Avg (ms)</th>
-                  <th style="padding: 0.25rem;">Count</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </details>
-        </div>
-      </div>
     </div>
 
     <!-- Terminal Area -->
     <div class="terminal-area">
-      <div class="terminal-tabs" id="terminal-tabs">
-        <!-- Tabs will be added here dynamically -->
-        <div class="new-tab-buttons">
-          <button class="new-tab-button" onclick="showNewTabMenu(event)" title="New tab">
-            <i data-lucide="plus" class="lucide-sm"></i>
+      <div class="terminal-header">
+        <div class="terminal-launch-buttons">
+          <button class="small" onclick="openShellForSelected()" title="Open Shell">
+            <i data-lucide="terminal" class="lucide-sm"></i> Shell
           </button>
+          <button class="small" onclick="openClaudeForSelected()" title="Open Claude">
+            <img src="/icons/anthropic.svg" style="width: 12px; height: 12px; vertical-align: middle; filter: brightness(0) invert(1);" /> Claude
+          </button>
+          <button class="small" onclick="openCodexForSelected()" title="Open Codex">
+            <img src="/icons/openai.svg" style="width: 12px; height: 12px; vertical-align: middle; filter: brightness(0) invert(1);" /> Codex
+          </button>
+          <button class="small" onclick="openWebUIForSelected()" title="Open Web UI">
+            <i data-lucide="globe" class="lucide-sm"></i> Web
+          </button>
+          <button class="small" onclick="openLogsForSelected()" title="Open Combined Logs">
+            <i data-lucide="scroll-text" class="lucide-sm"></i> Logs
+          </button>
+        </div>
+        <div class="terminal-tabs" id="terminal-tabs">
+          <!-- Tabs will be added here dynamically -->
         </div>
       </div>
       <div class="terminal-panels" id="terminal-panels">
@@ -102,25 +96,65 @@
   <div id="create-modal" class="modal">
     <div class="modal-content">
       <h2 class="modal-title">Create New Worktree</h2>
+
+      <!-- Tab Switcher -->
+      <div class="tab-switcher">
+        <button type="button" class="tab-button active" data-tab="new-branch" onclick="switchCreateTab('new-branch')">
+          New Branch
+        </button>
+        <button type="button" class="tab-button" data-tab="existing-branch" onclick="switchCreateTab('existing-branch')">
+          Existing Branch
+        </button>
+      </div>
+
       <form onsubmit="createWorktree(event)">
+        <!-- New Branch Tab -->
+        <div id="new-branch-tab" class="tab-content active">
+          <div class="form-group">
+            <label for="branch-name">Branch Name</label>
+            <input
+              type="text"
+              id="branch-name"
+              placeholder="feature/my-feature"
+            />
+          </div>
+          <div class="form-group">
+            <label for="from-branch">Create From</label>
+            <input
+              type="text"
+              id="from-branch"
+              placeholder="main"
+              value="main"
+            />
+          </div>
+        </div>
+
+        <!-- Existing Branch Tab -->
+        <div id="existing-branch-tab" class="tab-content">
+          <div class="form-group">
+            <label for="branch-search">Search Branches</label>
+            <input
+              type="text"
+              id="branch-search"
+              class="branch-search-input"
+              placeholder="Search by name or commit message..."
+            />
+          </div>
+          <div id="branch-selector-container"></div>
+        </div>
+
         <div class="form-group">
-          <label for="branch-name">Branch Name</label>
+          <label for="worktree-name">Worktree Name</label>
           <input
             type="text"
-            id="branch-name"
-            placeholder="feature/my-feature"
-            required
+            id="worktree-name"
+            placeholder="Will be auto-filled from branch"
           />
+          <div style="margin-top: 4px; font-size: 11px; color: #8b949e;">
+            Optional: Override the auto-generated worktree name
+          </div>
         </div>
-        <div class="form-group">
-          <label for="from-branch">Create From</label>
-          <input
-            type="text"
-            id="from-branch"
-            placeholder="main"
-            value="main"
-          />
-        </div>
+
         <div style="margin-top: 8px; padding: 12px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; font-size: 12px; color: #8b949e;">
           <strong style="color: #c9d1d9;"><i data-lucide="info" class="lucide-sm"></i> Note:</strong> All services will be included and the database will be copied from the main worktree.
         </div>
@@ -249,6 +283,38 @@
           <div id="not-merged-warning" class="warning-box" style="display: none;">
             ⚠️ Your branch hasn't been merged to main yet. We recommend merging your PR first, then closing the worktree to import your test data safely.
           </div>
+
+          <!-- Branch Deletion Options -->
+          <div id="branch-deletion-section" class="branch-deletion-section" style="display: none;">
+            <div class="section-header">
+              <h3>Branch Cleanup</h3>
+            </div>
+
+            <!-- Branch Status Box -->
+            <div id="branch-status-box" class="info-box">
+              <!-- Will be populated dynamically -->
+            </div>
+
+            <!-- Branch Deletion Checkbox -->
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="delete-branch-checkbox" onchange="toggleBranchDeletionOptions()">
+                <span>Also delete branch</span>
+              </label>
+            </div>
+
+            <!-- Sub-options (shown when checkbox is checked) -->
+            <div id="branch-deletion-options" class="branch-deletion-options" style="display: none;">
+              <label class="checkbox-label indented">
+                <input type="checkbox" id="delete-local-checkbox" checked>
+                <span>Delete local branch</span>
+              </label>
+              <label class="checkbox-label indented">
+                <input type="checkbox" id="delete-remote-checkbox">
+                <span id="delete-remote-label">Delete on GitHub</span>
+              </label>
+            </div>
+          </div>
         </form>
       </div>
 
@@ -256,6 +322,75 @@
         <button type="button" onclick="hideCloseModal()" id="close-cancel-button">Cancel</button>
         <button type="button" onclick="executeClose()" class="primary" id="close-execute-button">
           Close Worktree
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Worktree Modal -->
+  <div id="import-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">Import Existing Worktree</h2>
+
+      <!-- Loading State -->
+      <div id="import-loading" class="loading-state" style="display: none;">
+        <div class="spinner"></div>
+        <div>Discovering worktrees...</div>
+      </div>
+
+      <!-- Error State -->
+      <div id="import-error" class="error-box" style="display: none;"></div>
+
+      <!-- Worktree List -->
+      <div id="unmanaged-worktree-list" class="unmanaged-worktree-list">
+        <!-- Will be populated dynamically -->
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" onclick="window.importWorktreeModule.hideImportModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diagnostics Modal -->
+  <div id="diagnostics-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">System Diagnostics</h2>
+
+      <!-- Loading State -->
+      <div id="diagnostics-loading" class="loading-state" style="display: none;">
+        <div class="spinner"></div>
+        <div>Running diagnostics...</div>
+      </div>
+
+      <!-- Error State -->
+      <div id="diagnostics-error" class="error-box" style="display: none;"></div>
+
+      <!-- Summary -->
+      <div id="diagnostics-summary" class="diagnostics-summary" style="display: none;">
+        <div class="summary-item">
+          <span class="summary-label">Overall Health:</span>
+          <span id="overall-health" class="health-badge"></span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Checks Passed:</span>
+          <span id="checks-passed"></span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Issues Found:</span>
+          <span id="issues-found"></span>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="diagnostics-results" class="diagnostics-results">
+        <!-- Will be populated dynamically -->
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" onclick="window.diagnosticsModule.hideDiagnosticsModal()">Close</button>
+        <button type="button" onclick="window.diagnosticsModule.retryDiagnostics()" class="primary">
+          <i data-lucide="rotate-cw" class="lucide-sm"></i> Refresh
         </button>
       </div>
     </div>
@@ -331,6 +466,15 @@
     <div class="context-menu-item" onclick="worktreeContextMenuAction('viewAllLogs')">
       <i data-lucide="file-text" class="lucide-sm"></i>
       <span>View All Logs</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="worktreeContextMenuAction('database')">
+      <i data-lucide="database" class="lucide-sm"></i>
+      <span>Database Operations</span>
+    </div>
+    <div class="context-menu-item" onclick="worktreeContextMenuAction('diagnostics')">
+      <i data-lucide="stethoscope" class="lucide-sm"></i>
+      <span>Run Diagnostics</span>
     </div>
     <div class="context-menu-divider"></div>
     <div class="context-menu-item danger" onclick="worktreeContextMenuAction('close')">
@@ -414,6 +558,9 @@
   <script src="/js/theme.js"></script>
   <script src="/js/selection.js"></script>
   <script src="/js/database.js"></script>
+  <script src="/js/branch-selector.js"></script>
+  <script type="module" src="/js/import-worktree.js"></script>
+  <script type="module" src="/js/diagnostics.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
   <script type="module" src="/js/main.js"></script>

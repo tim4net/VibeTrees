@@ -52,6 +52,16 @@ export function worktreeContextMenuAction(action) {
     case 'viewAllLogs':
       openCombinedLogs(worktreeName);
       break;
+    case 'database':
+      if (window.openDatabaseModal) {
+        window.openDatabaseModal(worktreeName);
+      }
+      break;
+    case 'diagnostics':
+      if (window.diagnosticsModule) {
+        window.diagnosticsModule.showDiagnosticsModal(worktreeName);
+      }
+      break;
     case 'close':
       closeWorktree(worktreeName);
       break;
@@ -94,7 +104,7 @@ export function statusContextMenuAction(action) {
  * Tab context menu action handler
  */
 export function tabContextMenuAction(action) {
-  const { tabId, worktreeName, uiPort } = tabContextMenuData;
+  const { tabId, worktreeName, uiPort, isWebUI, isLogs, isCombinedLogs, command, serviceName } = tabContextMenuData;
   hideAllContextMenus();
 
   switch (action) {
@@ -102,7 +112,7 @@ export function tabContextMenuAction(action) {
       refreshWebUI(tabId);
       break;
     case 'clone':
-      cloneWebUITab(tabId, worktreeName, uiPort);
+      cloneTab(worktreeName, { isWebUI, isLogs, isCombinedLogs, command, serviceName, uiPort });
       break;
     case 'close':
       closeTerminalTab(tabId);
@@ -121,10 +131,28 @@ function refreshWebUI(tabId) {
 }
 
 /**
- * Clone a WebUI tab
+ * Clone a tab based on its type
  */
-function cloneWebUITab(tabId, worktreeName, uiPort) {
-  createTerminalTab(worktreeName, null, true, uiPort);
+function cloneTab(worktreeName, context) {
+  const { isWebUI, isLogs, isCombinedLogs, command, serviceName, uiPort } = context;
+
+  if (isWebUI) {
+    // Clone WebUI tab
+    createTerminalTab(worktreeName, null, true, uiPort);
+  } else if (isCombinedLogs) {
+    // Clone combined logs tab
+    createTerminalTab(worktreeName, null, false, null, false, null, true);
+  } else if (isLogs) {
+    // Clone service logs tab
+    createTerminalTab(worktreeName, null, false, null, true, serviceName, false);
+  } else if (command) {
+    // Clone terminal tab (shell, claude, codex)
+    createTerminalTab(worktreeName, command);
+  } else {
+    // Fallback: create a shell tab
+    console.warn('Could not determine tab type for cloning, defaulting to shell');
+    createTerminalTab(worktreeName, 'shell');
+  }
 }
 
 // Export to global scope for onclick handlers

@@ -3,11 +3,31 @@
  * Handles modal dialogs (create worktree)
  */
 
+// Initialize branch selector
+let branchSelector = null;
+
 /**
  * Show create worktree modal
  */
 export function showCreateModal() {
   document.getElementById('create-modal').classList.add('active');
+
+  // Initialize branch selector if not already done
+  if (!branchSelector && typeof BranchSelector !== 'undefined') {
+    branchSelector = new BranchSelector();
+    branchSelector.init('branch-selector-container', 'branch-search');
+
+    // Set callback for when branch is selected
+    branchSelector.onBranchSelected = (branch) => {
+      const worktreeName = BranchSelector.branchToWorktreeName(branch.name);
+      document.getElementById('worktree-name').value = worktreeName;
+    };
+  }
+
+  // Load branches when opening modal on "Existing Branch" tab
+  if (branchSelector && document.getElementById('existing-branch-tab').classList.contains('active')) {
+    branchSelector.load();
+  }
 }
 
 /**
@@ -17,6 +37,15 @@ export function hideCreateModal() {
   document.getElementById('create-modal').classList.remove('active');
   document.getElementById('branch-name').value = '';
   document.getElementById('from-branch').value = 'main';
+  document.getElementById('worktree-name').value = '';
+
+  // Reset to "New Branch" tab
+  switchCreateTab('new-branch');
+
+  // Clear branch selector
+  if (branchSelector) {
+    branchSelector.clearSelection();
+  }
 
   // Reset progress bar
   document.getElementById('create-progress').classList.remove('active');
@@ -48,8 +77,35 @@ export function hideCreateModal() {
 export async function createWorktree(event) {
   event.preventDefault();
 
-  const branchName = document.getElementById('branch-name').value;
-  const fromBranch = document.getElementById('from-branch').value;
+  // Determine which tab is active
+  const isNewBranch = document.getElementById('new-branch-tab').classList.contains('active');
+
+  let branchName, fromBranch, worktreeName;
+
+  if (isNewBranch) {
+    // New branch mode
+    branchName = document.getElementById('branch-name').value;
+    fromBranch = document.getElementById('from-branch').value;
+    worktreeName = document.getElementById('worktree-name').value || branchName.replace(/\//g, '-');
+
+    if (!branchName) {
+      alert('Please enter a branch name');
+      return;
+    }
+  } else {
+    // Existing branch mode
+    const selectedBranch = branchSelector?.getSelectedBranch();
+
+    if (!selectedBranch) {
+      alert('Please select a branch');
+      return;
+    }
+
+    branchName = selectedBranch.name;
+    fromBranch = null; // Existing branch doesn't need fromBranch
+    worktreeName = document.getElementById('worktree-name').value ||
+                   BranchSelector.branchToWorktreeName(branchName);
+  }
 
   // Disable buttons and show progress
   document.getElementById('create-button').disabled = true;
@@ -58,10 +114,15 @@ export async function createWorktree(event) {
   document.getElementById('progress-header-text').textContent = 'Starting...';
 
   try {
+    const payload = { branchName };
+    if (fromBranch) {
+      payload.fromBranch = fromBranch;
+    }
+
     const response = await fetch('/api/worktrees', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ branchName, fromBranch })
+      body: JSON.stringify(payload)
     });
 
     const result = await response.json();
@@ -298,10 +359,45 @@ export function tabContextMenuAction(action) {
   }
 }
 
+/**
+ * Switch between "New Branch" and "Existing Branch" tabs
+ */
+export function switchCreateTab(tab) {
+  // Update tab buttons
+  document.querySelectorAll('.tab-button').forEach(btn => {
+    if (btn.dataset.tab === tab) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.remove('active');
+  });
+
+  if (tab === 'new-branch') {
+    document.getElementById('new-branch-tab').classList.add('active');
+    // Make branch-name required for new branch
+    document.getElementById('branch-name').setAttribute('required', 'required');
+  } else if (tab === 'existing-branch') {
+    document.getElementById('existing-branch-tab').classList.add('active');
+    // Branch-name not required for existing branch
+    document.getElementById('branch-name').removeAttribute('required');
+
+    // Load branches when switching to this tab
+    if (branchSelector) {
+      branchSelector.load();
+    }
+  }
+}
+
 // Export to global scope for onclick handlers
 window.showCreateModal = showCreateModal;
 window.hideCreateModal = hideCreateModal;
 window.createWorktree = createWorktree;
+window.switchCreateTab = switchCreateTab;
 window.hideCloseModal = hideCloseModal;
 window.openUpdateMainInstructions = openUpdateMainInstructions;
 window.showNewTabMenu = showNewTabMenu;

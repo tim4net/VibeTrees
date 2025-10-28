@@ -7,6 +7,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname, basename } from 'path';
+import { homedir } from 'os';
 import { execSync } from 'child_process';
 
 /**
@@ -99,9 +100,27 @@ export class ConfigManager {
    */
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
-    this.configDir = join(projectRoot, '.vibe');
+    this.configDir = this._getProjectConfigDir(projectRoot);
     this.configPath = join(this.configDir, 'config.json');
     this._config = null;
+  }
+
+  /**
+   * Get project-specific config directory in ~/.vibetrees/
+   * Uses parent-child naming to avoid collisions
+   * @param {string} projectRoot - Project root directory
+   * @returns {string} Config directory path
+   */
+  _getProjectConfigDir(projectRoot) {
+    const parts = projectRoot.split(/[\/\\]/).filter(Boolean);
+
+    // Use last two path components: parent-child
+    // ~/code/ecommerce-app → code-ecommerce-app
+    const projectName = parts.length >= 2
+      ? `${parts[parts.length - 2]}-${parts[parts.length - 1]}`
+      : parts[parts.length - 1];
+
+    return join(homedir(), '.vibetrees', projectName);
   }
 
   /**

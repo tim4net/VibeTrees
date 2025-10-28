@@ -111,6 +111,11 @@ class SelectionManager {
       targetCard.setAttribute('aria-selected', 'true');
       this.selectedWorktree = name;
 
+      // Sync with appState if available
+      if (window.appState && window.appState.selectedWorktreeId !== name) {
+        window.appState.selectWorktree(name);
+      }
+
       // Save to storage
       if (!options.skipStorage) {
         localStorage.setItem(this.STORAGE_KEY, name);

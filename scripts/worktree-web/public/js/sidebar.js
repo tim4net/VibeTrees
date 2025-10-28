@@ -25,6 +25,14 @@ export function initSidebar() {
 
   appState.on('worktrees:updated', () => {
     renderWorktrees();
+
+    // Ensure a worktree is selected after rendering
+    // Give DOM time to update, then trigger selection if needed
+    setTimeout(() => {
+      if (!appState.selectedWorktreeId && window.selectionManager) {
+        window.selectionManager.selectDefaultWorktree();
+      }
+    }, 100);
   });
 
   // Set initial state
@@ -142,19 +150,45 @@ function renderWorktreeCards(worktrees, container) {
         }).join('')
       : '<div class="port"><span class="port-label">No containers</span></div>';
 
-    const consolePort = wt.ports.console;
-    const branchClickable = consolePort
-      ? `<div class="worktree-branch clickable" onclick="window.openWebUI('${wt.name}', ${consolePort})"><i data-lucide="globe" class="lucide-sm"></i> ${wt.branch}</div>`
-      : `<div class="worktree-branch"><i data-lucide="git-branch" class="lucide-sm"></i> ${wt.branch}</div>`;
+    // Determine icon based on whether this is the main worktree or has commits
+    // Main worktree or worktrees with at least 1 commit get tree-pine
+    // New worktrees with no commits get sprout
+    const hasCommits = wt.commitCount > 0;
+    const icon = (isMain || hasCommits) ? 'tree-pine' : 'sprout';
+    console.log(`[sidebar] ${wt.name}: commitCount=${wt.commitCount}, hasCommits=${hasCommits}, isMain=${isMain}, icon=${icon}`);
+
+    // Build GitHub link for the icon if available
+    const githubLink = wt.githubUrl && wt.branch
+      ? `${wt.githubUrl}/tree/${wt.branch}`
+      : null;
+
+    // Determine git status color and tooltip
+    const gitStatusColors = {
+      'clean': '#2ea043',
+      'uncommitted': '#e5a935',
+      'unpushed': '#58a6ff'
+    };
+    const gitStatusLabels = {
+      'clean': 'Clean - no changes',
+      'uncommitted': 'Uncommitted changes',
+      'unpushed': 'Unpushed commits'
+    };
+    const iconColor = wt.gitStatus ? gitStatusColors[wt.gitStatus] : '';
+    const iconTooltip = wt.gitStatus ? gitStatusLabels[wt.gitStatus] : 'Unknown git status';
+
+    const iconHtml = githubLink
+      ? `<a href="${githubLink}" target="_blank" onclick="event.stopPropagation();" title="${iconTooltip}\nClick to view branch on GitHub" style="display: inline-flex; align-items: center; text-decoration: none; color: ${iconColor};">
+           <i data-lucide="${icon}" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;"></i>
+         </a>`
+      : `<i data-lucide="${icon}" title="${iconTooltip}" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px; color: ${iconColor};"></i>`;
 
     return `
-      <div class="worktree-card ${isActive ? 'active' : ''} ${gitStatusClass}" onclick="selectWorktree('${wt.name}')">
+      <div class="worktree-card ${isActive ? 'active selected' : ''} ${gitStatusClass}" data-name="${wt.name}" onclick="selectWorktree('${wt.name}')">
         <div class="worktree-header">
           <div>
             <div class="worktree-title" oncontextmenu="showWorktreeContextMenu(event, '${wt.name}', ${isMain}); event.stopPropagation();" style="cursor: context-menu;">
-              <i data-lucide="sprout" class="lucide-sm" style="vertical-align: middle; margin-right: 6px;"></i>${wt.name}
+              ${iconHtml}${wt.name}
             </div>
-            ${branchClickable}
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
             ${statusBadge}
@@ -162,16 +196,6 @@ function renderWorktreeCards(worktrees, container) {
         </div>
 
         <div class="ports">${portsHtml}</div>
-
-        <div class="worktree-actions">
-          <button class="small" onclick="window.openShell('${wt.name}'); event.stopPropagation();"><i data-lucide="terminal" class="lucide-sm"></i> Shell</button>
-          <button class="small" onclick="window.openTerminal('${wt.name}', 'claude'); event.stopPropagation();">
-            <img src="/icons/anthropic.svg" style="width: 12px; height: 12px; vertical-align: middle; filter: brightness(0) invert(1);" /> Claude
-          </button>
-          <button class="small" onclick="window.openTerminal('${wt.name}', 'codex'); event.stopPropagation();">
-            <img src="/icons/openai.svg" style="width: 12px; height: 12px; vertical-align: middle; filter: brightness(0) invert(1);" /> Codex
-          </button>
-        </div>
       </div>
     `;
   }).join('');
@@ -211,15 +235,21 @@ function renderVerticalTabs(worktrees, container) {
 
 /**
  * Select a worktree
+ * Note: A worktree must ALWAYS be selected - clicking the same one does nothing
  */
 window.selectWorktree = function(worktreeName) {
-  if (appState.selectedWorktreeId === worktreeName) {
-    // Deselect if clicking the same one
-    appState.selectWorktree(null);
-  } else {
+  // Only change selection if clicking a different worktree
+  if (appState.selectedWorktreeId !== worktreeName) {
     appState.selectWorktree(worktreeName);
+
+    // Also update the selection manager if it exists
+    if (window.selectionManager) {
+      window.selectionManager.selectWorktree(worktreeName, { skipNavigation: true });
+    }
+
+    renderWorktrees();
   }
-  renderWorktrees();
+  // If clicking the same worktree, do nothing (keep it selected)
 };
 
 /**
