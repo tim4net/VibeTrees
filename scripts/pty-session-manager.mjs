@@ -133,6 +133,15 @@ export class PTYSessionManager {
   }
 
   /**
+   * Recover session state from disk
+   * @param {string} sessionId - Session ID
+   * @returns {Promise<object|null>} Saved state or null
+   */
+  async recoverSession(sessionId) {
+    return await this.serializer.loadState(sessionId);
+  }
+
+  /**
    * Auto-save session state (private)
    * @param {string} sessionId - Session ID
    */

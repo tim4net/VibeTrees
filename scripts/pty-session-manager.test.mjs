@@ -145,4 +145,40 @@ describe('PTYSessionManager', () => {
       expect(manager.hasSession(sessionId)).toBe(false);
     });
   });
+
+  describe('Session Recovery', () => {
+    it('should recover session from saved state', async () => {
+      const savedState = {
+        sessionId: 'test-session-123',
+        buffer: ['line1', 'line2'],
+        dimensions: { cols: 80, rows: 24 },
+        timestamp: Date.now()
+      };
+
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        loadState: vi.fn().mockResolvedValue(savedState)
+      };
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
+      const state = await manager.recoverSession('test-session-123');
+
+      expect(state).toEqual(savedState);
+      expect(mockSerializer.loadState).toHaveBeenCalledWith('test-session-123');
+    });
+
+    it('should return null if no saved state exists', async () => {
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        loadState: vi.fn().mockResolvedValue(null)
+      };
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
+      const state = await manager.recoverSession('nonexistent');
+
+      expect(state).toBeNull();
+    });
+  });
 });
