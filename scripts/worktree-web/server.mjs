@@ -103,6 +103,7 @@ ensureDependencies();
 
 // Dynamic imports after ensuring dependencies
 const express = (await import('express')).default;
+const multer = (await import('multer')).default;
 const { createServer } = await import('http');
 const { WebSocketServer } = await import('ws');
 const pty = await import('node-pty');
@@ -117,6 +118,8 @@ const { agentRegistry } = await import('../agents/index.mjs');
 const { GitSyncManager } = await import('../git-sync-manager.mjs');
 const { SmartReloadManager } = await import('../smart-reload-manager.mjs');
 const { AIConflictResolver } = await import('../ai-conflict-resolver.mjs');
+const { DatabaseManager } = await import('../database-manager.mjs');
+const { DatabaseValidator } = await import('../database-validator.mjs');
 
 const WORKTREE_BASE = join(process.cwd(), '.worktrees');
 
@@ -1417,6 +1420,9 @@ function createApp() {
   app.use(express.json());
   app.use(express.static(join(__dirname, 'public')));
 
+  // Multer configuration for file uploads
+  const upload = multer({ dest: join(homedir(), '.vibetrees', 'uploads') });
+
   // WebSocket for UI updates
   wss.on('connection', (ws, req) => {
     // Check if this is a terminal connection
@@ -1755,6 +1761,187 @@ function createApp() {
         success: false,
         error: error.message
       });
+    }
+  });
+
+  // Database export endpoint
+  app.post('/api/worktrees/:name/database/export', async (req, res) => {
+    const { name } = req.params;
+    const { type = 'full', format = 'sql' } = req.body;
+
+    try {
+      const worktrees = manager.listWorktrees();
+      const worktree = worktrees.find(w => w.name === name);
+
+      if (!worktree) {
+        return res.status(404).json({ error: 'Worktree not found' });
+      }
+
+      const ports = manager.portRegistry.getPorts(name);
+      if (!ports || !ports.postgres) {
+        return res.status(400).json({ error: 'Database port not allocated for this worktree' });
+      }
+
+      const dbConfig = {
+        host: 'localhost',
+        port: ports.postgres,
+        database: 'vibe',
+        user: 'postgres',
+        password: process.env.POSTGRES_PASSWORD || 'postgres'
+      };
+
+      const dbManager = new DatabaseManager(dbConfig);
+      const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+      const filename = `${name}-${type}-${timestamp}.sql`;
+      const outputPath = join(homedir(), '.vibetrees', 'exports', filename);
+
+      // Ensure export directory exists
+      const exportDir = dirname(outputPath);
+      if (!existsSync(exportDir)) {
+        mkdirSync(exportDir, { recursive: true });
+      }
+
+      let result;
+      if (type === 'schema') {
+        result = await dbManager.exportSchema(outputPath);
+      } else if (type === 'data') {
+        result = await dbManager.exportData(outputPath);
+      } else {
+        result = await dbManager.exportFull(outputPath);
+      }
+
+      if (!result.success) {
+        return res.status(500).json({ error: result.error });
+      }
+
+      res.download(outputPath, filename, (err) => {
+        // Clean up temp file after download
+        if (existsSync(outputPath)) {
+          try {
+            execSync(`rm -f "${outputPath}"`);
+          } catch (cleanupError) {
+            console.error('Error cleaning up export file:', cleanupError);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Database export error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Database import endpoint
+  app.post('/api/worktrees/:name/database/import', upload.single('file'), async (req, res) => {
+    const { name } = req.params;
+    const { validate = 'true', mode = 'replace' } = req.body;
+
+    try {
+      const worktrees = manager.listWorktrees();
+      const worktree = worktrees.find(w => w.name === name);
+
+      if (!worktree) {
+        return res.status(404).json({ error: 'Worktree not found' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const ports = manager.portRegistry.getPorts(name);
+      if (!ports || !ports.postgres) {
+        return res.status(400).json({ error: 'Database port not allocated for this worktree' });
+      }
+
+      const dbConfig = {
+        host: 'localhost',
+        port: ports.postgres,
+        database: 'vibe',
+        user: 'postgres',
+        password: process.env.POSTGRES_PASSWORD || 'postgres'
+      };
+
+      // Validate schema compatibility if requested
+      if (validate === 'true') {
+        const validator = new DatabaseValidator(dbConfig);
+        // TODO: Parse SQL file to extract schema
+        // const importSchema = parseSQLSchema(req.file.path);
+        // const validation = await validator.validateCompatibility(importSchema);
+        // if (!validation.compatible) {
+        //   return res.status(400).json({ error: 'Incompatible schema', issues: validation.issues });
+        // }
+      }
+
+      const dbManager = new DatabaseManager(dbConfig);
+      const result = await dbManager.importWithTransaction(req.file.path);
+
+      // Clean up uploaded file
+      if (existsSync(req.file.path)) {
+        try {
+          execSync(`rm -f "${req.file.path}"`);
+        } catch (cleanupError) {
+          console.error('Error cleaning up upload file:', cleanupError);
+        }
+      }
+
+      if (!result.success) {
+        return res.status(500).json({
+          error: result.error,
+          rollback: result.rollback
+        });
+      }
+
+      res.json({ success: true, message: 'Import complete' });
+    } catch (error) {
+      console.error('Database import error:', error);
+      // Clean up uploaded file on error
+      if (req.file && existsSync(req.file.path)) {
+        try {
+          execSync(`rm -f "${req.file.path}"`);
+        } catch (cleanupError) {
+          console.error('Error cleaning up upload file:', cleanupError);
+        }
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Database schema endpoint
+  app.get('/api/worktrees/:name/database/schema', async (req, res) => {
+    const { name } = req.params;
+
+    try {
+      const worktrees = manager.listWorktrees();
+      const worktree = worktrees.find(w => w.name === name);
+
+      if (!worktree) {
+        return res.status(404).json({ error: 'Worktree not found' });
+      }
+
+      const ports = manager.portRegistry.getPorts(name);
+      if (!ports || !ports.postgres) {
+        return res.status(400).json({ error: 'Database port not allocated for this worktree' });
+      }
+
+      const dbConfig = {
+        host: 'localhost',
+        port: ports.postgres,
+        database: 'vibe',
+        user: 'postgres',
+        password: process.env.POSTGRES_PASSWORD || 'postgres'
+      };
+
+      const validator = new DatabaseValidator(dbConfig);
+      const tables = await validator.getTables();
+
+      const schema = {};
+      for (const table of tables) {
+        schema[table] = await validator.getTableSchema(table);
+      }
+
+      res.json({ tables, schema });
+    } catch (error) {
+      console.error('Database schema error:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
