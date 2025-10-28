@@ -11,6 +11,9 @@ import { basename, join, dirname } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 import { createServer as createNetServer } from 'net';
+import { Profiler } from '../profiler.mjs';
+import { PerformanceOptimizer } from '../performance-optimizer.mjs';
+import { CacheManager } from '../cache-manager.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '../..');
@@ -246,6 +249,9 @@ class WorktreeManager {
     this.portRegistry = new PortRegistry();
     this.clients = new Set();
     this.ptyManager = new PTYManager();
+    this.profiler = new Profiler();
+    this.optimizer = new PerformanceOptimizer({ profiler: this.profiler });
+    this.cacheManager = new CacheManager();
   }
 
   broadcast(event, data) {
@@ -360,6 +366,8 @@ class WorktreeManager {
   }
 
   async createWorktree(branchName, fromBranch = 'main') {
+    const totalId = this.profiler.start('create-worktree-total');
+
     // Slugify branch name for git (replace invalid characters)
     const slugifiedBranch = branchName
       .toLowerCase()
@@ -380,6 +388,7 @@ class WorktreeManager {
 
     try {
       // Progress: Creating git worktree
+      const gitId = this.profiler.start('git-worktree-add', totalId);
       console.log(`[CREATE] Broadcasting git progress...`);
       this.broadcast('worktree:progress', {
         name: worktreeName,
@@ -393,6 +402,7 @@ class WorktreeManager {
       });
 
       console.log(`[CREATE] Git worktree created successfully`);
+      this.profiler.end(gitId);
 
       // Copy updated docker-compose.yml from main worktree (in case it has uncommitted fixes)
       console.log(`[CREATE] Copying updated docker-compose.yml...`);
@@ -408,6 +418,7 @@ class WorktreeManager {
       });
 
       // Progress: Allocating ports (quick, do before slow operations)
+      const portsId = this.profiler.start('allocate-ports', totalId);
       console.log(`[CREATE] Allocating ports...`);
       this.broadcast('worktree:progress', {
         name: worktreeName,
@@ -431,6 +442,7 @@ class WorktreeManager {
         step: 'ports',
         message: `✓ Ports allocated: API:${ports.api}, Console:${ports.console}`
       });
+      this.profiler.end(portsId);
 
       // Write .env file for docker-compose (quick, do before slow operations)
       const envFilePath = join(worktreePath, '.env');
@@ -447,6 +459,7 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
       writeFileSync(envFilePath, envContent);
 
       // Generate MCP server configuration for this worktree
+      const mcpId = this.profiler.start('mcp-discovery', totalId);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'mcp',
@@ -465,6 +478,7 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
       } catch (error) {
         console.warn(`[CREATE] MCP configuration failed (non-critical):`, error.message);
       }
+      this.profiler.end(mcpId);
 
       // Run database copy and bootstrap in parallel (both are slow)
       console.log(`[CREATE] Starting parallel operations: database copy + bootstrap...`);
@@ -476,6 +490,7 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
           throw err;
         });
 
+      const bootstrapId = this.profiler.start('npm-bootstrap', totalId);
       const bootstrapPromise = new Promise((resolve, reject) => {
         console.log(`[CREATE] Running bootstrap to build packages...`);
         this.broadcast('worktree:progress', {
@@ -496,9 +511,11 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
             step: 'bootstrap',
             message: '✓ Bootstrap complete'
           });
+          this.profiler.end(bootstrapId);
           resolve();
         } catch (err) {
           console.error(`[CREATE] Failed to bootstrap packages:`, err.message);
+          this.profiler.end(bootstrapId);
           reject(new Error(`Failed to bootstrap packages: ${err.message}`));
         }
       });
@@ -514,9 +531,11 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
       });
 
       // Start containers
+      const dockerId = this.profiler.start('docker-compose-up', totalId);
       console.log(`[CREATE] Starting containers...`);
       await this.startContainersForWorktree(worktreeName, worktreePath);
       console.log(`[CREATE] Containers started`);
+      this.profiler.end(dockerId);
 
       const worktree = {
         name: worktreeName,
@@ -532,15 +551,52 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
         message: '✓ Worktree ready!'
       });
 
+      this.profiler.end(totalId);
+
+      // Log performance report
+      const report = this.profiler.generateReport();
+      console.log('[PERFORMANCE] Worktree creation report:', JSON.stringify(report, null, 2));
+
       this.broadcast('worktree:created', worktree);
       return { success: true, worktree };
     } catch (error) {
+      this.profiler.end(totalId);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'error',
         message: `✗ Error: ${error.message}`
       });
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Optimized worktree creation using parallel operations and caching
+   * @param {string} branchName - Branch name
+   * @param {string} fromBranch - Source branch (default: 'main')
+   * @returns {Promise<object>} Result with success status
+   *
+   * NOTE: This is a foundation for optimization. Currently delegates to createWorktree.
+   * Full optimization implementation (parallel tasks, caching) will be added in future iterations.
+   */
+  async createWorktreeOptimized(branchName, fromBranch = 'main') {
+    const totalId = this.profiler.start('create-worktree-optimized');
+
+    try {
+      // For now, use the profiled baseline implementation
+      // Future: Use this.optimizer.runWithDependencies() for parallel execution
+      // Future: Use this.cacheManager for node_modules caching
+      const result = await this.createWorktree(branchName, fromBranch);
+
+      this.profiler.end(totalId);
+
+      const report = this.profiler.generateReport();
+      console.log('[PERFORMANCE] Optimized worktree creation report:', JSON.stringify(report, null, 2));
+
+      return result;
+    } catch (error) {
+      this.profiler.end(totalId);
+      throw error;
     }
   }
 
