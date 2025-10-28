@@ -2726,7 +2726,23 @@ async function startServer() {
     });
 
     server.listen(PORT, HOST, async () => {
-      const address = HOST === '0.0.0.0' ? `http://<your-ip>:${PORT}` : `http://localhost:${PORT}`;
+      // Get all network interfaces
+      const getNetworkAddresses = () => {
+        const os = await import('os');
+        const interfaces = os.networkInterfaces();
+        const addresses = [];
+
+        for (const [name, nets] of Object.entries(interfaces)) {
+          for (const net of nets) {
+            // Skip internal and non-IPv4 addresses
+            if (!net.internal && net.family === 'IPv4') {
+              addresses.push({ name, address: net.address });
+            }
+          }
+        }
+
+        return addresses;
+      };
 
       // Check for first run
       const wizard = new FirstRunWizard();
@@ -2754,13 +2770,29 @@ async function startServer() {
         wizard.saveConfig(defaultConfig);
       }
 
-      console.log(`\n🚀 Worktree Manager running at ${address}`);
+      console.log(`\n🚀 Worktree Manager is running!\n`);
+
       if (HOST === '0.0.0.0') {
-        console.log(`   Listening on all network interfaces (--listen mode)`);
+        console.log(`   📡 Network Mode: Listening on ALL interfaces (--listen)\n`);
+        console.log(`   Connect from any device on your network:\n`);
+
+        const addresses = getNetworkAddresses();
+        if (addresses.length > 0) {
+          addresses.forEach(({ name, address }) => {
+            console.log(`      http://${address}:${PORT}  (${name})`);
+          });
+        } else {
+          console.log(`      http://<your-ip>:${PORT}`);
+        }
+
+        console.log(`\n   💡 Tip: Share any of these URLs with teammates!`);
       } else {
-        console.log(`   Listening on localhost only (use --listen to allow network access)`);
+        console.log(`   🔒 Local Mode: Localhost only\n`);
+        console.log(`      http://localhost:${PORT}`);
+        console.log(`\n   💡 Use --listen to allow network access`);
       }
-      console.log('\nOpen this URL in your browser to manage worktrees\n');
+
+      console.log('');
 
       // Sync GitHub branches for all worktrees
       await syncGitHubBranches(manager);
