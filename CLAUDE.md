@@ -15,7 +15,7 @@ This project adheres to clean coding standards as core values:
 - **TDD (Test-Driven Development)**: Write tests first, watch them fail, implement minimal code to pass
 - **DRY (Don't Repeat Yourself)**: Extract shared logic into reusable modules
 - **SOLID Principles**: Single responsibility, proper separation of concerns
-- **Comprehensive test coverage**: 486 tests covering all major code paths
+- **Comprehensive test coverage**: 468 tests covering all major code paths
 - **Interactive Development**: Human-driven, collaborative approach (no autonomous orchestration)
 
 ## Common Commands
@@ -946,6 +946,116 @@ Smart reload can be configured per-sync:
 - Visual diff viewer for conflicts
 - Custom migration command support
 - Service impact preview before syncing
+
+## Database Workflow
+
+**Complete database import/export functionality** with schema validation and migration support.
+
+### Overview
+
+The database workflow feature enables users to:
+- **Export** database schema, data, or both to SQL files
+- **Import** SQL files with transaction safety and auto-rollback
+- **Validate** schema compatibility before import
+- **View** current database schema in the web UI
+
+### Components
+
+#### DatabaseManager (`scripts/database-manager.mjs`)
+
+**Purpose**: Orchestrates database export/import operations using pg_dump and psql
+
+**Key Methods**:
+- `exportSchema(outputPath)` - Export schema only (DDL)
+- `exportData(outputPath)` - Export data only (INSERT statements)
+- `exportFull(outputPath)` - Export both schema and data
+- `importSQL(inputPath)` - Import SQL file
+- `importWithTransaction(inputPath)` - Import with BEGIN/COMMIT/ROLLBACK
+
+**Features**:
+- Error handling for pg_dump/psql failures
+- Transaction-wrapped imports for safety
+- Automatic rollback on import errors
+
+#### DatabaseValidator (`scripts/database-validator.mjs`)
+
+**Purpose**: Schema validation and compatibility checking
+
+**Key Methods**:
+- `getTables()` - List all tables in database
+- `getTableSchema(tableName)` - Get column definitions for table
+- `validateCompatibility(importSchema)` - Check if import schema is compatible
+
+**Features**:
+- Detects type mismatches between current and import schemas
+- Allows new tables without conflicts
+- PostgreSQL introspection via information_schema
+
+### API Endpoints
+
+**POST `/api/worktrees/:name/database/export`**
+```javascript
+// Request
+{ "type": "full|schema|data" }
+
+// Response
+SQL file download
+```
+
+**POST `/api/worktrees/:name/database/import`**
+```javascript
+// Request
+FormData with file + { "validate": "true" }
+
+// Response
+{ "success": true, "message": "Import complete" }
+```
+
+**GET `/api/worktrees/:name/database/schema`**
+```json
+{
+  "tables": ["users", "posts"],
+  "schema": {
+    "users": [
+      { "column_name": "id", "data_type": "integer" },
+      { "column_name": "email", "data_type": "varchar" }
+    ]
+  }
+}
+```
+
+### Web UI
+
+**Database Modal** (`database.js`):
+- Export dropdown (full/schema/data)
+- Import file upload with validation checkbox
+- View current schema
+- Progress indicators for long operations
+
+**Usage Flow**:
+1. Right-click worktree → "Database Operations"
+2. Select export type and download
+3. Upload SQL file to import
+4. Enable validation to check compatibility
+5. View current schema in formatted JSON
+
+### Limitations
+
+- **PostgreSQL only**: MySQL/SQLite support planned
+- **Large imports**: Files >1GB may timeout
+- **Schema validation**: Conservative approach may reject valid imports
+- **No SQL parsing**: Schema validation requires manual schema extraction (TODO)
+
+### Future Enhancements
+
+- Support for MySQL and SQLite
+- CSV/JSON export formats
+- Incremental imports (apply only changed data)
+- SQL file parsing for automatic schema extraction
+- Backup scheduling and rotation
+- Point-in-time recovery
+
+See [docs/database-workflow.md](docs/database-workflow.md) for detailed API documentation.
 
 ## Development Patterns
 
