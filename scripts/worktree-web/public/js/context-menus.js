@@ -81,12 +81,52 @@ export function showStatusContextMenu(event, worktreeName, servicesRunning, serv
 /**
  * Show tab context menu
  */
-export function showTabContextMenu(event, tabId, worktreeName, uiPort) {
+export function showTabContextMenu(event, tabId, worktreeName, uiPort, context = {}) {
   event.preventDefault();
   event.stopPropagation();
 
   const menu = document.getElementById('tab-context-menu');
-  tabContextMenuData = { tabId, worktreeName, uiPort };
+  tabContextMenuData = {
+    tabId,
+    worktreeName,
+    uiPort,
+    isWebUI: context.isWebUI || false,
+    isLogs: context.isLogs || false,
+    isCombinedLogs: context.isCombinedLogs || false,
+    command: context.command || null,
+    serviceName: context.serviceName || null
+  };
+
+  // Update menu items based on tab type
+  const refreshItem = menu.querySelector('[onclick*="refresh"]');
+  const cloneItem = menu.querySelector('[onclick*="clone"]');
+
+  // Only show refresh for WebUI tabs
+  if (refreshItem) {
+    refreshItem.style.display = tabContextMenuData.isWebUI ? 'flex' : 'none';
+  }
+
+  // Show clone for all tabs
+  if (cloneItem) {
+    const icon = cloneItem.querySelector('i');
+    const text = cloneItem.querySelector('span:last-child');
+
+    if (tabContextMenuData.isWebUI) {
+      if (icon) icon.setAttribute('data-lucide', 'copy');
+      if (text) text.textContent = 'Clone Tab';
+    } else if (tabContextMenuData.isLogs || tabContextMenuData.isCombinedLogs) {
+      if (icon) icon.setAttribute('data-lucide', 'copy');
+      if (text) text.textContent = 'Clone Logs Tab';
+    } else {
+      if (icon) icon.setAttribute('data-lucide', 'copy');
+      if (text) text.textContent = 'Clone Terminal';
+    }
+
+    // Re-initialize Lucide icons
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+  }
 
   menu.style.left = event.pageX + 'px';
   menu.style.top = event.pageY + 'px';
@@ -98,3 +138,12 @@ window.showContextMenu = showContextMenu;
 window.showWorktreeContextMenu = showWorktreeContextMenu;
 window.showStatusContextMenu = showStatusContextMenu;
 window.showTabContextMenu = showTabContextMenu;
+
+// Export module data for access from other modules
+window.contextMenusModule = {
+  hideAllContextMenus,
+  tabContextMenuData,
+  contextMenuData,
+  worktreeContextMenuData,
+  statusContextMenuData
+};

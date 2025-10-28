@@ -26,6 +26,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Application Styles -->
+  <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/sidebar.css">
   <link rel="stylesheet" href="/css/terminals.css">
@@ -56,6 +57,11 @@
     <div class="terminal-area">
       <div class="terminal-tabs" id="terminal-tabs">
         <!-- Tabs will be added here dynamically -->
+        <div class="new-tab-buttons">
+          <button class="new-tab-button" onclick="showNewTabMenu(event)" title="New tab">
+            <i data-lucide="plus" class="lucide-sm"></i>
+          </button>
+        </div>
       </div>
       <div class="terminal-panels" id="terminal-panels">
         <div class="empty-terminal">
@@ -202,15 +208,15 @@
 
           <!-- Update Main Option -->
           <div id="update-main-option" class="update-main-option" style="display: none;">
-            <label class="checkbox-label">
-              <input type="checkbox" id="update-main-checkbox" checked>
-              <div class="checkbox-content">
-                <div class="checkbox-title">Pull latest changes to main first</div>
-                <div class="checkbox-description">
-                  Recommended: Ensures main has your merged migrations before importing data.
-                </div>
+            <div class="update-main-button-container">
+              <button type="button" class="update-main-button" onclick="openUpdateMainInstructions()">
+                <i data-lucide="external-link" class="lucide-sm"></i>
+                <span>Open Claude tab to update main from GitHub</span>
+              </button>
+              <div class="update-main-description">
+                Recommended: Ensures main has your merged migrations before importing data.
               </div>
-            </label>
+            </div>
             <div id="main-status-warning" class="warning-box" style="display: none;">
               ⚠️ Main worktree has uncommitted changes. Commit or stash them before proceeding.
             </div>
@@ -288,6 +294,26 @@
     </div>
   </div>
 
+  <!-- New Tab Menu -->
+  <div id="new-tab-menu" class="context-menu">
+    <div class="context-menu-item" onclick="newTabMenuAction('shell')">
+      <i data-lucide="terminal" class="lucide-sm"></i>
+      <span>Shell</span>
+    </div>
+    <div class="context-menu-item" onclick="newTabMenuAction('claude')">
+      <img src="/icons/anthropic.svg" style="width: 14px; height: 14px; filter: brightness(0) invert(1);" />
+      <span>Claude</span>
+    </div>
+    <div class="context-menu-item" onclick="newTabMenuAction('codex')">
+      <img src="/icons/openai.svg" style="width: 14px; height: 14px; filter: brightness(0) invert(1);" />
+      <span>Codex</span>
+    </div>
+    <div class="context-menu-item" onclick="newTabMenuAction('console')">
+      <i data-lucide="globe" class="lucide-sm"></i>
+      <span>Console UI</span>
+    </div>
+  </div>
+
   <!-- Tab Context Menu -->
   <div id="tab-context-menu" class="context-menu">
     <div class="context-menu-item" onclick="tabContextMenuAction('refresh')">
@@ -298,12 +324,24 @@
       <i data-lucide="copy" class="lucide-sm"></i>
       <span>Clone Tab</span>
     </div>
+    <div class="context-menu-item" onclick="tabContextMenuAction('reload')">
+      <i data-lucide="refresh-cw" class="lucide-sm"></i>
+      <span>Reload</span>
+    </div>
     <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" onclick="tabContextMenuAction('kill')">
+      <i data-lucide="x-octagon" class="lucide-sm"></i>
+      <span>Kill Process</span>
+    </div>
     <div class="context-menu-item danger" onclick="tabContextMenuAction('close')">
       <span>×</span>
       <span>Close Tab</span>
     </div>
   </div>
+
+  <!-- Theme and Selection Management (Load before main.js) -->
+  <script src="/js/theme.js"></script>
+  <script src="/js/selection.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
   <script type="module" src="/js/main.js"></script>

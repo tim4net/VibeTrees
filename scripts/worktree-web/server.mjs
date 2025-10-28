@@ -10,15 +10,57 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { basename, join, dirname } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
+import { createServer as createNetServer } from 'net';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '../..');
-const PORT = 3335; // Changed from 3333 to avoid conflict with orchestrator dashboard (3334)
 
 // Parse command-line arguments
 const args = process.argv.slice(2);
 const listenAll = args.includes('--listen');
 const HOST = listenAll ? '0.0.0.0' : '127.0.0.1';
+
+// Port configuration
+const portArg = args.find(arg => arg.startsWith('--port='));
+const requestedPort = portArg ? parseInt(portArg.split('=')[1], 10) : 3335;
+const PORT_RANGE_START = requestedPort;
+const PORT_RANGE_END = requestedPort + 10; // Try 10 ports
+
+/**
+ * Check if a port is available
+ */
+function isPortAvailable(port, host = '127.0.0.1') {
+  return new Promise((resolve) => {
+    const server = createNetServer();
+
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(false);
+      } else {
+        resolve(false);
+      }
+    });
+
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+
+    server.listen(port, host);
+  });
+}
+
+/**
+ * Find an available port in the range
+ */
+async function findAvailablePort(startPort, endPort, host = '127.0.0.1') {
+  for (let port = startPort; port <= endPort; port++) {
+    if (await isPortAvailable(port, host)) {
+      return port;
+    }
+  }
+  throw new Error(`No available ports found in range ${startPort}-${endPort}`);
+}
 
 /**
  * Check if required dependencies are installed
@@ -66,7 +108,27 @@ const { WebSocketServer } = await import('ws');
 const pty = await import('node-pty');
 const { PortRegistry } = await import('../port-registry.mjs');
 const { FirstRunWizard } = await import('../first-run-wizard.mjs');
+const { ContainerRuntime } = await import('../container-runtime.mjs');
+const { ComposeInspector } = await import('../compose-inspector.mjs');
+const { ConfigManager } = await import('../config-manager.mjs');
+const { DataSync } = await import('../data-sync.mjs');
+const { McpManager } = await import('../mcp-manager.mjs');
+const { agentRegistry } = await import('../agents/index.mjs');
+const { GitSyncManager } = await import('../git-sync-manager.mjs');
+const { SmartReloadManager } = await import('../smart-reload-manager.mjs');
+const { AIConflictResolver } = await import('../ai-conflict-resolver.mjs');
+
 const WORKTREE_BASE = join(process.cwd(), '.worktrees');
+
+// Initialize global instances
+const runtime = new ContainerRuntime();
+const config = new ConfigManager(process.cwd());
+config.load(); // Load or create default config
+const mcpManager = new McpManager(process.cwd(), runtime);
+
+console.log(`🐳 Container runtime: ${runtime.getRuntime()} (${runtime.getComposeCommand()})`);
+console.log(`🔌 MCP servers discovered: ${mcpManager.discoverServers().length}`);
+console.log(`🤖 AI agents available: ${agentRegistry.list().join(', ')}`);
 
 /**
  * PTY Manager for terminal sessions
@@ -149,6 +211,28 @@ class PTYManager {
     }
   }
 
+  /**
+   * Kill a terminal by its key (worktreeName:command)
+   */
+  killTerminalByKey(key) {
+    const terminal = this.terminals.get(key);
+    if (terminal) {
+      console.log(`Killing terminal: ${key}`);
+      terminal.kill();
+      this.terminals.delete(key);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Find terminal key by tabId (searches for matching worktree:command)
+   */
+  findKeyByTabContext(worktreeName, command) {
+    const key = `${worktreeName}:${command}`;
+    return this.terminals.has(key) ? key : null;
+  }
+
   hasTerminal(worktreeName) {
     return this.terminals.has(worktreeName);
   }
@@ -217,7 +301,7 @@ class WorktreeManager {
 
     // Get Docker container statuses
     try {
-      const output = execSync('sudo docker compose ps -a --format json', {
+      const output = runtime.execCompose('ps -a --format json', {
         cwd: worktreePath,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
@@ -361,6 +445,26 @@ MINIO_PORT=${ports.minio}
 MINIO_CONSOLE_PORT=${ports.minioconsole}
 `;
       writeFileSync(envFilePath, envContent);
+
+      // Generate MCP server configuration for this worktree
+      this.broadcast('worktree:progress', {
+        name: worktreeName,
+        step: 'mcp',
+        message: 'Configuring MCP servers...'
+      });
+
+      try {
+        const mcpResult = mcpManager.generateClaudeSettings(worktreePath, null, {
+          serverEnv: {
+            postgres: {
+              DATABASE_URL: `postgresql://localhost:${ports.postgres}/vibe`
+            }
+          }
+        });
+        console.log(`[CREATE] MCP configuration generated: ${mcpResult.count} servers configured`);
+      } catch (error) {
+        console.warn(`[CREATE] MCP configuration failed (non-critical):`, error.message);
+      }
 
       // Run database copy and bootstrap in parallel (both are slow)
       console.log(`[CREATE] Starting parallel operations: database copy + bootstrap...`);
@@ -514,7 +618,7 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
       const targetVolume = `${targetProjectName}_postgres_data`;
 
       // Check if main volume exists
-      const volumeCheck = execSync('sudo docker volume ls --format "{{.Name}}"', {
+      const volumeCheck = runtime.exec('volume ls --format "{{.Name}}"', {
         encoding: 'utf-8'
       });
 
@@ -536,7 +640,7 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
 
       // Create target volume if it doesn't exist
       try {
-        execSync(`sudo docker volume create ${targetVolume}`, {
+        runtime.exec(`volume create ${targetVolume}`, {
           stdio: 'pipe'
         });
       } catch (e) {
@@ -544,8 +648,11 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
       }
 
       // Copy data from main volume to target volume using a temporary container
+      const copyCmd = `run --rm -v ${mainVolume}:/source -v ${targetVolume}:/target alpine sh -c "cp -a /source/. /target/"`;
+      const fullCmd = runtime.needsElevation() ? `sudo ${runtime.getRuntime()} ${copyCmd}` : `${runtime.getRuntime()} ${copyCmd}`;
+
       await this._runCommandWithProgress(
-        `sudo docker run --rm -v ${mainVolume}:/source -v ${targetVolume}:/target alpine sh -c "cp -a /source/. /target/"`,
+        fullCmd,
         targetWorktreeName,
         'database'
       );
@@ -579,9 +686,13 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
     });
 
     try {
+      // Build the compose command - runtime handles sudo automatically
+      const composeCmd = `${runtime.getComposeCommand()} --env-file .env up -d`;
+      const fullCmd = runtime.needsElevation() ? `sudo ${composeCmd}` : composeCmd;
+
       // Start containers with docker-compose up -d
       await this._runCommandWithProgress(
-        'sudo docker compose --env-file .env up -d',
+        fullCmd,
         worktreeName,
         'containers',
         { cwd: worktreePath }
@@ -738,8 +849,8 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
         LIMIT 20;
       `;
 
-      const result = execSync(
-        `sudo docker compose exec -T postgres psql -U app app -t -A -F'|' -c "${query.replace(/\n/g, ' ')}"`,
+      const result = runtime.execCompose(
+        `exec -T postgres psql -U app app -t -A -F'|' -c "${query.replace(/\n/g, ' ')}"`,
         {
           cwd: worktreePath,
           encoding: 'utf-8',
@@ -802,7 +913,7 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
     try {
       // Stop services
       try {
-        execSync('sudo docker compose --env-file .env down -v', {
+        runtime.execCompose('--env-file .env down -v', {
           cwd: worktree.path,
           stdio: 'pipe'
         });
@@ -857,7 +968,7 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
       console.log(`✓ Wrote .env file for ${worktreeName}`);
 
       // Start Docker services
-      const output = execSync('sudo docker compose --env-file .env up -d', {
+      const output = runtime.execCompose('--env-file .env up -d', {
         cwd: worktree.path,
         encoding: 'utf-8',
         stdio: 'pipe'
@@ -886,7 +997,7 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
 
     try {
       // Stop Docker services
-      execSync('sudo docker compose down', {
+      runtime.execCompose('down', {
         cwd: worktree.path,
         stdio: 'pipe'
       });
@@ -896,6 +1007,177 @@ MINIO_CONSOLE_PORT=${ports.minioconsole}
     } catch (error) {
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Check for updates from main branch (Phase 2.9)
+   */
+  async checkUpdates(worktreeName, worktreePath) {
+    const syncManager = new GitSyncManager(worktreePath);
+    const updateInfo = await syncManager.fetchUpstream();
+
+    this.broadcast('updates:checked', {
+      worktree: worktreeName,
+      ...updateInfo
+    });
+
+    return updateInfo;
+  }
+
+  /**
+   * Sync worktree with main branch (Phase 2.9 + 5.2)
+   */
+  async syncWorktree(worktreeName, worktreePath, options = {}) {
+    const syncManager = new GitSyncManager(worktreePath);
+    const result = await syncManager.syncWithMain(options.strategy, options);
+
+    // If sync succeeded and smartReload is enabled, perform smart reload
+    if (result.success && options.smartReload) {
+      // Get commits that were merged
+      const commits = result.output?.match(/[0-9a-f]{7,40}/g) || [];
+
+      // Analyze changes
+      const analysis = await syncManager.analyzeChanges(commits);
+
+      // Perform smart reload
+      const reloadManager = new SmartReloadManager(worktreePath, runtime);
+      const reloadResult = await reloadManager.performSmartReload(analysis, options);
+
+      // Notify agent
+      await reloadManager.notifyAgent(analysis, this.ptyManager, worktreeName);
+
+      result.smartReload = reloadResult;
+    }
+
+    this.broadcast('worktree:synced', {
+      worktree: worktreeName,
+      ...result
+    });
+
+    return result;
+  }
+
+  /**
+   * Analyze changes from commits (Phase 5.1)
+   */
+  async analyzeChanges(worktreeName, worktreePath, commits) {
+    const syncManager = new GitSyncManager(worktreePath);
+    const analysis = await syncManager.analyzeChanges(commits);
+
+    return {
+      success: true,
+      worktree: worktreeName,
+      ...analysis
+    };
+  }
+
+  /**
+   * Rollback worktree to previous commit (Phase 2.9)
+   */
+  async rollbackWorktree(worktreeName, worktreePath, commitSha) {
+    const syncManager = new GitSyncManager(worktreePath);
+    const result = await syncManager.rollback(commitSha);
+
+    this.broadcast('worktree:rolled-back', {
+      worktree: worktreeName,
+      ...result
+    });
+
+    return result;
+  }
+
+  /**
+   * Perform smart reload (Phase 5.2)
+   */
+  async performSmartReload(worktreeName, worktreePath, commits, options = {}) {
+    const syncManager = new GitSyncManager(worktreePath);
+    const analysis = await syncManager.analyzeChanges(commits);
+
+    const reloadManager = new SmartReloadManager(worktreePath, runtime);
+    const result = await reloadManager.performSmartReload(analysis, options);
+
+    // Notify agent
+    await reloadManager.notifyAgent(analysis, this.ptyManager, worktreeName);
+
+    this.broadcast('worktree:smart-reload', {
+      worktree: worktreeName,
+      ...result
+    });
+
+    return {
+      success: result.success,
+      analysis,
+      reload: result
+    };
+  }
+
+  /**
+   * Get all conflicts (Phase 5.3)
+   */
+  async getConflicts(worktreeName, worktreePath) {
+    const resolver = new AIConflictResolver(worktreePath);
+    const conflicts = resolver.getConflicts();
+
+    return {
+      success: true,
+      worktree: worktreeName,
+      count: conflicts.length,
+      conflicts
+    };
+  }
+
+  /**
+   * Analyze conflicts with AI suggestions (Phase 5.3)
+   */
+  async analyzeConflicts(worktreeName, worktreePath) {
+    const resolver = new AIConflictResolver(worktreePath);
+    const analysis = await resolver.analyzeConflicts();
+
+    return {
+      success: true,
+      worktree: worktreeName,
+      ...analysis
+    };
+  }
+
+  /**
+   * Resolve a specific conflict (Phase 5.3)
+   */
+  async resolveConflict(worktreeName, worktreePath, file, strategy) {
+    const resolver = new AIConflictResolver(worktreePath);
+    const result = await resolver.autoResolve(file, strategy);
+
+    this.broadcast('conflict:resolved', {
+      worktree: worktreeName,
+      file,
+      ...result
+    });
+
+    return result;
+  }
+
+  /**
+   * Request AI assistance for conflict (Phase 5.3)
+   */
+  async requestAIAssistance(worktreeName, worktreePath, file) {
+    const resolver = new AIConflictResolver(worktreePath);
+    const conflicts = resolver.getConflicts();
+    const conflict = conflicts.find(c => c.file === file);
+
+    if (!conflict) {
+      return {
+        success: false,
+        message: 'Conflict not found for file: ' + file
+      };
+    }
+
+    const result = await resolver.requestAIAssistance(
+      conflict,
+      this.ptyManager,
+      worktreeName
+    );
+
+    return result;
   }
 }
 
@@ -947,9 +1229,12 @@ function handleLogsConnection(ws, worktreeName, serviceName, manager) {
   }
 
   // Spawn docker compose logs with --no-log-prefix for cleaner output
-  const logsProcess = spawn('sudo', [
-    'docker', 'compose', 'logs', '-f', '--tail=100', '--no-log-prefix', serviceName
-  ], {
+  const composeCmd = runtime.getComposeCommand().split(' ');
+  const args = [...composeCmd.slice(1), 'logs', '-f', '--tail=100', '--no-log-prefix', serviceName];
+  const cmd = runtime.needsElevation() ? 'sudo' : composeCmd[0];
+  const fullArgs = runtime.needsElevation() ? [composeCmd[0], ...args] : args;
+
+  const logsProcess = spawn(cmd, fullArgs, {
     cwd: worktree.path,
     env: process.env
   });
@@ -1011,9 +1296,12 @@ function handleCombinedLogsConnection(ws, worktreeName, manager) {
   }
 
   // Spawn docker compose logs for all services
-  const logsProcess = spawn('sudo', [
-    'docker', 'compose', 'logs', '-f', '--tail=100'
-  ], {
+  const composeCmd = runtime.getComposeCommand().split(' ');
+  const args = [...composeCmd.slice(1), 'logs', '-f', '--tail=100'];
+  const cmd = runtime.needsElevation() ? 'sudo' : composeCmd[0];
+  const fullArgs = runtime.needsElevation() ? [composeCmd[0], ...args] : args;
+
+  const logsProcess = spawn(cmd, fullArgs, {
     cwd: worktree.path,
     env: process.env
   });
@@ -1226,6 +1514,250 @@ function createApp() {
     }
   });
 
+  // Git Sync API Routes (Phase 2.9 + Phase 5)
+  app.get('/api/worktrees/:name/check-updates', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const result = await manager.checkUpdates(req.params.name, worktree.path);
+      res.json(result);
+    } catch (error) {
+      console.error('Error checking updates:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.post('/api/worktrees/:name/sync', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const { strategy = 'merge', force = false } = req.body;
+      const result = await manager.syncWorktree(
+        req.params.name,
+        worktree.path,
+        { strategy, force }
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('Error syncing worktree:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.get('/api/worktrees/:name/analyze-changes', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const { commits } = req.query;
+      const commitList = commits ? commits.split(',') : [];
+
+      const result = await manager.analyzeChanges(
+        req.params.name,
+        worktree.path,
+        commitList
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('Error analyzing changes:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.post('/api/worktrees/:name/rollback', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const { commitSha } = req.body;
+      if (!commitSha) {
+        return res.status(400).json({
+          success: false,
+          error: 'commitSha is required'
+        });
+      }
+
+      const result = await manager.rollbackWorktree(
+        req.params.name,
+        worktree.path,
+        commitSha
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('Error rolling back worktree:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.post('/api/worktrees/:name/smart-reload', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const { commits, options = {} } = req.body;
+      if (!commits || !Array.isArray(commits)) {
+        return res.status(400).json({
+          success: false,
+          error: 'commits array is required'
+        });
+      }
+
+      const result = await manager.performSmartReload(
+        req.params.name,
+        worktree.path,
+        commits,
+        options
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('Error performing smart reload:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Conflict Resolution API Routes (Phase 5.3)
+  app.get('/api/worktrees/:name/conflicts', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const result = await manager.getConflicts(req.params.name, worktree.path);
+      res.json(result);
+    } catch (error) {
+      console.error('Error getting conflicts:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.get('/api/worktrees/:name/conflicts/analyze', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const result = await manager.analyzeConflicts(req.params.name, worktree.path);
+      res.json(result);
+    } catch (error) {
+      console.error('Error analyzing conflicts:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.post('/api/worktrees/:name/conflicts/resolve', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const { file, strategy = 'auto' } = req.body;
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          error: 'file is required'
+        });
+      }
+
+      const result = await manager.resolveConflict(
+        req.params.name,
+        worktree.path,
+        file,
+        strategy
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('Error resolving conflict:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.post('/api/worktrees/:name/conflicts/ai-assist', async (req, res) => {
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === req.params.name);
+
+    if (!worktree) {
+      return res.status(404).json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const { file } = req.body;
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          error: 'file is required'
+        });
+      }
+
+      const result = await manager.requestAIAssistance(
+        req.params.name,
+        worktree.path,
+        file
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('Error requesting AI assistance:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   app.post('/api/worktrees/:name/services/start', async (req, res) => {
     const result = await manager.startServices(req.params.name);
     res.json(result);
@@ -1260,7 +1792,7 @@ function createApp() {
       console.log(`Restarting service ${service} in worktree ${name}...`);
 
       // All services managed by docker compose
-      execSync(`sudo docker compose restart ${service}`, {
+      runtime.execCompose(`restart ${service}`, {
         cwd: worktree.path,
         stdio: 'pipe',
         encoding: 'utf-8'
@@ -1288,14 +1820,14 @@ function createApp() {
 
       // All services managed by docker compose
       // Stop the service
-      execSync(`sudo docker compose stop ${service}`, {
+      runtime.execCompose(`stop ${service}`, {
         cwd: worktree.path,
         stdio: 'pipe',
         encoding: 'utf-8'
       });
 
       // Rebuild and start
-      execSync(`sudo docker compose up -d --build ${service}`, {
+      runtime.execCompose(`up -d --build ${service}`, {
         cwd: worktree.path,
         stdio: 'pipe',
         encoding: 'utf-8'
@@ -1305,6 +1837,72 @@ function createApp() {
     } catch (error) {
       console.error(`Failed to rebuild service ${service}:`, error.message);
       res.json({ success: false, error: error.message });
+    }
+  });
+
+  // Kill Terminal API Route
+  app.post('/api/kill-terminal', async (req, res) => {
+    const { worktreeName, command } = req.body;
+
+    if (!worktreeName || !command) {
+      res.json({ success: false, error: 'worktreeName and command are required' });
+      return;
+    }
+
+    try {
+      const key = manager.ptyManager.findKeyByTabContext(worktreeName, command);
+
+      if (!key) {
+        res.json({ success: false, error: 'Terminal not found' });
+        return;
+      }
+
+      const killed = manager.ptyManager.killTerminalByKey(key);
+
+      if (killed) {
+        console.log(`Successfully killed terminal: ${key}`);
+        res.json({ success: true });
+      } else {
+        res.json({ success: false, error: 'Failed to kill terminal' });
+      }
+    } catch (error) {
+      console.error('Error killing terminal:', error.message);
+      res.json({ success: false, error: error.message });
+    }
+  });
+
+  // Agent API Routes
+  app.get('/api/agents', async (req, res) => {
+    try {
+      const agents = await agentRegistry.getAll();
+      res.json(agents);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/agents/:name', async (req, res) => {
+    try {
+      const { name } = req.params;
+
+      if (!agentRegistry.has(name)) {
+        res.status(404).json({ error: `Agent not found: ${name}` });
+        return;
+      }
+
+      const metadata = await agentRegistry.getMetadata(name);
+      res.json(metadata);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/agents/availability', async (req, res) => {
+    try {
+      const availability = await agentRegistry.checkAvailability();
+      res.json(availability);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -1408,17 +2006,16 @@ async function autoStartContainers(manager) {
  */
 async function startServer() {
   try {
+    // Find an available port
+    console.log(`🔍 Finding available port...`);
+    const PORT = await findAvailablePort(PORT_RANGE_START, PORT_RANGE_END, HOST);
+    console.log(`✓ Port ${PORT} is available\n`);
+
     const { server, manager } = createApp();
 
     server.on('error', (error) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`\n❌ Port ${PORT} is already in use`);
-        console.error('Kill the existing process or choose a different port\n');
-        process.exit(1);
-      } else {
-        console.error('\n❌ Server error:', error.message);
-        process.exit(1);
-      }
+      console.error('\n❌ Server error:', error.message);
+      process.exit(1);
     });
 
     server.listen(PORT, HOST, async () => {

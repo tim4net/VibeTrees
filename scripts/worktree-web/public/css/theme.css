@@ -1,0 +1,385 @@
+/**
+ * Theme System - Dark/Light Mode with OS Preference Detection
+ *
+ * Features:
+ * - Follows OS preference by default (prefers-color-scheme)
+ * - Manual toggle override stored in localStorage
+ * - Smooth theme transitions
+ * - WCAG AA compliant contrast ratios
+ * - Developer-focused color palette
+ */
+
+:root {
+  /* Color System - Light Mode */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #f0f3f6;
+  --bg-hover: #eaeef2;
+  --bg-active: #dfe3e8;
+
+  --text-primary: #24292f;
+  --text-secondary: #57606a;
+  --text-tertiary: #818b98;
+  --text-inverse: #ffffff;
+
+  --border-primary: #d0d7de;
+  --border-secondary: #e5e9ed;
+  --border-hover: #c4cbd4;
+
+  --accent-primary: #0969da;
+  --accent-secondary: #0550ae;
+  --accent-hover: #0860ca;
+  --accent-bg: #ddf4ff;
+
+  --success: #1a7f37;
+  --success-bg: #dafbe1;
+  --warning: #9a6700;
+  --warning-bg: #fff8c5;
+  --error: #cf222e;
+  --error-bg: #ffebe9;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+
+  /* Selection States */
+  --selected-border: #0969da;
+  --selected-bg: #f6f8fa;
+  --selected-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+  --unselected-opacity: 0.7;
+
+  /* Terminal Colors */
+  --terminal-bg: #f6f8fa;
+  --terminal-text: #24292f;
+  --terminal-cursor: #0969da;
+}
+
+/* Dark Mode - System Preference */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Backgrounds */
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --bg-hover: #30363d;
+    --bg-active: #3c444d;
+
+    /* Text */
+    --text-primary: #e6edf3;
+    --text-secondary: #7d8590;
+    --text-tertiary: #6e7681;
+    --text-inverse: #0d1117;
+
+    /* Borders */
+    --border-primary: #30363d;
+    --border-secondary: #21262d;
+    --border-hover: #3c444d;
+
+    /* Accent (Blue) */
+    --accent-primary: #58a6ff;
+    --accent-secondary: #79c0ff;
+    --accent-hover: #6cb6ff;
+    --accent-bg: #1c2d41;
+
+    /* Status Colors */
+    --success: #3fb950;
+    --success-bg: #1a2f1f;
+    --warning: #d29922;
+    --warning-bg: #2d2108;
+    --error: #f85149;
+    --error-bg: #2d1417;
+
+    /* Shadows (more subtle in dark mode) */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+
+    /* Selection States */
+    --selected-border: #58a6ff;
+    --selected-bg: #1c2d41;
+    --selected-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+    --unselected-opacity: 0.6;
+
+    /* Terminal Colors */
+    --terminal-bg: #0d1117;
+    --terminal-text: #e6edf3;
+    --terminal-cursor: #58a6ff;
+  }
+}
+
+/* Explicit Light Mode Override */
+:root[data-theme="light"] {
+  /* Keep light mode values (already set above) */
+}
+
+/* Explicit Dark Mode Override */
+:root[data-theme="dark"] {
+  /* Backgrounds */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-hover: #30363d;
+  --bg-active: #3c444d;
+
+  /* Text */
+  --text-primary: #e6edf3;
+  --text-secondary: #7d8590;
+  --text-tertiary: #6e7681;
+  --text-inverse: #0d1117;
+
+  /* Borders */
+  --border-primary: #30363d;
+  --border-secondary: #21262d;
+  --border-hover: #3c444d;
+
+  /* Accent */
+  --accent-primary: #58a6ff;
+  --accent-secondary: #79c0ff;
+  --accent-hover: #6cb6ff;
+  --accent-bg: #1c2d41;
+
+  /* Status */
+  --success: #3fb950;
+  --success-bg: #1a2f1f;
+  --warning: #d29922;
+  --warning-bg: #2d2108;
+  --error: #f85149;
+  --error-bg: #2d1417;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+
+  /* Selection */
+  --selected-border: #58a6ff;
+  --selected-bg: #1c2d41;
+  --selected-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+  --unselected-opacity: 0.6;
+
+  /* Terminal */
+  --terminal-bg: #0d1117;
+  --terminal-text: #e6edf3;
+  --terminal-cursor: #58a6ff;
+}
+
+/* Smooth Theme Transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 3000; /* Above context menus (2000) and modals (1000) */
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.theme-toggle:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: var(--text-secondary);
+}
+
+/* Worktree Card - Base Styles */
+.worktree-card {
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Unselected State - Muted */
+.worktree-card:not(.selected) {
+  opacity: var(--unselected-opacity);
+}
+
+.worktree-card:not(.selected):hover {
+  opacity: 0.85;
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+/* Selected State - Prominent */
+.worktree-card.selected {
+  background: var(--selected-bg);
+  border-color: var(--selected-border);
+  border-width: 3px;
+  box-shadow: var(--selected-shadow), var(--shadow-lg);
+  transform: translateY(-2px);
+  opacity: 1;
+  padding: 15px; /* Adjust for thicker border */
+}
+
+.worktree-card.selected::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: 8px;
+  z-index: -1;
+  opacity: 0.15;
+}
+
+/* Selected Indicator Badge */
+.worktree-card.selected .worktree-name::after {
+  content: '●';
+  color: var(--accent-primary);
+  margin-left: 8px;
+  font-size: 12px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Worktree Name - Enhanced Typography */
+.worktree-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.worktree-card.selected .worktree-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+/* Status Badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.running {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.status-badge.stopped {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.status-badge.starting {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+/* Action Buttons - Improved Visual Hierarchy */
+.worktree-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.worktree-card.selected .worktree-actions button {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.worktree-card.selected .worktree-actions button:hover {
+  background: var(--accent-bg);
+}
+
+/* Focus States for Accessibility */
+.worktree-card:focus-visible {
+  outline: 3px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Loading State */
+.worktree-card.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.worktree-card.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border: 3px solid var(--border-primary);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Print Mode - Disable Transitions */
+@media print {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .theme-toggle {
+    display: none;
+  }
+}
+
+/* Reduced Motion for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

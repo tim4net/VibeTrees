@@ -47,6 +47,37 @@ button.small {
   font-size: 11px;
 }
 
+/* New Tab Buttons */
+.new-tab-buttons {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 8px;
+}
+
+.new-tab-button {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.new-tab-button:hover {
+  background: #21262d;
+  color: #c9d1d9;
+  border-color: transparent;
+}
+
+.new-tab-button i {
+  margin: 0;
+}
+
 /* Context Menu */
 .context-menu {
   display: none;
@@ -477,6 +508,37 @@ input:focus {
 
 .update-main-option {
   margin: 15px 0;
+}
+
+.update-main-button-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-main-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #238636;
+  border: 1px solid #2ea043;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.update-main-button:hover {
+  background: #2ea043;
+}
+
+.update-main-description {
+  font-size: 12px;
+  color: #8b949e;
+  line-height: 1.5;
+  padding-left: 4px;
 }
 
 .warning-box {

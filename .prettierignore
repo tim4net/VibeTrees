@@ -1,0 +1,6 @@
+node_modules
+coverage
+.worktrees
+dist
+*.log
+package-lock.json

@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "vibe-worktrees",
+    "description": ""
+  },
+  "container": {
+    "runtime": "auto",
+    "composeFile": "docker-compose.yml",
+    "servicesToLog": [],
+    "dataVolumes": [],
+    "sudo": "auto"
+  },
+  "agents": {
+    "default": "claude",
+    "available": [
+      "claude",
+      "codex",
+      "gemini",
+      "shell"
+    ]
+  },
+  "mcp": {
+    "autoInstall": true,
+    "servers": []
+  },
+  "sync": {
+    "enabled": true,
+    "baseBranch": "main",
+    "autoUpdate": false,
+    "checkInterval": 300000
+  }
+}

@@ -89,14 +89,18 @@ export function createTerminalTab(worktreeName, command, isWebUI = false, uiPort
     }
   };
 
-  // Add right-click context menu for WebUI tabs
-  if (isWebUI) {
-    tab.oncontextmenu = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      showTabContextMenu(e, tabId, worktreeName, uiPort);
-    };
-  }
+  // Add right-click context menu for ALL tab types
+  tab.oncontextmenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showTabContextMenu(e, tabId, worktreeName, uiPort, {
+      isWebUI,
+      isLogs,
+      isCombinedLogs,
+      command,
+      serviceName
+    });
+  };
 
   // Create panel
   const panel = document.createElement('div');

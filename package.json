@@ -1,15 +1,24 @@
 {
   "name": "vibetrees",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Manage multiple git worktrees with AI agents and isolated containers",
+  "bin": {
+    "vibe": "./bin/vibe.mjs"
+  },
   "scripts": {
     "web": "node scripts/worktree-web/server.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "orchestrator": "./scripts/start-orchestrator.sh",
-    "orchestrator:test": "cd scripts/orchestrator && npm test"
+    "test:security": "vitest run scripts/security/*.test.mjs",
+    "test:security:watch": "vitest scripts/security/*.test.mjs",
+    "lint": "eslint scripts/**/*.mjs",
+    "lint:fix": "eslint scripts/**/*.mjs --fix",
+    "lint:security": "eslint scripts/**/*.mjs --rule 'no-eval: error' --rule 'no-implied-eval: error'",
+    "format": "prettier --write \"scripts/**/*.{js,mjs,json,md}\"",
+    "format:check": "prettier --check \"scripts/**/*.{js,mjs,json,md}\"",
+    "security:audit": "npm audit && npm audit --production"
   },
   "keywords": [
     "git",
@@ -21,11 +30,15 @@
     "development"
   ],
   "devDependencies": {
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.0",
     "vitest": "^1.0.0"
   },
   "dependencies": {
     "express": "^4.18.0",
+    "node-pty": "^1.0.0",
     "ws": "^8.14.0",
-    "node-pty": "^1.0.0"
+    "yaml": "^2.8.1"
   }
 }
