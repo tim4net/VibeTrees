@@ -93,34 +93,44 @@
 .worktree-card.git-unpushed:hover { border-left-color: #58a6ff; box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2); }
 
 .worktree-header {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: start;
-  column-gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
 .worktree-header > :first-child {
+  flex: 1;
   min-width: 0; /* Critical for text ellipsis */
 }
 
+.worktree-header > :last-child {
+  flex-shrink: 0;
+}
+
 .worktree-title {
-  display: block;
-  font-size: 13px;
-  line-height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
   color: #79c0ff;
   text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
   margin: 0;
+  overflow: hidden;
+}
+
+.worktree-title > span,
+.worktree-title > a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .worktree-title i,
-.worktree-title .status-indicator {
-  margin-right: 8px;
-  vertical-align: middle;
+.worktree-title a {
+  flex-shrink: 0;
 }
 
 .worktree-branch {
@@ -148,19 +158,18 @@
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  height: 24px;
-  border-radius: 12px;
-  font-size: 11px;
-  line-height: 18px;
-  font-weight: 500;
+  gap: 4px;
+  padding: 2px 8px;
+  height: 20px;
+  border-radius: 10px;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s;
   user-select: none;
   flex-shrink: 0;
-  align-self: flex-start;
 }
 
 .status-badge:hover {
@@ -178,8 +187,8 @@
 }
 
 .status-badge-chevron {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   flex-shrink: 0;
   opacity: 0.7;
 }

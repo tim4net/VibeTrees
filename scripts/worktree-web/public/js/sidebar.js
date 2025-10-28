@@ -204,7 +204,7 @@ function renderWorktreeCards(worktrees, container) {
         <div class="worktree-header">
           <div>
             <div class="worktree-title" oncontextmenu="showWorktreeContextMenu(event, '${wt.name}', ${isMain}); event.stopPropagation();" style="cursor: context-menu;">
-              ${iconHtml}${wt.name}
+              ${iconHtml}<span>${wt.name}</span>
             </div>
             <div class="agent-badge-container" style="margin-top: 6px; margin-left: 24px;">
               <span class="agent-badge" title="${agentName}">
