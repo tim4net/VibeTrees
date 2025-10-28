@@ -65,6 +65,7 @@ const { createServer } = await import('http');
 const { WebSocketServer } = await import('ws');
 const pty = await import('node-pty');
 const { PortRegistry } = await import('../port-registry.mjs');
+const { FirstRunWizard } = await import('../first-run-wizard.mjs');
 const WORKTREE_BASE = join(process.cwd(), '.worktrees');
 
 /**
@@ -1422,6 +1423,33 @@ async function startServer() {
 
     server.listen(PORT, HOST, async () => {
       const address = HOST === '0.0.0.0' ? `http://<your-ip>:${PORT}` : `http://localhost:${PORT}`;
+
+      // Check for first run
+      const wizard = new FirstRunWizard();
+      if (wizard.isFirstRun()) {
+        console.log('\n' + '='.repeat(60));
+        console.log('🎉 Welcome to VibeTrees!');
+        console.log('='.repeat(60));
+        console.log('\nThis appears to be your first time running VibeTrees.');
+        console.log('\nDefault configuration:');
+        console.log('  • Repository root: Current directory');
+        console.log('  • AI agent: Claude Code');
+        console.log('  • Container runtime: Docker');
+        console.log('  • Network interface: localhost only\n');
+        console.log('You can change these settings later in ~/.vibetrees/config.json');
+        console.log('='.repeat(60) + '\n');
+
+        // Save default config
+        const defaultConfig = {
+          repositoryRoot: process.cwd(),
+          aiAgent: 'claude',
+          containerRuntime: 'docker',
+          defaultNetworkInterface: 'localhost',
+          initialized: true
+        };
+        wizard.saveConfig(defaultConfig);
+      }
+
       console.log(`\n🚀 Worktree Manager running at ${address}`);
       if (HOST === '0.0.0.0') {
         console.log(`   Listening on all network interfaces (--listen mode)`);
