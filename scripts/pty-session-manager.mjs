@@ -1,9 +1,12 @@
 import { randomUUID } from 'crypto';
 import pty from 'node-pty';
+import { PTYStateSerializer } from './pty-state-serializer.mjs';
 
 export class PTYSessionManager {
-  constructor() {
+  constructor(options = {}) {
     this._sessions = new Map();
+    this.serializer = options.serializer || new PTYStateSerializer();
+    this.autoSaveInterval = options.autoSaveInterval || 5000; // 5 seconds default
   }
 
   /**
@@ -101,6 +104,12 @@ export class PTYSessionManager {
     });
 
     session.pty = ptyProcess;
+
+    // Start auto-save interval
+    session.autoSaveTimer = setInterval(() => {
+      this._autoSaveSession(sessionId);
+    }, this.autoSaveInterval);
+
     return ptyProcess;
   }
 
@@ -111,10 +120,27 @@ export class PTYSessionManager {
   destroySession(sessionId) {
     const session = this._sessions.get(sessionId);
     if (session) {
+      // Clear auto-save timer
+      if (session.autoSaveTimer) {
+        clearInterval(session.autoSaveTimer);
+      }
+
       if (session.pty) {
         session.pty.kill();
       }
       this._sessions.delete(sessionId);
+    }
+  }
+
+  /**
+   * Auto-save session state (private)
+   * @param {string} sessionId - Session ID
+   */
+  async _autoSaveSession(sessionId) {
+    const session = this._sessions.get(sessionId);
+    if (session && session.pty) {
+      const state = this.serializer.captureState(sessionId, session.pty);
+      await this.serializer.saveState(state);
     }
   }
 }

@@ -112,4 +112,37 @@ describe('PTYSessionManager', () => {
       expect(pty.spawn).toHaveBeenCalledWith('npx', ['-y', '@anthropic-ai/claude-code'], expect.any(Object));
     });
   });
+
+  describe('Periodic State Capture', () => {
+    it('should start auto-save interval when session created', () => {
+      vi.useFakeTimers();
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn()
+      };
+      const manager = new PTYSessionManager({ serializer: mockSerializer, autoSaveInterval: 5000 });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      manager.spawnPTY(sessionId, { command: 'bash', args: [], cols: 80, rows: 24 });
+
+      const session = manager.getSession(sessionId);
+      expect(session.autoSaveTimer).toBeDefined();
+
+      vi.useRealTimers();
+    });
+
+    it('should clear auto-save interval when session destroyed', () => {
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn()
+      };
+      const manager = new PTYSessionManager({ serializer: mockSerializer, autoSaveInterval: 5000 });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      manager.spawnPTY(sessionId, { command: 'bash', args: [], cols: 80, rows: 24 });
+      manager.destroySession(sessionId);
+
+      expect(manager.hasSession(sessionId)).toBe(false);
+    });
+  });
 });
