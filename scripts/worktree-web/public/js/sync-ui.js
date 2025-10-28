@@ -491,8 +491,11 @@ function showSyncConflicts(worktreeName, result) {
 
     <div class="modal-actions">
       <button onclick="window.syncUI.rollbackSync('${worktreeName}')">Rollback</button>
-      <button onclick="window.syncUI.openTerminalForConflicts('${worktreeName}')" class="primary">
-        Open Terminal to Resolve
+      <button onclick="window.syncUI.openAIHelperForConflicts('${worktreeName}', 'claude', ${JSON.stringify(result.conflicts || [])})" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
+        <i data-lucide="bot" class="lucide-sm"></i> Ask Claude
+      </button>
+      <button onclick="window.syncUI.openAIHelperForConflicts('${worktreeName}', 'codex', ${JSON.stringify(result.conflicts || [])})" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
+        <i data-lucide="sparkles" class="lucide-sm"></i> Ask Codex
       </button>
     </div>
   `;
@@ -543,6 +546,57 @@ export function openTerminalForConflicts(worktreeName) {
   setTimeout(() => {
     alert(`Shell opened for ${worktreeName}.\n\nResolve conflicts, then run:\n  git add <files>\n  git commit\n\nRefresh the page when done.`);
   }, 500);
+}
+
+/**
+ * Open AI helper (Claude or Codex) with pre-generated prompt for conflict resolution
+ */
+export async function openAIHelperForConflicts(worktreeName, agent, conflicts) {
+  hideSyncDialog();
+
+  // Build the prompt
+  const conflictFiles = conflicts.map(c => c.path).join('\n  - ');
+  const conflictDetails = conflicts.map(c => `File: ${c.path}\nReason: ${c.reason || 'Merge conflict'}`).join('\n\n');
+
+  const prompt = `I have merge conflicts after pulling updates. Please help me resolve them.
+
+Conflicted files:
+  - ${conflictFiles}
+
+Details:
+${conflictDetails}
+
+Please:
+1. Show me the conflicts with git diff
+2. Help me understand what changed
+3. Guide me through resolving each conflict
+4. Verify the resolution is correct`;
+
+  // Open the appropriate AI terminal
+  if (agent === 'claude' && window.openClaude) {
+    await window.openClaude(worktreeName);
+  } else if (agent === 'codex' && window.openCodex) {
+    await window.openCodex(worktreeName);
+  }
+
+  // Copy prompt to clipboard
+  try {
+    await navigator.clipboard.writeText(prompt);
+
+    // Show notification
+    setTimeout(() => {
+      const agentName = agent === 'claude' ? 'Claude' : 'Codex';
+      alert(`${agentName} terminal opened!\n\nA conflict resolution prompt has been copied to your clipboard.\nPaste it into the terminal to get AI help.`);
+    }, 500);
+  } catch (error) {
+    console.error('[openAIHelperForConflicts] Failed to copy to clipboard:', error);
+
+    // Fallback: show the prompt in an alert
+    setTimeout(() => {
+      const agentName = agent === 'claude' ? 'Claude' : 'Codex';
+      alert(`${agentName} terminal opened!\n\nUse this prompt:\n\n${prompt}`);
+    }, 500);
+  }
 }
 
 /**
@@ -605,6 +659,7 @@ window.syncUI = {
   performSync,
   rollbackSync,
   openTerminalForConflicts,
+  openAIHelperForConflicts,
   checkWorktreeForUpdates
 };
 
