@@ -573,10 +573,10 @@ Please:
 4. Verify the fix works`;
 
   // Open the appropriate AI terminal
-  if (agent === 'claude' && window.openClaude) {
-    await window.openClaude(worktreeName);
-  } else if (agent === 'codex' && window.openCodex) {
-    await window.openCodex(worktreeName);
+  if (agent === 'claude' && window.openTerminal) {
+    await window.openTerminal(worktreeName, 'claude');
+  } else if (agent === 'codex' && window.openTerminal) {
+    await window.openTerminal(worktreeName, 'codex');
   }
 
   // Copy prompt to clipboard
@@ -624,10 +624,10 @@ Please:
 4. Verify the resolution is correct`;
 
   // Open the appropriate AI terminal
-  if (agent === 'claude' && window.openClaude) {
-    await window.openClaude(worktreeName);
-  } else if (agent === 'codex' && window.openCodex) {
-    await window.openCodex(worktreeName);
+  if (agent === 'claude' && window.openTerminal) {
+    await window.openTerminal(worktreeName, 'claude');
+  } else if (agent === 'codex' && window.openTerminal) {
+    await window.openTerminal(worktreeName, 'codex');
   }
 
   // Copy prompt to clipboard
