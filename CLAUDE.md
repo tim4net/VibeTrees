@@ -153,6 +153,29 @@ registry.release('feature-xyz'); // Frees all ports for this worktree
 { event: 'error', data: { message } }
 ```
 
+#### Terminal Persistence (Phase 6)
+
+**Purpose**: Enable terminal sessions to survive browser refresh and network disconnections
+
+**Components**:
+- `PTYSessionManager` (`scripts/pty-session-manager.mjs`) - Session lifecycle management
+- `PTYStateSerializer` (`scripts/pty-state-serializer.mjs`) - Terminal state capture/restore
+
+**Key Features**:
+- **Session Recovery**: Browser refresh preserves terminal history
+- **Process Continuity**: Running commands continue executing server-side
+- **Auto-Reconnection**: WebSocket reconnects automatically
+- **State Serialization**: Terminal buffer saved every 5 seconds to `~/.vibetrees/sessions/{session-id}/pty-state.json`
+- **Orphan Cleanup**: Inactive sessions cleaned up after 24 hours
+
+**Architecture**:
+- Session IDs stored in browser sessionStorage for reconnection
+- PTY processes remain alive server-side during disconnects
+- Terminal buffer captured from node-pty internal state
+- Automatic cleanup prevents session accumulation
+
+See [docs/terminal-persistence.md](docs/terminal-persistence.md) for details.
+
 ### Data Flow
 
 ```
@@ -180,6 +203,10 @@ scripts/
 ├── smart-reload-manager.test.mjs  # Smart reload test suite (46 tests)
 ├── ai-conflict-resolver.mjs    # AI conflict resolution (Phase 5.3)
 ├── ai-conflict-resolver.test.mjs  # Conflict resolution test suite (47 tests)
+├── pty-session-manager.mjs     # PTY session lifecycle (Phase 6)
+├── pty-session-manager.test.mjs  # PTY session test suite (13 tests)
+├── pty-state-serializer.mjs    # Terminal state persistence (Phase 6)
+├── pty-state-serializer.test.mjs  # State serializer test suite (6 tests)
 └── worktree-web/
     ├── server.mjs              # Web server with WebSocket
     └── public/                 # Browser UI (HTML, CSS, JS)
