@@ -23,25 +23,30 @@ export class FirewallHelper {
 
     try {
       // Check if firewall is enabled
+      // Output can be either "enabled" or "blocking" depending on macOS version
       const globalState = execSync('/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate', {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'ignore']
       });
 
-      if (!globalState.includes('enabled')) {
+      if (!globalState.includes('enabled') && !globalState.includes('blocking')) {
         return false; // Firewall is disabled
       }
 
       // Get the path to node
       const nodePath = execSync('which node', { encoding: 'utf-8' }).trim();
 
-      // Check if node is blocked
-      const blockStatus = execSync(
-        `/usr/libexec/ApplicationFirewall/socketfilterfw --getappblocked "${nodePath}"`,
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
-      );
-
-      return blockStatus.includes('blocked');
+      // Check if node is blocked (output goes to stderr, so we need to capture it)
+      try {
+        const blockStatus = execSync(
+          `/usr/libexec/ApplicationFirewall/socketfilterfw --getappblocked "${nodePath}" 2>&1`,
+          { encoding: 'utf-8' }
+        );
+        return blockStatus.includes('blocked');
+      } catch (err) {
+        // Command failed, assume not blocked
+        return false;
+      }
     } catch (error) {
       return false;
     }
@@ -65,28 +70,23 @@ export class FirewallHelper {
       // Get the path to node
       const nodePath = execSync('which node', { encoding: 'utf-8' }).trim();
 
-      // Add the application to firewall allowed list
-      execSync(
-        `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add "${nodePath}"`,
-        { stdio: 'inherit' }
+      // Try to add and unblock - capture output to check for managed Mac error
+      const addOutput = execSync(
+        `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add "${nodePath}" 2>&1`,
+        { encoding: 'utf-8' }
       );
 
-      // Unblock the application
-      execSync(
-        `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "${nodePath}"`,
-        { stdio: 'inherit' }
+      const unblockOutput = execSync(
+        `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "${nodePath}" 2>&1`,
+        { encoding: 'utf-8' }
       );
 
-      console.log('\n   ✅ Firewall configured successfully!\n');
-      return true;
-    } catch (error) {
-      // Check if this is a managed Mac
-      const errorMessage = error.stderr?.toString() || error.message || '';
-      if (errorMessage.includes('managed') || errorMessage.includes('cannot be modified from command line')) {
-        console.log('\n   ⚠️  This Mac is managed by your organization');
+      // Check if managed Mac (commands succeeded but printed error message)
+      const combinedOutput = addOutput + unblockOutput;
+      if (combinedOutput.includes('managed') || combinedOutput.includes('cannot be modified from command line')) {
+        console.log('   ⚠️  This Mac is managed by your organization');
         console.log('   ℹ️  Firewall settings must be configured manually:\n');
 
-        const nodePath = execSync('which node', { encoding: 'utf-8' }).trim();
         console.log('   1. Open System Preferences → Security & Privacy');
         console.log('   2. Click the "Firewall" tab');
         console.log('   3. Click the lock icon 🔒 and authenticate');
@@ -96,10 +96,15 @@ export class FirewallHelper {
         console.log('   7. Select "Allow incoming connections"');
         console.log('   8. Click "OK"\n');
         console.log('   💡 If you cannot modify firewall settings, contact your IT department\n');
-      } else {
-        console.log('\n   ⚠️  Could not configure firewall automatically');
-        console.log('   ℹ️  You may need to allow connections manually in System Preferences\n');
+        return false;
       }
+
+      console.log('\n   ✅ Firewall configured successfully!\n');
+      return true;
+    } catch (error) {
+      // Command failed (user cancelled sudo, permissions issue, etc)
+      console.log('\n   ⚠️  Could not configure firewall automatically');
+      console.log('   ℹ️  You may need to allow connections manually in System Preferences\n');
       return false;
     }
   }
@@ -151,11 +156,8 @@ export class FirewallHelper {
     console.log('   ℹ️  VibeTrees needs to accept incoming connections\n');
 
     // Try to add firewall rule with sudo
+    // Note: addFirewallRule already shows manual instructions if it fails
     const success = await this.addFirewallRule(port);
-
-    if (!success) {
-      this.suggestManualConfig(port);
-    }
 
     return success;
   }
