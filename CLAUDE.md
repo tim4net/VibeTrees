@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**VibeTrees** is a standalone application for orchestrating multiple git worktrees with AI agents (Claude Code, Codex), tmux multiplexing, and isolated Docker services. It enables parallel development across feature branches with each worktree having its own AI assistant, terminal environment, and service ports.
+**VibeTrees** is a web-based application for orchestrating multiple git worktrees with AI agents (Claude Code, Codex, Gemini) and isolated Docker/Podman services. It enables parallel development across feature branches with each worktree having its own AI assistant, browser-based terminal, and unique service ports.
+
+**Current Status**: Phase 1 Complete (web-only interface, no tmux CLI)
 
 ## Core Values
 
@@ -19,20 +21,14 @@ This project adheres to clean coding standards as core values:
 ### Development Workflow
 
 ```bash
-# Start/create tmux session with all worktrees
-npm start
-
-# Attach to existing session
-npm attach
-
-# Interactive management menu (create/delete worktrees, add/remove from session)
-npm run manage
-
-# Start web UI on localhost:3333
+# Start web UI on localhost:3335 (localhost only, secure default)
 npm run web
 
-# Kill the entire session
-npm run kill
+# Or allow network access (listen on all interfaces)
+npm run web -- --listen
+
+# First-run wizard automatically creates ~/.vibetrees/config.json
+# Edit config manually: ~/.vibetrees/config.json
 ```
 
 ### Testing

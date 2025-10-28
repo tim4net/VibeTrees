@@ -32,15 +32,15 @@ As a solo developer or small team, you want to:
 
 ## Current Status
 
-**Phase**: Planning Complete ✅
+**Phase 1 Complete** ✅ (3-4 days)
 
-We've completed comprehensive planning including:
-- 8-phase refactoring roadmap
-- Security architecture review
-- Feature specifications
-- Expert analysis (GPT-5)
+Completed:
+- ✅ Removed tmux CLI interface (web-only now)
+- ✅ Added --listen parameter for network configuration
+- ✅ Created first-run configuration wizard
+- ✅ Updated documentation
 
-**Next**: Begin implementation
+**Next**: Phase 2 - Make Codebase-Agnostic (29-31 days)
 
 ---
 
@@ -182,24 +182,35 @@ This project follows **clean coding standards** as core values:
 
 ---
 
-## Installation (Not Yet Available)
+## Quick Start
 
 ```bash
-# This will work once implementation is complete:
-npm install -g vibetrees
+# Clone the repository
+git clone https://github.com/your-org/vibe-worktrees
+cd vibe-worktrees
 
-# Or run directly:
-npx vibetrees
+# Install dependencies
+npm install
+
+# Start the web interface (localhost only)
+npm run web
+
+# Or allow network access
+npm run web -- --listen
 ```
+
+The first-run wizard will automatically configure VibeTrees with sensible defaults.
+Configuration is saved to `~/.vibetrees/config.json` and can be edited manually.
 
 ---
 
 ## Roadmap
 
-### Phase 1: Cleanup (Current)
-- Remove legacy tmux interface
-- Audit project-riftwing references
-- Create new GitHub repo
+### ✅ Phase 1: Cleanup & Setup (Complete)
+- ✅ Removed tmux CLI interface
+- ✅ Added --listen parameter for network configuration
+- ✅ Created first-run wizard
+- ✅ Updated documentation
 
 ### Phase 2: Codebase-Agnostic
 - Container runtime abstraction
