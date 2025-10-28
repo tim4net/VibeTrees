@@ -15,6 +15,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '../..');
 const PORT = 3333;
 
+// Parse command-line arguments
+const args = process.argv.slice(2);
+const listenAll = args.includes('--listen');
+const HOST = listenAll ? '0.0.0.0' : '127.0.0.1';
+
 /**
  * Check if required dependencies are installed
  */
@@ -1415,8 +1420,14 @@ async function startServer() {
       }
     });
 
-    server.listen(PORT, async () => {
-      console.log(`\n🚀 Worktree Manager running at http://localhost:${PORT}`);
+    server.listen(PORT, HOST, async () => {
+      const address = HOST === '0.0.0.0' ? `http://<your-ip>:${PORT}` : `http://localhost:${PORT}`;
+      console.log(`\n🚀 Worktree Manager running at ${address}`);
+      if (HOST === '0.0.0.0') {
+        console.log(`   Listening on all network interfaces (--listen mode)`);
+      } else {
+        console.log(`   Listening on localhost only (use --listen to allow network access)`);
+      }
       console.log('\nOpen this URL in your browser to manage worktrees\n');
 
       // Auto-start containers for all worktrees
