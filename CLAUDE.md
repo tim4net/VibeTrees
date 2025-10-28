@@ -1066,6 +1066,96 @@ MINIO_CONSOLE_PORT=9001
    - Web for teams without tmux experience
    - Both use same core logic (DRY principle)
 
+## Performance Optimization (Phase 5.4)
+
+**Infrastructure for performance profiling and optimization** to reduce worktree creation time from ~30s to <15s through parallel operations, intelligent caching, and lazy initialization.
+
+### Current Implementation (v1.1 - Foundation)
+
+**Completed:**
+- Performance profiler for tracking operation timing
+- Cache manager for node_modules and Docker layers
+- Performance optimizer with parallel execution and dependency graphs
+- Profiling integration in worktree creation
+- Performance metrics API (`GET /api/performance/metrics`)
+- Performance metrics UI in sidebar
+
+**Planned (Future Iteration):**
+- Full parallel optimization in `createWorktreeOptimized()`
+- Node modules caching with hardlinks (saves ~8-10s)
+- Docker BuildKit layer reuse (saves ~5-7s)
+- Lazy service initialization (saves ~3-5s perceived time)
+
+### Key Components
+
+#### `profiler.mjs`
+Performance profiling with nested operations and aggregated statistics:
+```javascript
+const profiler = new Profiler();
+const id = profiler.start('operation-name');
+// ... do work ...
+profiler.end(id);
+const stats = profiler.getStats('operation-name');
+```
+
+#### `performance-optimizer.mjs`
+Parallel task execution with dependency graphs:
+```javascript
+const optimizer = new PerformanceOptimizer();
+await optimizer.runParallel([
+  { name: 'task1', fn: async () => ... },
+  { name: 'task2', fn: async () => ... }
+]);
+```
+
+#### `cache-manager.mjs`
+Intelligent caching for dependencies and Docker layers:
+```javascript
+const cacheManager = new CacheManager();
+await cacheManager.cacheNodeModules('/path/to/node_modules');
+await cacheManager.restoreNodeModules('/target/node_modules');
+```
+
+### Performance Baseline
+
+| Operation | Current (Baseline) | Target (Optimized) | Expected Savings |
+|-----------|--------------------|--------------------|------------------|
+| Git worktree add | 2s | 2s | - |
+| npm install/bootstrap | 12s | 3s | 9s (cache) |
+| Docker compose up | 15s | 4s | 11s (cache + lazy) |
+| MCP discovery | 1s | 0.2s | 0.8s (cache) |
+| **Total** | **30s** | **9.2s** | **20.8s (69%)** |
+
+### API Reference
+
+**GET `/api/performance/metrics`** - Get performance statistics
+```json
+{
+  "operations": [
+    {
+      "name": "create-worktree-total",
+      "count": 3,
+      "avg": 28543.21,
+      "min": 26012.45,
+      "max": 31289.67,
+      "total": 85629.63
+    }
+  ],
+  "totalTime": 85629.63,
+  "avgWorktreeCreation": 28543.21
+}
+```
+
+### Usage
+
+View metrics in web UI:
+1. Open VibeTrees (`npm run web`)
+2. Check "Performance Metrics" section in sidebar
+3. Click "Refresh Metrics" for latest stats
+4. Expand "Operation Breakdown" for detailed timings
+
+See [docs/performance-optimization.md](docs/performance-optimization.md) for complete documentation.
+
 ## Troubleshooting
 
 **Port conflicts**: If services fail to start, check `~/.claude-worktrees/ports.json` for conflicts. Delete the file to reset all allocations.
