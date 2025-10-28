@@ -51,6 +51,29 @@
           <div>Loading worktrees...</div>
         </div>
       </div>
+
+      <!-- Performance Metrics Section -->
+      <div class="performance-metrics" style="padding: 1rem; border-top: 1px solid var(--border); background: var(--bg-secondary);">
+        <h3 style="margin: 0 0 0.5rem 0; font-size: 0.875rem; color: var(--text-secondary);">Performance Metrics</h3>
+        <button id="refreshMetricsBtn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-bottom: 0.5rem;">Refresh Metrics</button>
+
+        <div id="metricsDisplay">
+          <p style="font-size: 0.75rem; margin: 0.25rem 0;">Average worktree creation: <span id="avgCreation" style="font-weight: bold;">-</span></p>
+          <details style="margin-top: 0.5rem;">
+            <summary style="font-size: 0.75rem; cursor: pointer; color: var(--text-secondary);">Operation Breakdown</summary>
+            <table id="operationsTable" style="width: 100%; font-size: 0.7rem; margin-top: 0.5rem; border-collapse: collapse;">
+              <thead>
+                <tr style="text-align: left; border-bottom: 1px solid var(--border);">
+                  <th style="padding: 0.25rem;">Operation</th>
+                  <th style="padding: 0.25rem;">Avg (ms)</th>
+                  <th style="padding: 0.25rem;">Count</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </details>
+        </div>
+      </div>
     </div>
 
     <!-- Terminal Area -->

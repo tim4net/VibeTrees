@@ -1962,6 +1962,21 @@ function createApp() {
     }
   });
 
+  // Performance metrics endpoint
+  app.get('/api/performance/metrics', (req, res) => {
+    try {
+      const report = manager.profiler.generateReport();
+
+      res.json({
+        operations: report.operations,
+        totalTime: report.totalDuration,
+        avgWorktreeCreation: report.operations.find(op => op.name === 'create-worktree-total')?.avg || null
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return { server, manager };
 }
 
