@@ -4,14 +4,10 @@
   "type": "module",
   "description": "Manage multiple git worktrees with AI agents and isolated containers",
   "scripts": {
-    "start": "node scripts/worktree-manager.mjs",
-    "attach": "node scripts/worktree-manager.mjs attach",
-    "manage": "node scripts/worktree-manager.mjs manage",
-    "kill": "node scripts/worktree-manager.mjs kill",
     "web": "node scripts/worktree-web/server.mjs",
-    "test": "vitest run scripts/worktree-manager.test.mjs",
-    "test:watch": "vitest scripts/worktree-manager.test.mjs",
-    "test:coverage": "vitest run scripts/worktree-manager.test.mjs --coverage",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "orchestrator": "./scripts/start-orchestrator.sh",
     "orchestrator:test": "cd scripts/orchestrator && npm test"
   },
