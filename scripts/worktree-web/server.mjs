@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '../..');
-const PORT = 3333;
+const PORT = 3335; // Changed from 3333 to avoid conflict with orchestrator dashboard (3334)
 
 // Parse command-line arguments
 const args = process.argv.slice(2);
