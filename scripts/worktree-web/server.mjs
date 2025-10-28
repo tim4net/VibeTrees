@@ -2483,6 +2483,61 @@ function createApp() {
     }
   });
 
+  // PUT /api/worktrees/:name/agent - Switch agent for a worktree
+  app.put('/api/worktrees/:name/agent', async (req, res) => {
+    try {
+      const { name } = req.params;
+      const { agent } = req.body;
+
+      if (!agent) {
+        return res.status(400).json({ error: 'Agent name is required' });
+      }
+
+      // Validate agent exists and is available
+      if (!agentRegistry.has(agent)) {
+        return res.status(400).json({ error: `Agent "${agent}" not found` });
+      }
+
+      const agentMetadata = await agentRegistry.getMetadata(agent);
+      if (!agentMetadata.installed && agent !== 'shell') {
+        return res.status(400).json({ error: `Agent "${agent}" is not installed` });
+      }
+
+      // Kill existing PTY sessions for this worktree
+      const sessionsToKill = [];
+      for (const [sessionId, session] of ptyManager.sessions.entries()) {
+        if (session.worktreeName === name) {
+          sessionsToKill.push(sessionId);
+        }
+      }
+
+      for (const sessionId of sessionsToKill) {
+        const session = ptyManager.sessions.get(sessionId);
+        if (session && session.pty) {
+          session.pty.kill();
+        }
+        ptyManager.sessions.delete(sessionId);
+        console.log(`[agent-switch] Killed PTY session: ${sessionId}`);
+      }
+
+      // Store agent preference in worktree config
+      // This will be picked up when new PTY spawns
+      const worktrees = manager.listWorktrees();
+      const worktree = worktrees.find(w => w.name === name);
+      if (worktree) {
+        // Update in-memory agent preference
+        worktree.agent = agent;
+
+        // TODO: Persist to config file via config manager
+      }
+
+      res.json({ success: true, agent, killedSessions: sessionsToKill.length });
+    } catch (error) {
+      console.error('Failed to switch agent:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Worktree discovery and import endpoints
   app.get('/api/worktrees/discover', async (req, res) => {
     try {

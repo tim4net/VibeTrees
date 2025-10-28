@@ -6,6 +6,9 @@
 // Initialize branch selector
 let branchSelector = null;
 
+// Initialize agent selector
+let agentSelector = null;
+
 /**
  * Show create worktree modal
  */
@@ -21,6 +24,21 @@ export function showCreateModal() {
     branchSelector.onBranchSelected = (branch) => {
       const worktreeName = BranchSelector.branchToWorktreeName(branch.name);
       document.getElementById('worktree-name').value = worktreeName;
+    };
+  }
+
+  // Initialize agent selector if not already done
+  if (!agentSelector && typeof AgentSelector !== 'undefined') {
+    agentSelector = new AgentSelector();
+    agentSelector.init('agent-selector-container', {
+      defaultAgent: 'claude',
+      showHints: true,
+      showCapabilities: false
+    });
+
+    // Set callback for when agent is selected
+    agentSelector.onAgentChange = (agent) => {
+      console.log('[showCreateModal] Agent selected:', agent.name);
     };
   }
 
@@ -45,6 +63,11 @@ export function hideCreateModal() {
   // Clear branch selector
   if (branchSelector) {
     branchSelector.clearSelection();
+  }
+
+  // Reset agent selector to default
+  if (agentSelector) {
+    agentSelector.selectAgent('claude');
   }
 
   // Reset progress bar
@@ -107,6 +130,9 @@ export async function createWorktree(event) {
                    BranchSelector.branchToWorktreeName(branchName);
   }
 
+  // Get selected agent
+  const selectedAgent = agentSelector?.getSelectedAgentName() || 'claude';
+
   // Disable buttons and show progress
   document.getElementById('create-button').disabled = true;
   document.getElementById('cancel-button').disabled = true;
@@ -114,7 +140,10 @@ export async function createWorktree(event) {
   document.getElementById('progress-header-text').textContent = 'Starting...';
 
   try {
-    const payload = { branchName };
+    const payload = {
+      branchName,
+      agent: selectedAgent
+    };
     if (fromBranch) {
       payload.fromBranch = fromBranch;
     }

@@ -32,6 +32,9 @@
   <link rel="stylesheet" href="/css/terminals.css">
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/branch-selector.css">
+  <link rel="stylesheet" href="/css/agents.css">
+  <link rel="stylesheet" href="/css/sync.css">
+  <link rel="stylesheet" href="/css/conflict.css">
 </head>
 <body>
   <div class="app-container">
@@ -74,6 +77,9 @@
           </button>
           <button class="small" onclick="openLogsForSelected()" title="Open Combined Logs">
             <i data-lucide="scroll-text" class="lucide-sm"></i> Logs
+          </button>
+          <button class="small" id="update-button" onclick="handleUpdateButtonClick(event)" oncontextmenu="handleUpdateButtonContextMenu(event); return false;" title="Check for updates (Right-click to change AI agent)" style="display: none;">
+            <i data-lucide="arrow-down-to-line" class="lucide-sm"></i> Update
           </button>
         </div>
         <div class="terminal-tabs" id="terminal-tabs">
@@ -153,6 +159,11 @@
           <div style="margin-top: 4px; font-size: 11px; color: #8b949e;">
             Optional: Override the auto-generated worktree name
           </div>
+        </div>
+
+        <div class="form-group">
+          <label for="agent-selector-container">AI Agent</label>
+          <div id="agent-selector-container"></div>
         </div>
 
         <div style="margin-top: 8px; padding: 12px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; font-size: 12px; color: #8b949e;">
@@ -559,8 +570,14 @@
   <script src="/js/selection.js"></script>
   <script src="/js/database.js"></script>
   <script src="/js/branch-selector.js"></script>
+  <script src="/js/agent-selector.js"></script>
   <script type="module" src="/js/import-worktree.js"></script>
   <script type="module" src="/js/diagnostics.js"></script>
+
+  <!-- Git Sync UI Modules -->
+  <script type="module" src="/js/update-notifications.js"></script>
+  <script type="module" src="/js/conflict-ui.js"></script>
+  <script type="module" src="/js/sync-ui.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
   <script type="module" src="/js/main.js"></script>

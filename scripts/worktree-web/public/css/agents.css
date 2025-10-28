@@ -1,0 +1,305 @@
+/* Agent Selector Component Styles */
+
+/* Agent Selector Container */
+.agent-selector {
+  width: 100%;
+}
+
+/* Agent Selector Dropdown */
+.agent-selector-dropdown {
+  position: relative;
+}
+
+.agent-selector-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.agent-selector-button:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+}
+
+.agent-selector-button .agent-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.agent-selector-button .agent-name {
+  flex: 1;
+  text-align: left;
+}
+
+.agent-selector-button .agent-chevron {
+  font-size: 10px;
+  color: #8b949e;
+  transition: transform 0.2s;
+}
+
+.agent-selector-menu.active + .agent-selector-button .agent-chevron {
+  transform: rotate(180deg);
+}
+
+/* Agent Selector Menu */
+.agent-selector-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  display: none;
+}
+
+.agent-selector-menu.active {
+  display: block;
+}
+
+/* Agent Option */
+.agent-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid #21262d;
+}
+
+.agent-option:last-child {
+  border-bottom: none;
+}
+
+.agent-option:hover:not(.disabled) {
+  background: #21262d;
+}
+
+.agent-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-option .agent-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.agent-option .agent-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-option-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #c9d1d9;
+  margin-bottom: 2px;
+}
+
+.agent-capabilities {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-status {
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.agent-status.available {
+  color: #3fb950;
+}
+
+.agent-status.unavailable {
+  color: #f85149;
+}
+
+/* Agent Hint Box */
+.agent-hint {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #161b22;
+  border: 1px solid #58a6ff;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.agent-hint-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.agent-hint-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.agent-hint code {
+  background: #0d1117;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+  font-size: 11px;
+  color: #c9d1d9;
+}
+
+/* Agent Badge (on worktree cards) */
+.agent-badge-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.agent-badge-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.agent-switch-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.agent-switch-button:hover {
+  background: #21262d;
+  border-color: #30363d;
+  color: #58a6ff;
+}
+
+.agent-switch-button i {
+  width: 12px;
+  height: 12px;
+}
+
+/* Agent Switcher Modal (simple prompt-based for now) */
+.agent-switcher-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.agent-switcher-content {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90%;
+}
+
+.agent-switcher-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin-bottom: 16px;
+}
+
+.agent-switcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.agent-switcher-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.agent-switcher-option:hover:not(.disabled) {
+  background: #21262d;
+  border-color: #58a6ff;
+}
+
+.agent-switcher-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-switcher-option.selected {
+  border-color: #58a6ff;
+  background: #161b22;
+}
+
+.agent-switcher-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .agent-selector-menu {
+    max-height: 200px;
+  }
+
+  .agent-badge {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .agent-switch-button {
+    width: 20px;
+    height: 20px;
+  }
+}

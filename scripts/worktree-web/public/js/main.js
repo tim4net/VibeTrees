@@ -14,6 +14,9 @@ import { pollingManager } from './polling.js';
 import './modals.js'; // Import for side effects (global exports)
 import './context-menu-actions.js'; // Import for side effects (global exports)
 import './service-actions.js'; // Import for side effects (global exports)
+import './update-notifications.js'; // Import for side effects (toast notifications)
+import './conflict-ui.js'; // Import for side effects (conflict resolution)
+import './sync-ui.js'; // Import for side effects (sync UI)
 
 // Make appState globally available for synchronization
 window.appState = appState;

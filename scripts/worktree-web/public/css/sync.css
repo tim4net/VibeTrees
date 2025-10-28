@@ -1,0 +1,463 @@
+/* Git Sync UI Styles */
+
+/* Update Button in Toolbar */
+#update-button {
+  position: relative;
+}
+
+#update-button.has-updates {
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border-color: #2ea043;
+  color: #ffffff;
+  animation: pulse-green 2s infinite;
+}
+
+#update-button.has-updates:hover {
+  background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
+  box-shadow: 0 4px 10px rgba(35, 134, 54, 0.4);
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(46, 160, 67, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(46, 160, 67, 0);
+  }
+}
+
+.update-count-badge {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+/* Sync Modal Specific Styles */
+.sync-modal-content {
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Sync Sections */
+.sync-section {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #30363d;
+}
+
+.sync-section:last-of-type {
+  border-bottom: none;
+}
+
+.sync-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin-bottom: 12px;
+}
+
+/* Commit List */
+.commit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.commit-item {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-left: 3px solid #58a6ff;
+  border-radius: 6px;
+  padding: 10px 12px;
+  transition: all 0.2s;
+}
+
+.commit-item:hover {
+  background: #1c2128;
+  border-color: #58a6ff;
+}
+
+.commit-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.commit-hash {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  background: rgba(88, 166, 255, 0.1);
+  color: #58a6ff;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.commit-author {
+  color: #8b949e;
+  font-weight: 500;
+}
+
+.commit-time {
+  color: #6e7681;
+  margin-left: auto;
+}
+
+.commit-message {
+  color: #c9d1d9;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Strategy Options */
+.strategy-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Sync Progress */
+.sync-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.progress-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #30363d;
+  border-top-color: #58a6ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.progress-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin-bottom: 8px;
+}
+
+.progress-detail {
+  font-size: 13px;
+  color: #8b949e;
+}
+
+/* Success Message */
+.success-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.success-message h3 {
+  font-size: 18px;
+  color: #c9d1d9;
+  margin: 16px 0 8px 0;
+}
+
+.success-details {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0 0;
+  text-align: left;
+}
+
+.success-details li {
+  padding: 6px 12px;
+  background: #161b22;
+  border-left: 3px solid #2ea043;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  color: #8b949e;
+  font-size: 13px;
+}
+
+.success-details li::before {
+  content: '✓ ';
+  color: #2ea043;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* Error Message */
+.error-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.error-message h3 {
+  font-size: 18px;
+  color: #c9d1d9;
+  margin: 16px 0 8px 0;
+}
+
+.error-detail {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: 6px;
+  color: #ff7b72;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  word-break: break-word;
+}
+
+/* Conflict Warning */
+.conflict-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+  background: rgba(187, 128, 9, 0.1);
+  border: 1px solid rgba(187, 128, 9, 0.3);
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.conflict-warning h3 {
+  font-size: 16px;
+  color: #d29922;
+  margin: 12px 0 8px 0;
+}
+
+.conflict-warning p {
+  color: #8b949e;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Conflict List */
+.conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conflict-item {
+  background: #161b22;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-left: 3px solid #f85149;
+  border-radius: 6px;
+  padding: 10px 12px;
+  transition: all 0.2s;
+}
+
+.conflict-item:hover {
+  background: #1c2128;
+}
+
+.conflict-path {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  color: #c9d1d9;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.conflict-reason {
+  color: #8b949e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.toast {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 16px;
+  min-width: 320px;
+  max-width: 400px;
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  opacity: 0;
+  transform: translateX(400px);
+  transition: all 0.3s ease;
+  pointer-events: auto;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border-radius: 6px;
+  color: #ffffff;
+}
+
+.toast-icon i {
+  width: 18px;
+  height: 18px;
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.toast-message {
+  font-size: 12px;
+  color: #8b949e;
+  line-height: 1.4;
+}
+
+.toast-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.toast-button {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #30363d;
+}
+
+.toast-button-primary {
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border-color: #2ea043;
+  color: #ffffff;
+}
+
+.toast-button-primary:hover {
+  background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
+}
+
+.toast-button-dismiss {
+  background: #21262d;
+  border-color: #30363d;
+  color: #8b949e;
+}
+
+.toast-button-dismiss:hover {
+  background: #30363d;
+  color: #c9d1d9;
+}
+
+.toast-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #6e7681;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.toast-close:hover {
+  background: #21262d;
+  color: #c9d1d9;
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 30px;
+  color: #8b949e;
+  justify-content: center;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #30363d;
+  border-top-color: #58a6ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .sync-modal-content {
+    max-width: 95%;
+    padding: 20px;
+  }
+
+  .toast-container {
+    right: 10px;
+    left: 10px;
+  }
+
+  .toast {
+    min-width: auto;
+    max-width: none;
+  }
+
+  .commit-list {
+    max-height: 200px;
+  }
+}

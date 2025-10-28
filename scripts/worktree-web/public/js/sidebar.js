@@ -182,12 +182,37 @@ function renderWorktreeCards(worktrees, container) {
          </a>`
       : `<i data-lucide="${icon}" title="${iconTooltip}" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px; color: ${iconColor};"></i>`;
 
+    // Render agent badge (default to 'claude' if not set)
+    const currentAgent = wt.agent || 'claude';
+    const agentIcons = {
+      'claude': '🤖',
+      'codex': '🔮',
+      'gemini': '✨',
+      'shell': '💻'
+    };
+    const agentNames = {
+      'claude': 'Claude',
+      'codex': 'Codex',
+      'gemini': 'Gemini',
+      'shell': 'Shell'
+    };
+    const agentIcon = agentIcons[currentAgent] || '🤖';
+    const agentName = agentNames[currentAgent] || currentAgent;
+
     return `
       <div class="worktree-card ${isActive ? 'active selected' : ''} ${gitStatusClass}" data-name="${wt.name}" onclick="selectWorktree('${wt.name}')">
         <div class="worktree-header">
           <div>
             <div class="worktree-title" oncontextmenu="showWorktreeContextMenu(event, '${wt.name}', ${isMain}); event.stopPropagation();" style="cursor: context-menu;">
               ${iconHtml}${wt.name}
+            </div>
+            <div class="agent-badge-container" style="margin-top: 6px; margin-left: 24px;">
+              <span class="agent-badge" title="${agentName}">
+                ${agentIcon} ${agentName}
+              </span>
+              <button class="agent-switch-button" onclick="event.stopPropagation(); window.showAgentSwitcher('${wt.name}', '${currentAgent}');" title="Switch Agent">
+                <i data-lucide="refresh-cw" class="lucide-sm"></i>
+              </button>
             </div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
