@@ -12,9 +12,9 @@ export class FirewallHelper {
   }
 
   /**
-   * Check if firewall is blocking the port
+   * Check if firewall is blocking node
    * @param {number} port - Port number to check
-   * @returns {boolean} - True if port might be blocked
+   * @returns {boolean} - True if node is blocked
    */
   async isPortBlocked(port) {
     if (this.platform !== 'darwin') {
@@ -23,12 +23,25 @@ export class FirewallHelper {
 
     try {
       // Check if firewall is enabled
-      const result = execSync('/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate', {
+      const globalState = execSync('/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate', {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'ignore']
       });
 
-      return result.includes('enabled');
+      if (!globalState.includes('enabled')) {
+        return false; // Firewall is disabled
+      }
+
+      // Get the path to node
+      const nodePath = execSync('which node', { encoding: 'utf-8' }).trim();
+
+      // Check if node is blocked
+      const blockStatus = execSync(
+        `/usr/libexec/ApplicationFirewall/socketfilterfw --getappblocked "${nodePath}"`,
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+      );
+
+      return blockStatus.includes('blocked');
     } catch (error) {
       return false;
     }
