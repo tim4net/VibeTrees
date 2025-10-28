@@ -267,6 +267,18 @@ class WorktreeManager {
             current.gitStatus = this.getGitStatus(current.path);
             current.githubUrl = this.getGitHubUrl(current.path);
             current.commitCount = this.getCommitCount(current.path, current.branch);
+
+            // Add status bar fields
+            const aheadBehind = this.getAheadBehind(current.path, current.branch);
+            current.ahead = aheadBehind.ahead;
+            current.behind = aheadBehind.behind;
+
+            const fileChanges = this.getFileChanges(current.path);
+            current.modifiedFiles = fileChanges.modifiedFiles;
+            current.untrackedFiles = fileChanges.untrackedFiles;
+
+            current.lastCommit = this.getLastCommit(current.path);
+
             worktrees.push(current);
             current = {};
           }
@@ -281,6 +293,18 @@ class WorktreeManager {
         current.gitStatus = this.getGitStatus(current.path);
         current.githubUrl = this.getGitHubUrl(current.path);
         current.commitCount = this.getCommitCount(current.path, current.branch);
+
+        // Add status bar fields
+        const aheadBehind = this.getAheadBehind(current.path, current.branch);
+        current.ahead = aheadBehind.ahead;
+        current.behind = aheadBehind.behind;
+
+        const fileChanges = this.getFileChanges(current.path);
+        current.modifiedFiles = fileChanges.modifiedFiles;
+        current.untrackedFiles = fileChanges.untrackedFiles;
+
+        current.lastCommit = this.getLastCommit(current.path);
+
         worktrees.push(current);
       }
 

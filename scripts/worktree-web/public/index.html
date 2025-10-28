@@ -35,6 +35,7 @@
   <link rel="stylesheet" href="/css/agents.css">
   <link rel="stylesheet" href="/css/sync.css">
   <link rel="stylesheet" href="/css/conflict.css">
+  <link rel="stylesheet" href="/css/status-bar.css">
 </head>
 <body>
   <div class="app-container">
@@ -563,6 +564,65 @@
     <div class="context-menu-item danger" onclick="tabContextMenuAction('close')">
       <span>×</span>
       <span>Close Tab</span>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar hidden" id="status-bar">
+    <!-- Branch -->
+    <div class="status-segment clickable branch" onclick="copyBranchName()" title="Click to copy branch name">
+      <i data-lucide="git-branch" class="status-icon"></i>
+      <span class="text-full"><span class="branch-name-full">main</span></span>
+      <span class="text-short"><span class="branch-name-short">main</span></span>
+      <span class="text-minimal"><span class="branch-name-minimal">main</span></span>
+    </div>
+
+    <div class="status-divider">│</div>
+
+    <!-- Ahead/Behind -->
+    <div class="status-segment clickable ahead-behind-segment" onclick="openSyncDialog()" title="Click to sync">
+      <i data-lucide="arrow-up" class="status-icon"></i>
+      <span class="ahead-count">0</span>
+      <span class="text-full">commits ahead,</span>
+      <span class="text-short">ahead</span>
+
+      <i data-lucide="arrow-down" class="status-icon"></i>
+      <span class="behind-count">0</span>
+      <span class="text-full">behind <span class="from-main">main</span></span>
+      <span class="text-short">behind</span>
+      <span class="text-minimal"></span>
+    </div>
+
+    <div class="status-divider">│</div>
+
+    <!-- Uncommitted Changes -->
+    <div class="status-segment clickable changes" onclick="showChangesModal()" title="Click to view changes">
+      <span class="status-icon">●</span>
+      <span class="change-count">0</span>
+      <span class="text-full">modified files</span>
+      <span class="text-short">files</span>
+      <span class="text-minimal"></span>
+    </div>
+
+    <div class="status-divider">│</div>
+
+    <!-- Last Commit -->
+    <div class="status-segment clickable last-commit" onclick="openCommitOnGitHub()" title="Click to view commit on GitHub">
+      <i data-lucide="clock" class="status-icon"></i>
+      <span class="text-full">unknown</span>
+      <span class="text-short">unknown</span>
+      <span class="text-minimal">?</span>
+    </div>
+
+    <div class="status-divider">│</div>
+
+    <!-- Docker Services -->
+    <div class="status-segment clickable docker" onclick="showServicesModal()" title="Click to manage services">
+      <span class="status-icon">🐳</span>
+      <span class="service-count">0/0</span>
+      <span class="text-full">services running</span>
+      <span class="text-short">running</span>
+      <span class="text-minimal"></span>
     </div>
   </div>
 

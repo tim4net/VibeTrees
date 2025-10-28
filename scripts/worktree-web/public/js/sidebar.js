@@ -132,7 +132,7 @@ function renderWorktreeCards(worktrees, container) {
       statusText = 'Partial';
     }
 
-    const statusBadge = `<span class="status-badge ${statusClass}" onclick="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})" oncontextmenu="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})">${statusText} <span class="status-badge-chevron">▼</span></span>`;
+    const statusBadge = `<span class="status-badge ${statusClass}" onclick="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})" oncontextmenu="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})">${statusText} <i data-lucide="chevron-down" class="status-badge-chevron"></i></span>`;
 
     const portsHtml = wt.dockerStatus.length > 0
       ? wt.dockerStatus.map(container => {

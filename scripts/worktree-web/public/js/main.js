@@ -11,6 +11,7 @@ import { initTabFiltering } from './tabs.js';
 import { initTerminals } from './terminals.js';
 import { initPerformanceMetrics } from './performance-metrics.js';
 import { pollingManager } from './polling.js';
+import { initStatusBar } from './status-bar.js';
 import './modals.js'; // Import for side effects (global exports)
 import './context-menu-actions.js'; // Import for side effects (global exports)
 import './service-actions.js'; // Import for side effects (global exports)
@@ -53,6 +54,7 @@ function initApp() {
   initTabFiltering();
   initTerminals();
   initPerformanceMetrics();
+  initStatusBar();
 
   console.log('[main] All modules initialized');
 
