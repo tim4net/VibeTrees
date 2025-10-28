@@ -2774,27 +2774,23 @@ async function startServer() {
       console.log(`\n🚀 Worktree Manager is running!\n`);
 
       if (HOST === '0.0.0.0') {
-        console.log(`   📡 Network Mode: Listening on ALL interfaces (--listen)\n`);
+        console.log(`   📡 Network Mode: ALL interfaces\n`);
 
         // Setup firewall for network mode
         const firewall = new FirewallHelper();
         await firewall.setupForNetworkMode(PORT);
 
-        console.log(`   Connect from any device on your network:\n`);
-
         const addresses = getNetworkAddresses();
         if (addresses.length > 0) {
           addresses.forEach(({ name, address }) => {
-            console.log(`      http://${address}:${PORT}  (${name})`);
+            console.log(`      🌐 http://${address}:${PORT}`);
           });
         } else {
-          console.log(`      http://<your-ip>:${PORT}`);
+          console.log(`      🌐 http://<your-ip>:${PORT}`);
         }
-
-        console.log(`\n   💡 Tip: Share any of these URLs with teammates!`);
       } else {
         console.log(`   🔒 Local Mode: Localhost only\n`);
-        console.log(`      http://localhost:${PORT}`);
+        console.log(`      🏠 http://localhost:${PORT}`);
         console.log(`\n   💡 Use --listen to allow network access`);
       }
 
