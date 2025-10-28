@@ -452,6 +452,12 @@ function showSyncError(worktreeName, errorMessage) {
 
     <div class="modal-actions">
       <button onclick="window.syncUI.hideSyncDialog()">Close</button>
+      <button onclick="window.syncUI.openAIHelperForError('${worktreeName}', 'claude', ${JSON.stringify(errorMessage)})" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
+        <i data-lucide="bot" class="lucide-sm"></i> Ask Claude
+      </button>
+      <button onclick="window.syncUI.openAIHelperForError('${worktreeName}', 'codex', ${JSON.stringify(errorMessage)})" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
+        <i data-lucide="sparkles" class="lucide-sm"></i> Ask Codex
+      </button>
       <button class="primary" onclick="window.syncUI.showSyncDialog('${worktreeName}')">Try Again</button>
     </div>
   `;
@@ -546,6 +552,51 @@ export function openTerminalForConflicts(worktreeName) {
   setTimeout(() => {
     alert(`Shell opened for ${worktreeName}.\n\nResolve conflicts, then run:\n  git add <files>\n  git commit\n\nRefresh the page when done.`);
   }, 500);
+}
+
+/**
+ * Open AI helper (Claude or Codex) with pre-generated prompt for general errors
+ */
+export async function openAIHelperForError(worktreeName, agent, errorMessage) {
+  hideSyncDialog();
+
+  // Build the prompt
+  const prompt = `I got an error while trying to update/sync my worktree. Please help me fix it.
+
+Worktree: ${worktreeName}
+Error: ${errorMessage}
+
+Please:
+1. Help me understand what went wrong
+2. Show me how to check the current state (git status, git log, etc.)
+3. Suggest steps to fix this issue
+4. Verify the fix works`;
+
+  // Open the appropriate AI terminal
+  if (agent === 'claude' && window.openClaude) {
+    await window.openClaude(worktreeName);
+  } else if (agent === 'codex' && window.openCodex) {
+    await window.openCodex(worktreeName);
+  }
+
+  // Copy prompt to clipboard
+  try {
+    await navigator.clipboard.writeText(prompt);
+
+    // Show notification
+    setTimeout(() => {
+      const agentName = agent === 'claude' ? 'Claude' : 'Codex';
+      alert(`${agentName} terminal opened!\n\nA troubleshooting prompt has been copied to your clipboard.\nPaste it into the terminal to get AI help.`);
+    }, 500);
+  } catch (error) {
+    console.error('[openAIHelperForError] Failed to copy to clipboard:', error);
+
+    // Fallback: show the prompt in an alert
+    setTimeout(() => {
+      const agentName = agent === 'claude' ? 'Claude' : 'Codex';
+      alert(`${agentName} terminal opened!\n\nUse this prompt:\n\n${prompt}`);
+    }, 500);
+  }
 }
 
 /**
@@ -659,6 +710,7 @@ window.syncUI = {
   performSync,
   rollbackSync,
   openTerminalForConflicts,
+  openAIHelperForError,
   openAIHelperForConflicts,
   checkWorktreeForUpdates
 };
