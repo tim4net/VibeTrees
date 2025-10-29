@@ -28,6 +28,7 @@ const rootDir = process.cwd();
 // Parse command-line arguments
 const args = process.argv.slice(2);
 const listenAll = args.includes('--listen');
+const ENABLE_PROFILING = args.includes('--profile');
 const HOST = listenAll ? '0.0.0.0' : '127.0.0.1';
 
 // Port configuration
@@ -2197,14 +2198,21 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   // Store listener reference for cleanup
   session.activeListener = onData;
 
+  // Performance tracking for PTY writes (only if profiling enabled)
+  let ptyWriteLatencies = ENABLE_PROFILING ? [] : null;
+  let lastPtyLatencyReport = Date.now();
+
   // Handle WebSocket messages (both terminal input and control messages)
   ws.on('message', (data) => {
+    const writeStart = ENABLE_PROFILING ? process.hrtime.bigint() : null;
+
     try {
       const msg = JSON.parse(data.toString());
       // Only treat as control message if it's an object with a type field
       if (typeof msg === 'object' && msg !== null && msg.type === 'resize' && msg.cols && msg.rows) {
         terminal.resize(msg.cols, msg.rows);
         console.log(`Resized PTY for ${worktreeName} to ${msg.cols}x${msg.rows}`);
+        return; // Don't measure resize latency
       } else {
         // Valid JSON but not a control message (e.g., single digits "1", "2")
         // Treat as terminal input - but ignore during backpressure pause
@@ -2221,6 +2229,29 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
         return;
       }
       terminal.write(data.toString());
+    }
+
+    // Measure PTY write latency (only if profiling enabled)
+    if (ENABLE_PROFILING && writeStart) {
+      const writeEnd = process.hrtime.bigint();
+      const latencyNs = Number(writeEnd - writeStart);
+      const latencyMs = latencyNs / 1_000_000;
+      ptyWriteLatencies.push(latencyMs);
+
+      // Report stats every 10 seconds
+      if (Date.now() - lastPtyLatencyReport > 10000 && ptyWriteLatencies.length > 0) {
+        const sorted = [...ptyWriteLatencies].sort((a, b) => a - b);
+        const avg = sorted.reduce((a, b) => a + b) / sorted.length;
+        const p50 = sorted[Math.floor(sorted.length * 0.5)];
+        const p95 = sorted[Math.floor(sorted.length * 0.95)];
+        const p99 = sorted[Math.floor(sorted.length * 0.99)];
+        const max = sorted[sorted.length - 1];
+
+        console.log(`[PTY Latency] ${worktreeName}:${command} n=${sorted.length} avg=${avg.toFixed(2)}ms p50=${p50.toFixed(2)}ms p95=${p95.toFixed(2)}ms p99=${p99.toFixed(2)}ms max=${max.toFixed(2)}ms`);
+
+        ptyWriteLatencies = [];
+        lastPtyLatencyReport = Date.now();
+      }
     }
   });
 
@@ -2275,7 +2306,8 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
     type: 'session',
     sessionId: sessionId,
     sessionName: sessionName,
-    tookOver: isTakeover
+    tookOver: isTakeover,
+    profiling: ENABLE_PROFILING
   }));
 
   // Send visual confirmation in terminal

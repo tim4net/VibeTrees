@@ -620,6 +620,12 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
             saveTerminalSession(worktreeName, command, msg.sessionId);
             console.log(`PTY session ID: ${msg.sessionId}`);
 
+            // Enable profiling if server has it enabled
+            if (msg.profiling) {
+              profilingEnabled = true;
+              console.log(`[Profiling] Enabled - latency stats will be reported`);
+            }
+
             // Show takeover warning if applicable
             if (msg.tookOver) {
               console.warn(`[TAKEOVER] This session was taken over from another client`);
@@ -657,17 +663,33 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
         }
       }
 
-      // Track latency for performance measurement
-      if (lastKeyTime > 0) {
+      // Track latency for performance measurement (only if profiling enabled)
+      if (profilingEnabled && lastKeyTime > 0) {
         const latency = performance.now() - lastKeyTime;
         echoTimes.push(latency);
+        latencyMeasurements.push(latency);
 
         if (echoTimes.length >= 10) {
           const avg = echoTimes.reduce((a, b) => a + b) / echoTimes.length;
-          console.log(`[Local Echo] Avg server echo latency: ${avg.toFixed(1)}ms (hidden by local echo)`);
+          console.log(`[Latency] Avg server echo: ${avg.toFixed(1)}ms`);
           echoTimes = [];
         }
         lastKeyTime = 0;
+      }
+
+      // Report detailed latency stats every 10 seconds (only if profiling enabled)
+      if (profilingEnabled && Date.now() - lastLatencyReport > 10000 && latencyMeasurements.length > 0) {
+        const sorted = [...latencyMeasurements].sort((a, b) => a - b);
+        const avg = sorted.reduce((a, b) => a + b) / sorted.length;
+        const p50 = sorted[Math.floor(sorted.length * 0.5)];
+        const p95 = sorted[Math.floor(sorted.length * 0.95)];
+        const p99 = sorted[Math.floor(sorted.length * 0.99)];
+        const max = sorted[sorted.length - 1];
+
+        console.log(`[Latency Stats] n=${sorted.length} avg=${avg.toFixed(1)}ms p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms p99=${p99.toFixed(1)}ms max=${max.toFixed(1)}ms`);
+
+        latencyMeasurements = [];
+        lastLatencyReport = Date.now();
       }
 
       // Check if this is echo confirmation
@@ -724,10 +746,20 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     let inputBuffer = '';
     let batchTimeout = null;
 
+    // Performance tracking (enabled by server via session message)
+    let profilingEnabled = false;
+    let inputTimestamps = new Map(); // Track when each character was typed
+    let latencyMeasurements = [];
+    let lastLatencyReport = Date.now();
+
     // Send terminal input to PTY with batching
     terminal.onData((data) => {
       // Track key timing for performance measurement
       lastKeyTime = performance.now();
+
+      // Store timestamp for this input with unique ID
+      const inputId = `${Date.now()}-${Math.random()}`;
+      inputTimestamps.set(inputId, performance.now());
 
       // Check for control characters that should clear pending echo
       if (data === '\x03' || // Ctrl+C
