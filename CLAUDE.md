@@ -117,6 +117,19 @@ API: `GET /api/agents`, `GET /api/agents/:name`, `GET /api/agents/availability`
 
 See [docs/adding-agents.md](docs/adding-agents.md) for custom agents.
 
+### Dependency Management
+Automatic dependency installation with smart fallback.
+
+**Automatic installation**:
+- **During worktree creation**: Checks for `bootstrap` script in package.json, falls back to `npm install`
+- **During git sync**: Auto-detects changes to package files and reinstalls dependencies
+
+**Manual installation**:
+- API: `POST /api/worktrees/:name/dependencies/install`
+- Supports: npm, pip, pipenv, poetry, bundle, go mod, cargo, composer
+
+**Fallback logic**: If `package.json` has a `bootstrap` script, runs it. Otherwise, runs `npm install`.
+
 ### Git Sync & Smart Reload
 Intelligent sync with automatic change detection and service management.
 

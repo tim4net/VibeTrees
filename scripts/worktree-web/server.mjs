@@ -767,31 +767,49 @@ class WorktreeManager {
 
       const bootstrapId = this.profiler.start('npm-bootstrap', totalId);
       const bootstrapPromise = new Promise((resolve, reject) => {
-        console.log(`[CREATE] Running bootstrap to build packages...`);
-        this.broadcast('worktree:progress', {
-          name: worktreeName,
-          step: 'bootstrap',
-          message: 'Building packages (bootstrap)...'
-        });
-
         try {
-          execSync('npm run bootstrap', {
+          // Check if bootstrap script exists in package.json
+          const packageJsonPath = join(worktreePath, 'package.json');
+          let installCommand = 'npm install';
+
+          if (existsSync(packageJsonPath)) {
+            const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+            if (packageJson.scripts && packageJson.scripts.bootstrap) {
+              installCommand = 'npm run bootstrap';
+              console.log(`[CREATE] Running bootstrap script to build packages...`);
+              this.broadcast('worktree:progress', {
+                name: worktreeName,
+                step: 'bootstrap',
+                message: 'Building packages (bootstrap)...'
+              });
+            } else {
+              console.log(`[CREATE] No bootstrap script found, running npm install...`);
+              this.broadcast('worktree:progress', {
+                name: worktreeName,
+                step: 'install',
+                message: 'Installing dependencies...'
+              });
+            }
+          }
+
+          execSync(installCommand, {
             cwd: worktreePath,
             stdio: 'pipe',
             encoding: 'utf-8'
           });
-          console.log(`[CREATE] Bootstrap completed successfully`);
+
+          console.log(`[CREATE] Dependencies installed successfully`);
           this.broadcast('worktree:progress', {
             name: worktreeName,
-            step: 'bootstrap',
-            message: '✓ Bootstrap complete'
+            step: installCommand.includes('bootstrap') ? 'bootstrap' : 'install',
+            message: '✓ Dependencies ready'
           });
           this.profiler.end(bootstrapId);
           resolve();
         } catch (err) {
-          console.error(`[CREATE] Failed to bootstrap packages:`, err.message);
+          console.error(`[CREATE] Failed to install dependencies:`, err.message);
           this.profiler.end(bootstrapId);
-          reject(new Error(`Failed to bootstrap packages: ${err.message}`));
+          reject(new Error(`Failed to install dependencies: ${err.message}`));
         }
       });
 
@@ -1267,6 +1285,67 @@ class WorktreeManager {
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Install dependencies for a worktree
+   * Supports bootstrap script or falls back to npm install
+   */
+  async installDependencies(worktreeName, worktreePath) {
+    try {
+      // Check if bootstrap script exists in package.json
+      const packageJsonPath = join(worktreePath, 'package.json');
+      let installCommand = 'npm install';
+      let scriptType = 'install';
+
+      if (existsSync(packageJsonPath)) {
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+        if (packageJson.scripts && packageJson.scripts.bootstrap) {
+          installCommand = 'npm run bootstrap';
+          scriptType = 'bootstrap';
+        }
+      }
+
+      console.log(`[INSTALL] Running ${installCommand} for ${worktreeName}...`);
+      this.broadcast('worktree:progress', {
+        name: worktreeName,
+        step: 'install',
+        message: `Installing dependencies (${scriptType})...`
+      });
+
+      const output = execSync(installCommand, {
+        cwd: worktreePath,
+        stdio: 'pipe',
+        encoding: 'utf-8'
+      });
+
+      console.log(`[INSTALL] Dependencies installed successfully for ${worktreeName}`);
+      this.broadcast('worktree:progress', {
+        name: worktreeName,
+        step: 'install',
+        message: '✓ Dependencies installed'
+      });
+
+      return {
+        success: true,
+        command: installCommand,
+        scriptType,
+        output
+      };
+    } catch (error) {
+      console.error(`[INSTALL] Failed to install dependencies for ${worktreeName}:`, error.message);
+      this.broadcast('worktree:progress', {
+        name: worktreeName,
+        step: 'install',
+        message: `✗ Installation failed: ${error.message}`
+      });
+
+      return {
+        success: false,
+        error: error.message,
+        stderr: error.stderr || error.stdout || ''
+      };
     }
   }
 
@@ -2507,6 +2586,19 @@ function createApp() {
 
   app.post('/api/worktrees/:name/services/stop', async (req, res) => {
     const result = await manager.stopServices(req.params.name);
+    res.json(result);
+  });
+
+  app.post('/api/worktrees/:name/dependencies/install', async (req, res) => {
+    const { name } = req.params;
+    const worktrees = manager.listWorktrees();
+    const worktree = worktrees.find(w => w.name === name);
+
+    if (!worktree) {
+      return res.status(404).json({ error: 'Worktree not found' });
+    }
+
+    const result = await manager.installDependencies(name, worktree.path);
     res.json(result);
   });
 
