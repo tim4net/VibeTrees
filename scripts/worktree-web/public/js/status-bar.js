@@ -432,7 +432,7 @@ window.openSyncDialog = function() {
 /**
  * Show modal with list of changed files
  */
-window.showChangesModal = function() {
+window.showChangesModal = async function() {
   const worktree = window.appState?.worktrees?.find(
     w => w.name === window.appState.selectedWorktreeId
   );
@@ -450,9 +450,88 @@ window.showChangesModal = function() {
     return;
   }
 
-  // TODO: Implement proper modal with file list
-  // For now, just show a simple alert with counts
-  alert(`Changes in ${worktree.name}:\n\n${modified} modified files\n${untracked} untracked files\n\nFile list modal coming soon...`);
+  // Show modal
+  const modal = document.getElementById('changes-modal');
+  const loading = document.getElementById('changes-loading');
+  const content = document.getElementById('changes-content');
+  const error = document.getElementById('changes-error');
+  const empty = document.getElementById('changes-empty');
+
+  modal.classList.add('active');
+  loading.style.display = 'flex';
+  content.style.display = 'none';
+  error.style.display = 'none';
+  empty.style.display = 'none';
+
+  try {
+    // Fetch detailed file list
+    const response = await fetch(`/api/worktrees/${worktree.name}/files`);
+    const data = await response.json();
+
+    if (response.ok) {
+      // Hide loading, show content
+      loading.style.display = 'none';
+
+      if (data.modified.length === 0 && data.untracked.length === 0) {
+        empty.style.display = 'flex';
+      } else {
+        content.style.display = 'block';
+
+        // Populate modified files
+        const modifiedSection = document.getElementById('modified-section');
+        const modifiedFiles = document.getElementById('modified-files');
+        const modifiedCount = document.getElementById('modified-count');
+
+        if (data.modified.length > 0) {
+          modifiedSection.style.display = 'block';
+          modifiedCount.textContent = `${data.modified.length}`;
+          modifiedFiles.innerHTML = data.modified.map(file => `
+            <div class="file-item">
+              <span class="file-status ${file.status.toLowerCase()}"></span>
+              <span class="file-path" title="${file.path}">${file.path}</span>
+            </div>
+          `).join('');
+        } else {
+          modifiedSection.style.display = 'none';
+        }
+
+        // Populate untracked files
+        const untrackedSection = document.getElementById('untracked-section');
+        const untrackedFiles = document.getElementById('untracked-files');
+        const untrackedCount = document.getElementById('untracked-count');
+
+        if (data.untracked.length > 0) {
+          untrackedSection.style.display = 'block';
+          untrackedCount.textContent = `${data.untracked.length}`;
+          untrackedFiles.innerHTML = data.untracked.map(file => `
+            <div class="file-item">
+              <span class="file-status untracked"></span>
+              <span class="file-path" title="${file.path}">${file.path}</span>
+            </div>
+          `).join('');
+        } else {
+          untrackedSection.style.display = 'none';
+        }
+      }
+
+      // Re-render icons
+      if (window.lucide) window.lucide.createIcons();
+    } else {
+      throw new Error(data.error || 'Failed to fetch file changes');
+    }
+  } catch (err) {
+    loading.style.display = 'none';
+    error.style.display = 'block';
+    error.textContent = `Error loading file changes: ${err.message}`;
+  }
+};
+
+/**
+ * Hide the file changes modal
+ */
+window.hideChangesModal = function() {
+  const modal = document.getElementById('changes-modal');
+  modal.classList.remove('active');
 };
 
 /**
