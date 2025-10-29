@@ -568,7 +568,7 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     const terminalSocket = new WebSocket(url);
 
     // Local echo configuration
-    const LOCAL_ECHO_ENABLED = true; // Can be toggled via settings later
+    const LOCAL_ECHO_ENABLED = false; // DISABLED: Causing ghosting/duplication issues
     const LOCAL_ECHO_DIM = '\x1b[2m'; // ANSI dim
     const LOCAL_ECHO_RESET = '\x1b[0m'; // ANSI reset
     let pendingEcho = []; // Track pending echoed characters
