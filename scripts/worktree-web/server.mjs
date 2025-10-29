@@ -6,7 +6,9 @@
  */
 
 import { execSync, spawn } from 'child_process';
+import fs from 'fs';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import path from 'path';
 import { basename, join, dirname } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
@@ -26,6 +28,7 @@ const rootDir = process.cwd();
 // Parse command-line arguments
 const args = process.argv.slice(2);
 const listenAll = args.includes('--listen');
+const ENABLE_PROFILING = args.includes('--profile');
 const HOST = listenAll ? '0.0.0.0' : '127.0.0.1';
 
 // Port configuration
@@ -473,6 +476,16 @@ class WorktreeManager {
 
   getDockerStatus(worktreePath, worktreeName) {
     const statuses = [];
+
+    // Check if docker-compose.yml exists in this worktree
+    const composeFiles = ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml'];
+    const hasComposeFile = composeFiles.some(file =>
+      fs.existsSync(path.join(worktreePath, file))
+    );
+
+    if (!hasComposeFile) {
+      return statuses; // No compose file, no containers
+    }
 
     // Get Docker container statuses
     try {
@@ -1532,10 +1545,15 @@ class WorktreeManager {
       this.broadcast('services:started', { worktree: worktreeName, ports });
       return { success: true, ports };
     } catch (error) {
-      console.error(`Failed to start services for ${worktreeName}:`, error.message);
-      console.error('stderr:', error.stderr?.toString());
-      console.error('stdout:', error.stdout?.toString());
       const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message;
+
+      // Only log verbose errors if it's not just a "no compose file" situation
+      if (!errorMsg.includes('no configuration file provided')) {
+        console.error(`Failed to start services for ${worktreeName}:`, error.message);
+        console.error('stderr:', error.stderr?.toString());
+        console.error('stdout:', error.stdout?.toString());
+      }
+
       return { success: false, error: errorMsg };
     }
   }
@@ -2028,8 +2046,22 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   // Generate unique client ID for this WebSocket connection
   const clientId = `${sessionId}-${Date.now()}`;
 
-  // Attach client to session
-  manager.ptyManager.attachClient(sessionId, clientId);
+  // Attach client to session (returns previous WebSocket if takeover)
+  const previousWs = manager.ptyManager.attachClient(sessionId, clientId, ws);
+  const isTakeover = !!previousWs;
+
+  // If this is a takeover, notify the previous client
+  if (isTakeover && previousWs.readyState === 1) { // WebSocket.OPEN
+    try {
+      previousWs.send(JSON.stringify({
+        type: 'takeover',
+        message: 'Session taken over by another client'
+      }));
+      console.log(`[TAKEOVER] Notified previous client for ${worktreeName}:${command}`);
+    } catch (e) {
+      console.error(`[TAKEOVER] Failed to notify previous client: ${e.message}`);
+    }
+  }
 
   // Spawn PTY if not already spawned
   let terminal;
@@ -2166,14 +2198,21 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   // Store listener reference for cleanup
   session.activeListener = onData;
 
+  // Performance tracking for PTY writes (only if profiling enabled)
+  let ptyWriteLatencies = ENABLE_PROFILING ? [] : null;
+  let lastPtyLatencyReport = Date.now();
+
   // Handle WebSocket messages (both terminal input and control messages)
   ws.on('message', (data) => {
+    const writeStart = ENABLE_PROFILING ? process.hrtime.bigint() : null;
+
     try {
       const msg = JSON.parse(data.toString());
       // Only treat as control message if it's an object with a type field
       if (typeof msg === 'object' && msg !== null && msg.type === 'resize' && msg.cols && msg.rows) {
         terminal.resize(msg.cols, msg.rows);
         console.log(`Resized PTY for ${worktreeName} to ${msg.cols}x${msg.rows}`);
+        return; // Don't measure resize latency
       } else {
         // Valid JSON but not a control message (e.g., single digits "1", "2")
         // Treat as terminal input - but ignore during backpressure pause
@@ -2190,6 +2229,29 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
         return;
       }
       terminal.write(data.toString());
+    }
+
+    // Measure PTY write latency (only if profiling enabled)
+    if (ENABLE_PROFILING && writeStart) {
+      const writeEnd = process.hrtime.bigint();
+      const latencyNs = Number(writeEnd - writeStart);
+      const latencyMs = latencyNs / 1_000_000;
+      ptyWriteLatencies.push(latencyMs);
+
+      // Report stats every 10 seconds
+      if (Date.now() - lastPtyLatencyReport > 10000 && ptyWriteLatencies.length > 0) {
+        const sorted = [...ptyWriteLatencies].sort((a, b) => a - b);
+        const avg = sorted.reduce((a, b) => a + b) / sorted.length;
+        const p50 = sorted[Math.floor(sorted.length * 0.5)];
+        const p95 = sorted[Math.floor(sorted.length * 0.95)];
+        const p99 = sorted[Math.floor(sorted.length * 0.99)];
+        const max = sorted[sorted.length - 1];
+
+        console.log(`[PTY Latency] ${worktreeName}:${command} n=${sorted.length} avg=${avg.toFixed(2)}ms p50=${p50.toFixed(2)}ms p95=${p95.toFixed(2)}ms p99=${p99.toFixed(2)}ms max=${max.toFixed(2)}ms`);
+
+        ptyWriteLatencies = [];
+        lastPtyLatencyReport = Date.now();
+      }
     }
   });
 
@@ -2243,11 +2305,17 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   ws.send(JSON.stringify({
     type: 'session',
     sessionId: sessionId,
-    sessionName: sessionName
+    sessionName: sessionName,
+    tookOver: isTakeover,
+    profiling: ENABLE_PROFILING
   }));
 
-  // Also send visual confirmation in terminal
-  ws.send(`\r\n\x1b[32mConnected to ${sessionName} session (ID: ${sessionId.slice(0, 8)})\x1b[0m\r\n`);
+  // Send visual confirmation in terminal
+  if (isTakeover) {
+    ws.send(`\r\n\x1b[33mConnected to ${sessionName} session (ID: ${sessionId.slice(0, 8)}) - took over from previous client\x1b[0m\r\n`);
+  } else {
+    ws.send(`\r\n\x1b[32mConnected to ${sessionName} session (ID: ${sessionId.slice(0, 8)})\x1b[0m\r\n`);
+  }
 }
 
 /**
@@ -3132,7 +3200,7 @@ function createApp() {
       }
 
       // Destroy the session
-      manager.ptyManager.destroySession(sessionId);
+      await manager.ptyManager.destroySession(sessionId);
       console.log(`Successfully killed terminal session: ${sessionId} (${worktreeName}:${command})`);
       res.json({ success: true });
     } catch (error) {
@@ -3396,6 +3464,12 @@ async function autoStartContainers(manager) {
       if (result.success) {
         console.log(`✓ ${worktree.name}: Services started successfully`);
       } else {
+        // Check if this is just a "no compose file" situation (not an error)
+        if (result.error.includes('no configuration file provided')) {
+          console.log(`ℹ ${worktree.name}: No Docker services configured (no compose file)`);
+          continue;
+        }
+
         console.error(`✗ ${worktree.name}: Failed to start services`);
         console.error(`  Reason: ${result.error}`);
 
