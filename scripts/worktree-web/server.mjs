@@ -277,6 +277,23 @@ class WorktreeManager {
   }
 
   /**
+   * Convert service name to environment variable name
+   * Handles special cases where service names don't match expected env var names
+   * @private
+   * @param {string} serviceName - Docker service name
+   * @returns {string} Environment variable name (without _PORT suffix)
+   */
+  _serviceNameToEnvVar(serviceName) {
+    // Special mappings for services with non-standard env var names
+    const serviceToEnvVar = {
+      'api-gateway': 'API',
+      'api': 'API',
+    };
+
+    return serviceToEnvVar[serviceName] || serviceName.toUpperCase().replace(/-/g, '_');
+  }
+
+  /**
    * Fallback to default port allocation for project-riftwing compatibility
    * @private
    */
@@ -905,8 +922,9 @@ class WorktreeManager {
       // Generate env content dynamically from discovered ports
       let envContent = `COMPOSE_PROJECT_NAME=${projectName}\n`;
       for (const [serviceName, port] of Object.entries(ports)) {
-        // Convert service name to env var format: postgres -> POSTGRES_PORT
-        const envVarName = `${serviceName.toUpperCase().replace(/-/g, '_')}_PORT`;
+        // Convert service name to env var format: api-gateway -> API_PORT
+        const envVarBase = this._serviceNameToEnvVar(serviceName);
+        const envVarName = `${envVarBase}_PORT`;
         envContent += `${envVarName}=${port}\n`;
       }
 
@@ -1419,8 +1437,9 @@ class WorktreeManager {
       // Generate env content dynamically from discovered ports
       let envContent = `COMPOSE_PROJECT_NAME=${projectName}\n`;
       for (const [serviceName, port] of Object.entries(ports)) {
-        // Convert service name to env var format: postgres -> POSTGRES_PORT
-        const envVarName = `${serviceName.toUpperCase().replace(/-/g, '_')}_PORT`;
+        // Convert service name to env var format: api-gateway -> API_PORT
+        const envVarBase = this._serviceNameToEnvVar(serviceName);
+        const envVarName = `${envVarBase}_PORT`;
         envContent += `${envVarName}=${port}\n`;
       }
 

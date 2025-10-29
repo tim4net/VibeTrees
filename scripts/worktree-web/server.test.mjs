@@ -56,6 +56,20 @@ class WorktreeWebManagerMock {
     // Fallback: use index-based suffix for unknown ports
     return `port${index + 1}`;
   }
+
+  /**
+   * Convert service name to environment variable name
+   * @param {string} serviceName - Docker service name
+   * @returns {string} Environment variable name (without _PORT suffix)
+   */
+  _serviceNameToEnvVar(serviceName) {
+    const serviceToEnvVar = {
+      'api-gateway': 'API',
+      'api': 'API',
+    };
+
+    return serviceToEnvVar[serviceName] || serviceName.toUpperCase().replace(/-/g, '_');
+  }
 }
 
 describe('WorktreeWebManager - extractPortsFromDockerStatus', () => {
@@ -245,5 +259,33 @@ describe('WorktreeWebManager - _getPortSuffix', () => {
   it('should return indexed suffix for unknown ports on known services', () => {
     expect(manager._getPortSuffix('temporal', 9999, 1)).toBe('port2');
     expect(manager._getPortSuffix('minio', 8888, 2)).toBe('port3');
+  });
+});
+
+describe('WorktreeWebManager - _serviceNameToEnvVar', () => {
+  let manager;
+
+  beforeEach(() => {
+    manager = new WorktreeWebManagerMock();
+  });
+
+  it('should convert api-gateway to API', () => {
+    expect(manager._serviceNameToEnvVar('api-gateway')).toBe('API');
+  });
+
+  it('should convert api to API', () => {
+    expect(manager._serviceNameToEnvVar('api')).toBe('API');
+  });
+
+  it('should convert standard service names correctly', () => {
+    expect(manager._serviceNameToEnvVar('postgres')).toBe('POSTGRES');
+    expect(manager._serviceNameToEnvVar('console')).toBe('CONSOLE');
+    expect(manager._serviceNameToEnvVar('minio')).toBe('MINIO');
+    expect(manager._serviceNameToEnvVar('temporal')).toBe('TEMPORAL');
+  });
+
+  it('should handle hyphenated service names', () => {
+    expect(manager._serviceNameToEnvVar('minio-console')).toBe('MINIO_CONSOLE');
+    expect(manager._serviceNameToEnvVar('temporal-ui')).toBe('TEMPORAL_UI');
   });
 });
