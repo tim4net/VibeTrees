@@ -3,6 +3,13 @@
  * Handles xterm.js initialization for different terminal types
  */
 
+// Check WebGL availability
+if (typeof WebglAddon === 'undefined') {
+  console.error('[Terminal] WebglAddon not loaded! Check CDN link.');
+} else {
+  console.log('[Terminal] WebglAddon available, version:', WebglAddon.WebglAddon.name);
+}
+
 /**
  * Session Storage Helpers
  * Store and retrieve terminal session IDs for reconnection after page refresh
@@ -112,13 +119,30 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: {
       background: '#0d1117',
-      foreground: '#c9d1d9'
+      foreground: '#c9d1d9',
+      cursor: '#c9d1d9',
+      cursorAccent: '#0d1117'
     },
-    allowProposedApi: true
+    allowProposedApi: true,
+    scrollback: 50000, // Increase for logs
+    fastScrollModifier: 'shift', // Shift+scroll for fast scrolling
+    windowOptions: {
+      setWinSizePixels: false
+    }
   });
 
   const fitAddon = new FitAddon.FitAddon();
   terminal.loadAddon(fitAddon);
+
+  // Enable WebGL rendering with fallback
+  try {
+    const webglAddon = new WebglAddon.WebglAddon();
+    terminal.loadAddon(webglAddon);
+    console.log('[Terminal] WebGL renderer enabled for logs');
+  } catch (e) {
+    console.warn('[Terminal] WebGL not available, using canvas:', e.message);
+  }
+
   terminal.open(panel.querySelector('.terminal-wrapper'));
 
   // Fit terminal after delay to ensure toolbar is rendered
@@ -172,7 +196,27 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     };
 
     logsSocket.onmessage = (event) => {
-      terminal.write(event.data);
+      const data = event.data;
+
+      // Fast path: Check for JSON only if starts with '{'
+      // Most messages are log data, not JSON control messages
+      if (data.length > 0 && data[0] === '{') {
+        try {
+          const msg = JSON.parse(data);
+
+          if (msg.type === 'clear') {
+            terminal.clear();
+            return;
+          }
+
+          // Fall through if JSON but unknown type
+        } catch (e) {
+          // Not valid JSON, fall through to write
+        }
+      }
+
+      // Write log data to terminal
+      terminal.write(data);
     };
 
     logsSocket.onerror = (error) => {
@@ -249,20 +293,38 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
  */
 export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals, activeTabId, switchToTab) {
   const terminal = new Terminal({
-    cursorBlink: true,
-    fontSize: 14,
+    cursorBlink: true, // Enable for PTY terminals
+    fontSize: 13,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: {
-      background: '#0d1117',
-      foreground: '#c9d1d9',
-      cursor: '#58a6ff',
-      selection: '#264f78'
+      background: '#1e1e1e',
+      foreground: '#d4d4d4',
+      cursor: '#d4d4d4',
+      cursorAccent: '#1e1e1e',
+      selection: 'rgba(255, 255, 255, 0.3)'
     },
-    allowProposedApi: true
+    allowProposedApi: true,
+    scrollback: 10000, // Reasonable for PTY
+    fastScrollModifier: 'shift',
+    windowOptions: {
+      setWinSizePixels: false
+    },
+    convertEol: false, // Let shell handle line endings
+    windowsMode: false // Set to true on Windows
   });
 
   const fitAddon = new FitAddon.FitAddon();
   terminal.loadAddon(fitAddon);
+
+  // Enable WebGL rendering with fallback
+  try {
+    const webglAddon = new WebglAddon.WebglAddon();
+    terminal.loadAddon(webglAddon);
+    console.log(`[Terminal] WebGL renderer enabled for ${worktreeName}`);
+  } catch (e) {
+    console.warn(`[Terminal] WebGL not available for ${worktreeName}, using canvas:`, e.message);
+  }
+
   terminal.open(panel.querySelector('.terminal-wrapper'));
 
   // Fit terminal after delay
@@ -329,31 +391,45 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     };
 
     terminalSocket.onmessage = (event) => {
-      try {
-        // Check if message contains session ID or status update
-        const data = JSON.parse(event.data);
-        if (data.type === 'session' && data.sessionId) {
-          reconnectState.sessionId = data.sessionId;
-          // Save session ID to sessionStorage for persistence across page refreshes
-          saveTerminalSession(worktreeName, command, data.sessionId);
-          console.log(`PTY session ID: ${data.sessionId}`);
-          return;
-        }
-        if (data.type === 'status') {
-          // Handle backpressure status messages
-          if (data.paused) {
-            console.warn(`[BACKPRESSURE] Terminal output paused: ${data.message}`);
-            terminal.write(`\r\n\x1b[33m${data.message}\x1b[0m\r\n`);
-          } else if (data.message === '') {
-            console.log(`[BACKPRESSURE] Terminal output resumed`);
-            terminal.write(`\r\n\x1b[32mOutput resumed\x1b[0m\r\n`);
+      const data = event.data;
+
+      // Fast path: Quick check if message looks like JSON
+      // Most messages are terminal data (don't start with '{')
+      if (data.length > 0 && data[0] === '{') {
+        try {
+          const msg = JSON.parse(data);
+
+          // Handle session ID
+          if (msg.type === 'session' && msg.sessionId) {
+            reconnectState.sessionId = msg.sessionId;
+            // Save session ID to sessionStorage for persistence across page refreshes
+            saveTerminalSession(worktreeName, command, msg.sessionId);
+            console.log(`PTY session ID: ${msg.sessionId}`);
+            return; // Don't write to terminal
           }
-          return;
+
+          // Handle status messages
+          if (msg.type === 'status') {
+            // Handle backpressure status messages
+            if (msg.paused) {
+              console.warn(`[BACKPRESSURE] Terminal output paused: ${msg.message}`);
+              terminal.write(`\r\n\x1b[33m${msg.message}\x1b[0m\r\n`);
+            } else if (msg.message === '') {
+              console.log(`[BACKPRESSURE] Terminal output resumed`);
+              terminal.write(`\r\n\x1b[32mOutput resumed\x1b[0m\r\n`);
+            }
+            return; // Don't write to terminal
+          }
+
+          // If parsed but not handled, fall through to write
+        } catch (e) {
+          // JSON-like but invalid, treat as terminal data
+          // Fall through to write
         }
-      } catch (e) {
-        // Not JSON, treat as regular terminal data
       }
-      terminal.write(event.data);
+
+      // Default: Write to terminal
+      terminal.write(data);
     };
 
     terminalSocket.onerror = (error) => {
