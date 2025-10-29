@@ -50,14 +50,21 @@ export class PTYStateSerializer {
   async saveState(state) {
     const sessionDir = path.join(this.baseDir, state.sessionId);
 
-    // Create directory if needed
-    if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir, { recursive: true });
+    // Use async versions - NO BLOCKING
+    try {
+      await fs.promises.mkdir(sessionDir, { recursive: true });
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
     }
 
-    // Write state file
     const statePath = path.join(sessionDir, 'pty-state.json');
-    fs.writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
+
+    // Async write - NO BLOCKING (remove pretty-print for performance)
+    await fs.promises.writeFile(
+      statePath,
+      JSON.stringify(state),
+      'utf-8'
+    );
   }
 
   /**
@@ -68,11 +75,13 @@ export class PTYStateSerializer {
   async loadState(sessionId) {
     const statePath = path.join(this.baseDir, sessionId, 'pty-state.json');
 
-    if (!fs.existsSync(statePath)) {
+    try {
+      // Check if exists asynchronously
+      await fs.promises.access(statePath, fs.constants.F_OK);
+      const data = await fs.promises.readFile(statePath, 'utf-8');
+      return JSON.parse(data);
+    } catch (error) {
       return null;
     }
-
-    const data = fs.readFileSync(statePath, 'utf-8');
-    return JSON.parse(data);
   }
 }

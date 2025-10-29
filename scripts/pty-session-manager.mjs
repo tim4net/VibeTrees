@@ -113,8 +113,8 @@ export class PTYSessionManager {
     session.pty = ptyProcess;
 
     // Start auto-save interval
-    session.autoSaveTimer = setInterval(() => {
-      this._autoSaveSession(sessionId);
+    session.autoSaveTimer = setInterval(async () => {
+      await this._autoSaveSession(sessionId);
     }, this.autoSaveInterval);
 
     return ptyProcess;
