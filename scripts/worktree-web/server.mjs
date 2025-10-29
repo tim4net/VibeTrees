@@ -232,7 +232,7 @@ class WorktreeManager {
         }
       }
 
-      console.log(`[PORTS] Discovered ${services.length} services, allocated ${Object.keys(ports).length} ports`);
+      // Ports allocated successfully
       return ports;
     } catch (error) {
       console.warn(`[PORTS] Failed to inspect compose file: ${error.message}, using defaults`);
@@ -245,7 +245,7 @@ class WorktreeManager {
    * @private
    */
   _allocateDefaultPorts(worktreeName) {
-    console.log(`[PORTS] Using default port allocation`);
+    // Using default port allocation
     return {
       postgres: this.portRegistry.allocate(worktreeName, 'postgres', 5432),
       api: this.portRegistry.allocate(worktreeName, 'api', 3000),
@@ -407,7 +407,6 @@ class WorktreeManager {
           encoding: 'utf-8'
         }).trim();
         const count = parseInt(output, 10) || 0;
-        console.log(`[getCommitCount] ${branchName}: ${count} commits (main branch)`);
         return count;
       }
 
@@ -418,10 +417,8 @@ class WorktreeManager {
         encoding: 'utf-8'
       }).trim();
       const count = parseInt(output, 10) || 0;
-      console.log(`[getCommitCount] ${branchName}: ${count} commits unique to branch`);
       return count;
     } catch (error) {
-      console.log(`[getCommitCount] ${branchName}: Error with ^main comparison (${error.message}), returning 0`);
       // If the comparison fails (e.g., main doesn't exist), return 0
       return 0;
     }
