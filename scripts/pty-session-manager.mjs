@@ -33,6 +33,7 @@ export class PTYSessionManager {
       connected: false,
       clientId: null,
       pty: null,
+      activeListener: null, // Track active data listener
       createdAt: new Date(),
       disconnectedAt: null
     });
@@ -129,6 +130,12 @@ export class PTYSessionManager {
       // Clear auto-save timer
       if (session.autoSaveTimer) {
         clearInterval(session.autoSaveTimer);
+      }
+
+      // Remove active listener if exists
+      if (session.pty && session.activeListener) {
+        session.pty.removeListener('data', session.activeListener);
+        session.activeListener = null;
       }
 
       if (session.pty) {
