@@ -1544,10 +1544,15 @@ class WorktreeManager {
       this.broadcast('services:started', { worktree: worktreeName, ports });
       return { success: true, ports };
     } catch (error) {
-      console.error(`Failed to start services for ${worktreeName}:`, error.message);
-      console.error('stderr:', error.stderr?.toString());
-      console.error('stdout:', error.stdout?.toString());
       const errorMsg = error.stderr?.toString() || error.stdout?.toString() || error.message;
+
+      // Only log verbose errors if it's not just a "no compose file" situation
+      if (!errorMsg.includes('no configuration file provided')) {
+        console.error(`Failed to start services for ${worktreeName}:`, error.message);
+        console.error('stderr:', error.stderr?.toString());
+        console.error('stdout:', error.stdout?.toString());
+      }
+
       return { success: false, error: errorMsg };
     }
   }
@@ -3427,6 +3432,12 @@ async function autoStartContainers(manager) {
       if (result.success) {
         console.log(`✓ ${worktree.name}: Services started successfully`);
       } else {
+        // Check if this is just a "no compose file" situation (not an error)
+        if (result.error.includes('no configuration file provided')) {
+          console.log(`ℹ ${worktree.name}: No Docker services configured (no compose file)`);
+          continue;
+        }
+
         console.error(`✗ ${worktree.name}: Failed to start services`);
         console.error(`  Reason: ${result.error}`);
 
