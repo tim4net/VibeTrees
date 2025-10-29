@@ -6,7 +6,9 @@
  */
 
 import { execSync, spawn } from 'child_process';
+import fs from 'fs';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import path from 'path';
 import { basename, join, dirname } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
@@ -473,6 +475,16 @@ class WorktreeManager {
 
   getDockerStatus(worktreePath, worktreeName) {
     const statuses = [];
+
+    // Check if docker-compose.yml exists in this worktree
+    const composeFiles = ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml'];
+    const hasComposeFile = composeFiles.some(file =>
+      fs.existsSync(path.join(worktreePath, file))
+    );
+
+    if (!hasComposeFile) {
+      return statuses; // No compose file, no containers
+    }
 
     // Get Docker container statuses
     try {
