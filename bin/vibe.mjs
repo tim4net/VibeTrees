@@ -51,7 +51,7 @@ Documentation: https://github.com/your-org/vibe-worktrees
 
 // Version
 if (args.includes('--version') || args.includes('-v')) {
-  const packageJson = await import('../package.json', { assert: { type: 'json' } });
+  const packageJson = await import('../package.json', { with: { type: 'json' } });
   console.log(`Vibe Worktrees v${packageJson.default.version}`);
   process.exit(0);
 }
