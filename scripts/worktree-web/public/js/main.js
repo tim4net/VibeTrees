@@ -56,6 +56,15 @@ function initApp() {
   initPerformanceMetrics();
   initStatusBar();
 
+  // Update browser title when worktree selection changes
+  appState.on('worktree:selected', (worktreeId) => {
+    if (worktreeId) {
+      document.title = `${worktreeId} VibeTrees`;
+    } else {
+      document.title = 'VibeTrees';
+    }
+  });
+
   console.log('[main] All modules initialized');
 
   // Initialize Lucide icons
