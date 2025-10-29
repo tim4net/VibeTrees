@@ -954,15 +954,8 @@ class WorktreeManager {
       }
       this.profiler.end(mcpId);
 
-      // Run database copy and bootstrap in parallel (both are slow)
-      console.log(`[CREATE] Starting parallel operations: database copy + bootstrap...`);
-
-      const databaseCopyPromise = this.copyDatabase(worktreeName, worktreePath)
-        .then(() => console.log(`[CREATE] Database copy completed`))
-        .catch(err => {
-          console.error(`[CREATE] Database copy failed:`, err.message);
-          throw err;
-        });
+      // Run bootstrap (containers must start before database copy)
+      console.log(`[CREATE] Starting bootstrap...`);
 
       const bootstrapId = this.profiler.start('npm-bootstrap', totalId);
       const bootstrapPromise = new Promise((resolve, reject) => {
@@ -1012,14 +1005,14 @@ class WorktreeManager {
         }
       });
 
-      // Wait for both parallel operations to complete
-      await Promise.all([databaseCopyPromise, bootstrapPromise]);
-      console.log(`[CREATE] All parallel operations completed`);
+      // Wait for bootstrap to complete
+      await bootstrapPromise;
+      console.log(`[CREATE] Bootstrap completed`);
 
       this.broadcast('worktree:progress', {
         name: worktreeName,
-        step: 'parallel',
-        message: '✓ Database and packages ready'
+        step: 'bootstrap',
+        message: '✓ Packages ready'
       });
 
       // Start containers
@@ -1028,6 +1021,17 @@ class WorktreeManager {
       await this.startContainersForWorktree(worktreeName, worktreePath);
       console.log(`[CREATE] Containers started`);
       this.profiler.end(dockerId);
+
+      // Copy database after containers are running
+      const dbCopyId = this.profiler.start('database-copy', totalId);
+      try {
+        await this.copyDatabase(worktreeName, worktreePath);
+        console.log(`[CREATE] Database copy completed`);
+      } catch (err) {
+        console.error(`[CREATE] Database copy failed (non-critical):`, err.message);
+        // Don't fail worktree creation if database copy fails
+      }
+      this.profiler.end(dbCopyId);
 
       const worktree = {
         name: worktreeName,
@@ -1138,14 +1142,63 @@ class WorktreeManager {
         return;
       }
 
-      // Database copy is intentionally skipped to avoid checkpoint corruption
-      // Each worktree will start with a fresh database
-      // TODO: Implement proper database copy using pg_dump when containers are running
-      console.log(`Skipping database copy to avoid checkpoint corruption`);
+      // Copy database using pg_dump/pg_restore for consistent snapshot
+      const targetDbPort = this._findDatabasePort(this.portRegistry.getWorktreePorts(targetWorktreeName));
+
+      if (!targetDbPort) {
+        console.log(`Target database port not found for ${targetWorktreeName}`);
+        this.broadcast('worktree:progress', {
+          name: targetWorktreeName,
+          step: 'database',
+          message: 'Starting with fresh database (no target port)'
+        });
+        return;
+      }
+
+      // Wait for target database to be ready (max 30 seconds)
+      console.log(`Waiting for target database on port ${targetDbPort} to be ready...`);
+      let attempts = 0;
+      const maxAttempts = 30;
+      while (attempts < maxAttempts) {
+        try {
+          execSync(`PGPASSWORD=app pg_isready -h localhost -p ${targetDbPort} -U app -d app`, {
+            stdio: 'pipe'
+          });
+          console.log(`✓ Target database is ready`);
+          break;
+        } catch (e) {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            console.log(`Target database not ready after ${maxAttempts}s, skipping copy`);
+            this.broadcast('worktree:progress', {
+              name: targetWorktreeName,
+              step: 'database',
+              message: 'Starting with fresh database (timeout waiting for DB)'
+            });
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      console.log(`Copying database from port ${sourcePort} to ${targetDbPort}...`);
+
+      // Use pg_dump to export from source and pipe directly to target
+      // This avoids writing large files to disk and is more efficient
+      const dumpCommand = `PGPASSWORD=app pg_dump -h localhost -p ${sourcePort} -U app -d app --no-owner --no-acl`;
+      const restoreCommand = `PGPASSWORD=app psql -h localhost -p ${targetDbPort} -U app -d app -q`;
+
+      execSync(`${dumpCommand} | ${restoreCommand}`, {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+        maxBuffer: 100 * 1024 * 1024 // 100MB buffer for large databases
+      });
+
+      console.log(`✓ Database copied successfully from main to ${targetWorktreeName}`);
       this.broadcast('worktree:progress', {
         name: targetWorktreeName,
         step: 'database',
-        message: 'Starting with fresh database'
+        message: '✓ Database copied successfully'
       });
       return;
     } catch (error) {
