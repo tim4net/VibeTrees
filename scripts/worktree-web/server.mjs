@@ -2028,8 +2028,22 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   // Generate unique client ID for this WebSocket connection
   const clientId = `${sessionId}-${Date.now()}`;
 
-  // Attach client to session
-  manager.ptyManager.attachClient(sessionId, clientId);
+  // Attach client to session (returns previous WebSocket if takeover)
+  const previousWs = manager.ptyManager.attachClient(sessionId, clientId, ws);
+  const isTakeover = !!previousWs;
+
+  // If this is a takeover, notify the previous client
+  if (isTakeover && previousWs.readyState === 1) { // WebSocket.OPEN
+    try {
+      previousWs.send(JSON.stringify({
+        type: 'takeover',
+        message: 'Session taken over by another client'
+      }));
+      console.log(`[TAKEOVER] Notified previous client for ${worktreeName}:${command}`);
+    } catch (e) {
+      console.error(`[TAKEOVER] Failed to notify previous client: ${e.message}`);
+    }
+  }
 
   // Spawn PTY if not already spawned
   let terminal;
@@ -2243,11 +2257,16 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   ws.send(JSON.stringify({
     type: 'session',
     sessionId: sessionId,
-    sessionName: sessionName
+    sessionName: sessionName,
+    tookOver: isTakeover
   }));
 
-  // Also send visual confirmation in terminal
-  ws.send(`\r\n\x1b[32mConnected to ${sessionName} session (ID: ${sessionId.slice(0, 8)})\x1b[0m\r\n`);
+  // Send visual confirmation in terminal
+  if (isTakeover) {
+    ws.send(`\r\n\x1b[33mConnected to ${sessionName} session (ID: ${sessionId.slice(0, 8)}) - took over from previous client\x1b[0m\r\n`);
+  } else {
+    ws.send(`\r\n\x1b[32mConnected to ${sessionName} session (ID: ${sessionId.slice(0, 8)})\x1b[0m\r\n`);
+  }
 }
 
 /**

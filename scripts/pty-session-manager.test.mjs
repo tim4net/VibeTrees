@@ -84,14 +84,77 @@ describe('PTYSessionManager', () => {
     });
   });
 
+  describe('Session Takeover', () => {
+    it('should return null when attaching to new session', () => {
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      const mockWs = { readyState: 1 };
+
+      const previousWs = manager.attachClient(sessionId, 'ws-client-1', mockWs);
+
+      expect(previousWs).toBeNull();
+    });
+
+    it('should return previous WebSocket when taking over active session', () => {
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      const mockWs1 = { readyState: 1, send: vi.fn() };
+      const mockWs2 = { readyState: 1, send: vi.fn() };
+
+      // First client connects
+      manager.attachClient(sessionId, 'ws-client-1', mockWs1);
+
+      // Second client takes over
+      const previousWs = manager.attachClient(sessionId, 'ws-client-2', mockWs2);
+
+      expect(previousWs).toBe(mockWs1);
+
+      const session = manager.getSession(sessionId);
+      expect(session.ws).toBe(mockWs2);
+      expect(session.clientId).toBe('ws-client-2');
+    });
+
+    it('should not return previous WebSocket for disconnected session', () => {
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      const mockWs1 = { readyState: 1 };
+      const mockWs2 = { readyState: 1 };
+
+      // First client connects then disconnects
+      manager.attachClient(sessionId, 'ws-client-1', mockWs1);
+      manager.detachClient(sessionId);
+
+      // Second client reconnects (not a takeover)
+      const previousWs = manager.attachClient(sessionId, 'ws-client-2', mockWs2);
+
+      expect(previousWs).toBeNull();
+    });
+
+    it('should clear WebSocket reference on detach', () => {
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      const mockWs = { readyState: 1 };
+
+      manager.attachClient(sessionId, 'ws-client-1', mockWs);
+      manager.detachClient(sessionId);
+
+      const session = manager.getSession(sessionId);
+      expect(session.ws).toBeNull();
+    });
+  });
+
   describe('Session Cleanup', () => {
-    it('should destroy session and kill PTY process', () => {
+    it('should destroy session and kill PTY process', async () => {
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        deleteState: vi.fn().mockResolvedValue(undefined)
+      };
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
       const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
       manager._sessions.get(sessionId).pty = mockPty;
 
-      manager.destroySession(sessionId);
+      await manager.destroySession(sessionId);
 
       expect(mockPty.kill).toHaveBeenCalled();
+      expect(mockSerializer.deleteState).toHaveBeenCalledWith(sessionId);
       expect(manager.hasSession(sessionId)).toBe(false);
     });
   });
@@ -131,18 +194,20 @@ describe('PTYSessionManager', () => {
       vi.useRealTimers();
     });
 
-    it('should clear auto-save interval when session destroyed', () => {
+    it('should clear auto-save interval when session destroyed', async () => {
       const mockSerializer = {
         captureState: vi.fn(),
-        saveState: vi.fn()
+        saveState: vi.fn(),
+        deleteState: vi.fn().mockResolvedValue(undefined)
       };
       const manager = new PTYSessionManager({ serializer: mockSerializer, autoSaveInterval: 5000 });
 
       const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
       manager.spawnPTY(sessionId, { command: 'bash', args: [], cols: 80, rows: 24 });
-      manager.destroySession(sessionId);
+      await manager.destroySession(sessionId);
 
       expect(manager.hasSession(sessionId)).toBe(false);
+      expect(mockSerializer.deleteState).toHaveBeenCalledWith(sessionId);
     });
   });
 

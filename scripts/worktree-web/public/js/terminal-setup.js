@@ -619,7 +619,22 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
             // Save session ID to sessionStorage for persistence across page refreshes
             saveTerminalSession(worktreeName, command, msg.sessionId);
             console.log(`PTY session ID: ${msg.sessionId}`);
+
+            // Show takeover warning if applicable
+            if (msg.tookOver) {
+              console.warn(`[TAKEOVER] This session was taken over from another client`);
+            }
             return; // Don't write to terminal
+          }
+
+          // Handle takeover notification (this client was displaced)
+          if (msg.type === 'takeover') {
+            console.warn(`[TAKEOVER] ${msg.message}`);
+            terminal.write(`\r\n\x1b[31m⚠ ${msg.message}\x1b[0m\r\n`);
+            terminal.write(`\x1b[90mConnection closed. Refresh the page to reconnect.\x1b[0m\r\n`);
+            // Close the socket - this client has been replaced
+            terminalSocket.close();
+            return;
           }
 
           // Handle status messages

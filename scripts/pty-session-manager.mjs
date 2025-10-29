@@ -32,6 +32,7 @@ export class PTYSessionManager {
       cwd,
       connected: false,
       clientId: null,
+      ws: null, // WebSocket reference for takeover notifications
       pty: null,
       activeListener: null, // Track active data listener
       createdAt: new Date(),
@@ -63,14 +64,24 @@ export class PTYSessionManager {
    * Attach WebSocket client to session
    * @param {string} sessionId - Session ID
    * @param {string} clientId - WebSocket client ID
+   * @param {object} ws - WebSocket connection (optional)
+   * @returns {object|null} Previous WebSocket if session was taken over, null otherwise
    */
-  attachClient(sessionId, clientId) {
+  attachClient(sessionId, clientId, ws = null) {
     const session = this._sessions.get(sessionId);
     if (session) {
+      const previousWs = session.ws;
+      const wasTakeover = session.connected && previousWs;
+
       session.connected = true;
       session.clientId = clientId;
+      session.ws = ws;
       session.disconnectedAt = null;
+
+      // Return previous WebSocket if this was a takeover
+      return wasTakeover ? previousWs : null;
     }
+    return null;
   }
 
   /**
@@ -81,6 +92,7 @@ export class PTYSessionManager {
     const session = this._sessions.get(sessionId);
     if (session) {
       session.connected = false;
+      session.ws = null;
       session.disconnectedAt = new Date();
     }
   }
