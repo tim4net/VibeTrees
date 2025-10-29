@@ -225,10 +225,20 @@ class WorktreeManager {
 
       // Allocate ports for each service that exposes ports
       for (const service of services) {
-        if (service.ports.length > 0) {
-          // Use the first exposed port as the base port
+        if (service.ports.length === 0) continue;
+
+        if (service.ports.length === 1) {
+          // Single port: use service name directly
           const basePort = service.ports[0];
           ports[service.name] = this.portRegistry.allocate(worktreeName, service.name, basePort);
+        } else {
+          // Multiple ports: use suffixes based on known port conventions
+          for (let i = 0; i < service.ports.length; i++) {
+            const basePort = service.ports[i];
+            const suffix = this._getPortSuffix(service.name, basePort, i);
+            const portKey = suffix ? `${service.name}-${suffix}` : service.name;
+            ports[portKey] = this.portRegistry.allocate(worktreeName, portKey, basePort);
+          }
         }
       }
 
@@ -238,6 +248,32 @@ class WorktreeManager {
       console.warn(`[PORTS] Failed to inspect compose file: ${error.message}, using defaults`);
       return this._allocateDefaultPorts(worktreeName);
     }
+  }
+
+  /**
+   * Get a descriptive suffix for additional ports in a multi-port service
+   * @private
+   * @param {string} serviceName - Name of the service
+   * @param {number} port - The port number
+   * @param {number} index - Index in the ports array
+   * @returns {string} Suffix to append to service name, or empty string for first port
+   */
+  _getPortSuffix(serviceName, port, index) {
+    // First port doesn't need a suffix (use service name directly)
+    if (index === 0) return '';
+
+    // Known port mappings for common services
+    const portMappings = {
+      temporal: { 7233: '', 8233: 'ui' },
+      minio: { 9000: '', 9001: 'console' },
+    };
+
+    if (portMappings[serviceName] && portMappings[serviceName][port]) {
+      return portMappings[serviceName][port];
+    }
+
+    // Fallback: use index-based suffix for unknown ports
+    return `port${index + 1}`;
   }
 
   /**

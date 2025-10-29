@@ -31,6 +31,31 @@ class WorktreeWebManagerMock {
 
     return ports;
   }
+
+  /**
+   * Get a descriptive suffix for additional ports in a multi-port service
+   * @param {string} serviceName - Name of the service
+   * @param {number} port - The port number
+   * @param {number} index - Index in the ports array
+   * @returns {string} Suffix to append to service name, or empty string for first port
+   */
+  _getPortSuffix(serviceName, port, index) {
+    // First port doesn't need a suffix (use service name directly)
+    if (index === 0) return '';
+
+    // Known port mappings for common services
+    const portMappings = {
+      temporal: { 7233: '', 8233: 'ui' },
+      minio: { 9000: '', 9001: 'console' },
+    };
+
+    if (portMappings[serviceName] && portMappings[serviceName][port]) {
+      return portMappings[serviceName][port];
+    }
+
+    // Fallback: use index-based suffix for unknown ports
+    return `port${index + 1}`;
+  }
 }
 
 describe('WorktreeWebManager - extractPortsFromDockerStatus', () => {
@@ -188,5 +213,37 @@ describe('WorktreeWebManager - extractPortsFromDockerStatus', () => {
     expect(result).toEqual({
       console: 5175
     });
+  });
+});
+
+describe('WorktreeWebManager - _getPortSuffix', () => {
+  let manager;
+
+  beforeEach(() => {
+    manager = new WorktreeWebManagerMock();
+  });
+
+  it('should return empty string for first port (index 0)', () => {
+    expect(manager._getPortSuffix('temporal', 7233, 0)).toBe('');
+    expect(manager._getPortSuffix('minio', 9000, 0)).toBe('');
+    expect(manager._getPortSuffix('postgres', 5432, 0)).toBe('');
+  });
+
+  it('should return "ui" for temporal port 8233', () => {
+    expect(manager._getPortSuffix('temporal', 8233, 1)).toBe('ui');
+  });
+
+  it('should return "console" for minio port 9001', () => {
+    expect(manager._getPortSuffix('minio', 9001, 1)).toBe('console');
+  });
+
+  it('should return indexed suffix for unknown service/port combinations', () => {
+    expect(manager._getPortSuffix('unknown-service', 1234, 1)).toBe('port2');
+    expect(manager._getPortSuffix('unknown-service', 5678, 2)).toBe('port3');
+  });
+
+  it('should return indexed suffix for unknown ports on known services', () => {
+    expect(manager._getPortSuffix('temporal', 9999, 1)).toBe('port2');
+    expect(manager._getPortSuffix('minio', 8888, 2)).toBe('port3');
   });
 });
