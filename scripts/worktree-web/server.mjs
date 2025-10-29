@@ -287,6 +287,12 @@ class WorktreeManager {
             current.name = current.branch || basename(current.path);
             current.ports = this.portRegistry.getWorktreePorts(current.name);
             current.dockerStatus = this.getDockerStatus(current.path, current.name);
+
+            // Fallback: If port registry is empty, extract ports from running containers
+            if (Object.keys(current.ports).length === 0 && current.dockerStatus.length > 0) {
+              current.ports = this.extractPortsFromDockerStatus(current.dockerStatus);
+            }
+
             current.gitStatus = this.getGitStatus(current.path);
             current.githubUrl = this.getGitHubUrl(current.path);
             current.commitCount = this.getCommitCount(current.path, current.branch);
@@ -313,6 +319,12 @@ class WorktreeManager {
         current.name = current.branch || basename(current.path);
         current.ports = this.portRegistry.getWorktreePorts(current.name);
         current.dockerStatus = this.getDockerStatus(current.path, current.name);
+
+        // Fallback: If port registry is empty, extract ports from running containers
+        if (Object.keys(current.ports).length === 0 && current.dockerStatus.length > 0) {
+          current.ports = this.extractPortsFromDockerStatus(current.dockerStatus);
+        }
+
         current.gitStatus = this.getGitStatus(current.path);
         current.githubUrl = this.getGitHubUrl(current.path);
         current.commitCount = this.getCommitCount(current.path, current.branch);
@@ -426,6 +438,33 @@ class WorktreeManager {
     }
 
     return statuses;
+  }
+
+  /**
+   * Extract port mappings from Docker container status
+   * Used as fallback when port registry lookup fails
+   * @param {Array} dockerStatus - Array of container status objects
+   * @returns {Object} Port mappings keyed by service name
+   */
+  extractPortsFromDockerStatus(dockerStatus) {
+    const ports = {};
+
+    for (const container of dockerStatus) {
+      // Only process running containers
+      if (container.state !== 'running') continue;
+
+      // Extract the first published port for each container
+      if (container.ports && container.ports.length > 0) {
+        const firstPort = container.ports[0];
+        const match = firstPort.match(/^(\d+)→/);
+        if (match) {
+          const publishedPort = parseInt(match[1], 10);
+          ports[container.name] = publishedPort;
+        }
+      }
+    }
+
+    return ports;
   }
 
   /**
