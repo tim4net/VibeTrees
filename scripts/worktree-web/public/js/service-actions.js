@@ -329,16 +329,62 @@ export async function deleteWorktree(name) {
  */
 export async function startServices(name) {
   try {
-    const response = await fetch(`/api/worktrees/${name}/services/start`, {
-      method: 'POST'
-    });
+    // Get worktree data to find ports
+    const worktree = window.appState?.worktrees?.find(w => w.name === name);
+    if (!worktree) {
+      alert('Worktree not found');
+      return;
+    }
 
-    const result = await response.json();
+    // Get ports for this worktree (or use common default services)
+    const ports = worktree.ports || {
+      'postgres': 5432,
+      'api': 3000,
+      'console': 4200,
+      'temporal': 7233,
+      'temporal-ui': 8080,
+      'minio': 9000,
+      'minio-console': 9001
+    };
 
-    if (result.success) {
-      window.refreshWorktrees?.();
+    // Show the service startup modal
+    if (window.showServiceStartupModal) {
+      window.showServiceStartupModal(name, ports);
     } else {
-      alert('Failed to start services: ' + result.error);
+      // Fallback to simple loading if modal not loaded yet
+      const button = event?.target?.closest('button');
+      const originalText = button?.innerHTML;
+      if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i data-lucide="loader-2" class="lucide-sm animate-spin"></i> Starting...';
+        if (window.lucide) window.lucide.createIcons();
+      }
+
+      const response = await fetch(`/api/worktrees/${name}/services/start`, {
+        method: 'POST'
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        if (button) {
+          button.innerHTML = '<i data-lucide="check" class="lucide-sm"></i> Started!';
+          if (window.lucide) window.lucide.createIcons();
+          setTimeout(() => {
+            button.disabled = false;
+            if (originalText) button.innerHTML = originalText;
+            if (window.lucide) window.lucide.createIcons();
+          }, 2000);
+        }
+        window.refreshWorktrees?.();
+      } else {
+        if (button) {
+          button.disabled = false;
+          if (originalText) button.innerHTML = originalText;
+          if (window.lucide) window.lucide.createIcons();
+        }
+        alert('Failed to start services: ' + result.error);
+      }
     }
   } catch (error) {
     alert('Failed to start services: ' + error.message);
@@ -350,6 +396,15 @@ export async function startServices(name) {
  */
 export async function stopServices(name) {
   try {
+    // Show loading indicator
+    const button = event?.target?.closest('button');
+    const originalText = button?.innerHTML;
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<i data-lucide="loader-2" class="lucide-sm animate-spin"></i> Stopping...';
+      if (window.lucide) window.lucide.createIcons();
+    }
+
     const response = await fetch(`/api/worktrees/${name}/services/stop`, {
       method: 'POST'
     });
@@ -357,11 +412,33 @@ export async function stopServices(name) {
     const result = await response.json();
 
     if (result.success) {
+      // Show success feedback
+      if (button) {
+        button.innerHTML = '<i data-lucide="check" class="lucide-sm"></i> Stopped!';
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+          button.disabled = false;
+          if (originalText) button.innerHTML = originalText;
+          if (window.lucide) window.lucide.createIcons();
+        }, 2000);
+      }
       window.refreshWorktrees?.();
     } else {
+      if (button) {
+        button.disabled = false;
+        if (originalText) button.innerHTML = originalText;
+        if (window.lucide) window.lucide.createIcons();
+      }
       alert('Failed to stop services: ' + result.error);
     }
   } catch (error) {
+    const button = event?.target?.closest('button');
+    const originalText = button?.innerHTML;
+    if (button) {
+      button.disabled = false;
+      if (originalText) button.innerHTML = originalText;
+      if (window.lucide) window.lucide.createIcons();
+    }
     alert('Failed to stop services: ' + error.message);
   }
 }
@@ -371,6 +448,15 @@ export async function stopServices(name) {
  */
 export async function restartServices(name) {
   try {
+    // Show loading indicator
+    const button = event?.target?.closest('button');
+    const originalText = button?.innerHTML;
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<i data-lucide="loader-2" class="lucide-sm animate-spin"></i> Restarting...';
+      if (window.lucide) window.lucide.createIcons();
+    }
+
     const response = await fetch(`/api/worktrees/${name}/services/restart`, {
       method: 'POST'
     });
@@ -378,11 +464,33 @@ export async function restartServices(name) {
     const result = await response.json();
 
     if (result.success) {
+      // Show success feedback
+      if (button) {
+        button.innerHTML = '<i data-lucide="check" class="lucide-sm"></i> Restarted!';
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+          button.disabled = false;
+          if (originalText) button.innerHTML = originalText;
+          if (window.lucide) window.lucide.createIcons();
+        }, 2000);
+      }
       window.refreshWorktrees?.();
     } else {
+      if (button) {
+        button.disabled = false;
+        if (originalText) button.innerHTML = originalText;
+        if (window.lucide) window.lucide.createIcons();
+      }
       alert('Failed to restart services: ' + result.error);
     }
   } catch (error) {
+    const button = event?.target?.closest('button');
+    const originalText = button?.innerHTML;
+    if (button) {
+      button.disabled = false;
+      if (originalText) button.innerHTML = originalText;
+      if (window.lucide) window.lucide.createIcons();
+    }
     alert('Failed to restart services: ' + error.message);
   }
 }

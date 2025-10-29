@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="/css/base.css?v=2">
   <link rel="stylesheet" href="/css/sidebar.css?v=2">
   <link rel="stylesheet" href="/css/terminals.css?v=2">
-  <link rel="stylesheet" href="/css/components.css?v=3">
+  <link rel="stylesheet" href="/css/components.css?v=4">
   <link rel="stylesheet" href="/css/branch-selector.css?v=2">
   <link rel="stylesheet" href="/css/agents.css?v=2">
   <link rel="stylesheet" href="/css/sync.css?v=2">
@@ -457,6 +457,37 @@
     </div>
   </div>
 
+  <!-- Service Startup Progress Modal -->
+  <div id="service-startup-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2><i data-lucide="rocket" class="lucide"></i> Starting Services</h2>
+        <button class="close-btn" onclick="hideServiceStartupModal()" id="service-startup-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="progress-container active">
+          <div class="progress-header">
+            <div class="progress-spinner"></div>
+            <div class="progress-header-text" id="service-startup-header">Initializing...</div>
+          </div>
+
+          <!-- Service list -->
+          <div class="service-startup-list" id="service-startup-list">
+            <!-- Will be populated dynamically with services -->
+          </div>
+
+          <!-- Log output -->
+          <div id="service-startup-logs" class="progress-output"></div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" onclick="hideServiceStartupModal()" id="service-startup-done-btn" style="display: none;" class="primary">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Database Operations Modal -->
   <div id="database-modal" class="modal">
     <div class="modal-content">
@@ -687,6 +718,9 @@
   <script type="module" src="/js/update-notifications.js"></script>
   <script type="module" src="/js/conflict-ui.js"></script>
   <script type="module" src="/js/sync-ui.js"></script>
+
+  <!-- Service Startup Modal -->
+  <script type="module" src="/js/service-startup.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
   <script type="module" src="/js/main.js?v=2"></script>

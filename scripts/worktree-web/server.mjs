@@ -514,6 +514,76 @@ class WorktreeManager {
   }
 
   /**
+   * Get detailed list of changed files with their status
+   * Note: git status --porcelain automatically respects .gitignore
+   */
+  getDetailedFileChanges(worktreePath) {
+    try {
+      const statusOutput = execSync('git status --porcelain', {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+
+      if (!statusOutput) {
+        return { modified: [], untracked: [] };
+      }
+
+      const lines = statusOutput.split('\n');
+      const modified = [];
+      const untracked = [];
+
+      // Map of git status codes to readable names
+      const statusMap = {
+        'M ': 'Modified',
+        ' M': 'Modified',
+        'MM': 'Modified',
+        'A ': 'Added',
+        ' A': 'Added',
+        'D ': 'Deleted',
+        ' D': 'Deleted',
+        'R ': 'Renamed',
+        ' R': 'Renamed',
+        'C ': 'Copied',
+        ' C': 'Copied',
+        'U ': 'Unmerged',
+        ' U': 'Unmerged',
+        'UU': 'Unmerged',
+        '??': 'Untracked'
+      };
+
+      for (const line of lines) {
+        if (!line) continue;
+
+        const status = line.substring(0, 2);
+        const filePath = line.substring(3); // Skip status and space
+
+        // Untracked files
+        if (status === '??') {
+          untracked.push({
+            path: filePath,
+            status: 'Untracked',
+            statusCode: status
+          });
+        } else if (status[0] !== ' ' || status[1] !== ' ') {
+          // Modified/Added/Deleted files (anything that's not untracked or ignored)
+          const statusLabel = statusMap[status] || 'Modified';
+          modified.push({
+            path: filePath,
+            status: statusLabel,
+            statusCode: status
+          });
+        }
+      }
+
+      return { modified, untracked };
+    } catch (error) {
+      console.warn(`[getDetailedFileChanges] Error:`, error.message);
+      return { modified: [], untracked: [] };
+    }
+  }
+
+  /**
    * Get last commit information
    */
   getLastCommit(worktreePath) {
@@ -1984,6 +2054,25 @@ function createApp() {
       res.json(status);
     } catch (error) {
       console.error('Failed to get branch status:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get detailed list of changed files (respects .gitignore)
+  app.get('/api/worktrees/:name/files', (req, res) => {
+    try {
+      const { name } = req.params;
+      const worktrees = manager.listWorktrees();
+      const worktree = worktrees.find(w => w.name === name);
+
+      if (!worktree) {
+        return res.status(404).json({ error: 'Worktree not found' });
+      }
+
+      const files = manager.getDetailedFileChanges(worktree.path);
+      res.json(files);
+    } catch (error) {
+      console.error('Failed to get file changes:', error);
       res.status(500).json({ error: error.message });
     }
   });

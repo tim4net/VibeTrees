@@ -1247,3 +1247,110 @@ input:focus {
   margin: 0;
   font-size: 14px;
 }
+
+/* Service Startup Modal Styles */
+.service-startup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 16px;
+  background: var(--border-primary);
+  border-radius: 6px;
+  padding: 1px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.service-startup-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  transition: background 0.2s ease;
+}
+
+.service-startup-item:first-child {
+  border-radius: 5px 5px 0 0;
+}
+
+.service-startup-item:last-child {
+  border-radius: 0 0 5px 5px;
+}
+
+.service-startup-item:only-child {
+  border-radius: 5px;
+}
+
+.service-startup-item.starting {
+  background: rgba(88, 166, 255, 0.05);
+}
+
+.service-startup-item.completed {
+  background: rgba(46, 160, 67, 0.05);
+}
+
+.service-startup-item.error {
+  background: rgba(248, 81, 73, 0.05);
+}
+
+.service-status-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.service-startup-item.pending .service-status-icon::before {
+  content: '○';
+  color: var(--text-tertiary);
+}
+
+.service-startup-item.starting .service-status-icon::before {
+  content: '◐';
+  color: var(--accent-primary);
+  animation: spin 1s linear infinite;
+}
+
+.service-startup-item.completed .service-status-icon::before {
+  content: '✓';
+  color: var(--success);
+}
+
+.service-startup-item.error .service-status-icon::before {
+  content: '✗';
+  color: var(--error);
+}
+
+.service-name {
+  flex: 1;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.service-startup-item.starting .service-name {
+  color: var(--accent-primary);
+}
+
+.service-startup-item.completed .service-name {
+  color: var(--success);
+}
+
+.service-startup-item.error .service-name {
+  color: var(--error);
+}
+
+.service-port {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.service-startup-item.completed .service-port {
+  color: var(--text-secondary);
+}
