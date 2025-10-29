@@ -2052,13 +2052,7 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       args = ['-y', '@openai/codex@latest', '--dangerously-bypass-approvals-and-sandbox'];
     } else {
       console.log(`Spawning Claude Code for ${worktreeName}...`);
-      // Clear npx cache for @anthropic-ai/claude-code to ensure latest version
-      try {
-        execSync('npm cache clean --force', { stdio: 'pipe' });
-        console.log(`✓ Cache cleared for Claude Code`);
-      } catch (error) {
-        console.error('Failed to clear cache:', error.message);
-      }
+      // npx handles caching intelligently - no need to clear cache
       commandStr = 'npx';
       args = ['-y', '@anthropic-ai/claude-code@latest', '--dangerously-skip-permissions'];
     }
@@ -2074,15 +2068,55 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   } else {
     terminal = session.pty;
     console.log(`✓ Reusing existing PTY for ${worktreeName} (session: ${sessionId})`);
+
+    // Clean up any existing listeners for this session to prevent memory leaks
+    if (session.activeListener) {
+      terminal.removeListener('data', session.activeListener);
+      session.activeListener = null;
+    }
   }
 
-  // Forward PTY output to WebSocket
+  // Forward PTY output to WebSocket with backpressure handling
+  const BACKPRESSURE_THRESHOLD = 1024 * 1024; // 1MB buffer threshold
+  let draining = false;
+
   const onData = (data) => {
-    if (ws.readyState === 1) { // WebSocket.OPEN
+    if (ws.readyState !== 1) { // Not WebSocket.OPEN
+      return;
+    }
+
+    // Check backpressure - if buffer is too full, pause PTY temporarily
+    if (ws.bufferedAmount > BACKPRESSURE_THRESHOLD) {
+      if (!draining) {
+        draining = true;
+        terminal.pause();
+        console.log(`[BACKPRESSURE] Pausing PTY for ${worktreeName} (buffer: ${ws.bufferedAmount} bytes)`);
+
+        // Resume when buffer drains
+        const checkDrain = setInterval(() => {
+          if (ws.readyState !== 1) {
+            clearInterval(checkDrain);
+            draining = false;
+            return;
+          }
+
+          if (ws.bufferedAmount < BACKPRESSURE_THRESHOLD / 2) {
+            clearInterval(checkDrain);
+            draining = false;
+            terminal.resume();
+            console.log(`[BACKPRESSURE] Resumed PTY for ${worktreeName}`);
+          }
+        }, 100);
+      }
+    } else {
       ws.send(data);
     }
   };
+
   terminal.onData(onData);
+
+  // Store listener reference for cleanup
+  session.activeListener = onData;
 
   // Handle WebSocket messages (both terminal input and control messages)
   ws.on('message', (data) => {
@@ -2103,10 +2137,17 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
     }
   });
 
+  // Handle WebSocket errors
+  ws.on('error', (error) => {
+    console.error(`WebSocket error for ${worktreeName} (session: ${sessionId}):`, error.message);
+    // Don't destroy the session - let it reconnect
+  });
+
   // Cleanup on close
   ws.on('close', () => {
     console.log(`Terminal connection closed for worktree: ${worktreeName} (session: ${sessionId})`);
     terminal.removeListener('data', onData);
+    session.activeListener = null;
     // Detach client but keep session alive for reconnection
     manager.ptyManager.detachClient(sessionId);
   });

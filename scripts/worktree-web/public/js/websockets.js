@@ -6,15 +6,25 @@
 import { appState } from './state.js';
 
 let ws = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_DELAY = 30000; // 30 seconds max
+const INITIAL_RECONNECT_DELAY = 1000; // Start with 1 second
 
 /**
  * Connect to WebSocket server
  */
 export function connectWebSocket() {
+  // Prevent multiple concurrent connection attempts
+  if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+    console.log('WebSocket already connecting or connected');
+    return;
+  }
+
   ws = new WebSocket(`ws://${window.location.host}`);
 
   ws.onopen = () => {
     console.log('WebSocket connected');
+    reconnectAttempts = 0; // Reset counter on successful connection
   };
 
   ws.onmessage = (event) => {
@@ -39,12 +49,21 @@ export function connectWebSocket() {
   };
 
   ws.onclose = () => {
-    console.log('WebSocket closed, reconnecting...');
-    setTimeout(connectWebSocket, 1000);
+    // Calculate exponential backoff delay
+    const delay = Math.min(
+      INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts),
+      MAX_RECONNECT_DELAY
+    );
+
+    reconnectAttempts++;
+    console.log(`WebSocket closed, reconnecting in ${delay}ms (attempt ${reconnectAttempts})...`);
+
+    setTimeout(connectWebSocket, delay);
   };
 
   ws.onerror = (error) => {
     console.error('WebSocket error:', error);
+    // onclose will handle reconnection
   };
 }
 
