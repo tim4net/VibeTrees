@@ -862,6 +862,33 @@ class WorktreeManager {
       execSync(createCmd, { stdio: 'pipe' });
 
       console.log(`[CREATE] Git worktree created successfully`);
+
+      // Add worktree-specific files to .gitignore to prevent git conflicts
+      const gitignorePath = join(worktreePath, '.gitignore');
+      const worktreeIgnoreEntries = [
+        '',
+        '# Worktree-specific files (managed by VibeTrees)',
+        'docker-compose.yml',
+        '.env',
+      ].join('\n');
+
+      try {
+        // Append to existing .gitignore or create new one
+        if (existsSync(gitignorePath)) {
+          const existingContent = readFileSync(gitignorePath, 'utf-8');
+          // Only add if not already present
+          if (!existingContent.includes('# Worktree-specific files')) {
+            writeFileSync(gitignorePath, existingContent + '\n' + worktreeIgnoreEntries);
+            console.log(`[CREATE] Updated .gitignore with worktree-specific entries`);
+          }
+        } else {
+          writeFileSync(gitignorePath, worktreeIgnoreEntries);
+          console.log(`[CREATE] Created .gitignore with worktree-specific entries`);
+        }
+      } catch (gitignoreError) {
+        console.warn(`[CREATE] Failed to update .gitignore (non-critical):`, gitignoreError.message);
+      }
+
       this.profiler.end(gitId);
 
       // Push the new branch to GitHub to create it remotely
