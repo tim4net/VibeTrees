@@ -66,6 +66,8 @@ class WorktreeWebManagerMock {
     const serviceToEnvVar = {
       'api-gateway': 'API',
       'api': 'API',
+      'temporal-ui': 'TEMPORAL_UI',
+      'minio-console': 'MINIO_CONSOLE',
     };
 
     return serviceToEnvVar[serviceName] || serviceName.toUpperCase().replace(/-/g, '_');

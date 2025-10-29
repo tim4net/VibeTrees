@@ -15,6 +15,7 @@ import { Profiler } from '../profiler.mjs';
 import { PerformanceOptimizer } from '../performance-optimizer.mjs';
 import { CacheManager } from '../cache-manager.mjs';
 import { FirewallHelper } from '../firewall-helper.mjs';
+import { ServiceConfig } from '../service-config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Package root directory (where package.json lives)
@@ -284,13 +285,7 @@ class WorktreeManager {
    * @returns {string} Environment variable name (without _PORT suffix)
    */
   _serviceNameToEnvVar(serviceName) {
-    // Special mappings for services with non-standard env var names
-    const serviceToEnvVar = {
-      'api-gateway': 'API',
-      'api': 'API',
-    };
-
-    return serviceToEnvVar[serviceName] || serviceName.toUpperCase().replace(/-/g, '_');
+    return ServiceConfig.getEnvVar(serviceName).replace('_PORT', '');
   }
 
   /**
@@ -298,16 +293,15 @@ class WorktreeManager {
    * @private
    */
   _allocateDefaultPorts(worktreeName) {
-    // Using default port allocation
-    return {
-      postgres: this.portRegistry.allocate(worktreeName, 'postgres', 5432),
-      api: this.portRegistry.allocate(worktreeName, 'api', 3000),
-      console: this.portRegistry.allocate(worktreeName, 'console', 5173),
-      temporal: this.portRegistry.allocate(worktreeName, 'temporal', 7233),
-      temporalui: this.portRegistry.allocate(worktreeName, 'temporalui', 8233),
-      minio: this.portRegistry.allocate(worktreeName, 'minio', 9000),
-      minioconsole: this.portRegistry.allocate(worktreeName, 'minioconsole', 9001),
-    };
+    const defaultServices = ['postgres', 'api', 'console', 'temporal', 'temporal-ui', 'minio', 'minio-console'];
+    const ports = {};
+
+    for (const serviceName of defaultServices) {
+      const basePort = ServiceConfig.getBasePort(serviceName);
+      ports[serviceName] = this.portRegistry.allocate(worktreeName, serviceName, basePort);
+    }
+
+    return ports;
   }
 
   /**
@@ -2078,7 +2072,10 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
 
   // Forward PTY output to WebSocket with backpressure handling
   const BACKPRESSURE_THRESHOLD = 1024 * 1024; // 1MB buffer threshold
+  const BACKPRESSURE_TIMEOUT = 30000; // 30 seconds max pause
+  const BACKPRESSURE_CHECK_INTERVAL = 100; // Check every 100ms
   let draining = false;
+  let isPaused = false;
 
   const onData = (data) => {
     if (ws.readyState !== 1) { // Not WebSocket.OPEN
@@ -2089,24 +2086,75 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
     if (ws.bufferedAmount > BACKPRESSURE_THRESHOLD) {
       if (!draining) {
         draining = true;
+        isPaused = true;
         terminal.pause();
-        console.log(`[BACKPRESSURE] Pausing PTY for ${worktreeName} (buffer: ${ws.bufferedAmount} bytes)`);
+        console.warn(`[BACKPRESSURE] Pausing PTY for ${worktreeName} (buffer: ${ws.bufferedAmount} bytes)`);
+
+        // Send notification to client
+        try {
+          ws.send(JSON.stringify({
+            type: 'status',
+            message: 'Output paused (slow connection)',
+            paused: true
+          }));
+        } catch (e) {
+          console.error('[BACKPRESSURE] Failed to send pause notification:', e.message);
+        }
 
         // Resume when buffer drains
+        const pauseStart = Date.now();
         const checkDrain = setInterval(() => {
           if (ws.readyState !== 1) {
             clearInterval(checkDrain);
+            session.drainInterval = null;
             draining = false;
+            isPaused = false;
+            return;
+          }
+
+          // Force resume after timeout
+          if (Date.now() - pauseStart > BACKPRESSURE_TIMEOUT) {
+            console.warn(`[BACKPRESSURE] Timeout after ${BACKPRESSURE_TIMEOUT}ms - force resuming PTY for session ${sessionId}`);
+            clearInterval(checkDrain);
+            session.drainInterval = null;
+            draining = false;
+            isPaused = false;
+            terminal.resume();
+            // Notify client
+            try {
+              ws.send(JSON.stringify({
+                type: 'status',
+                message: '',
+                paused: false
+              }));
+            } catch (e) {
+              console.error('[BACKPRESSURE] Failed to send resume notification:', e.message);
+            }
             return;
           }
 
           if (ws.bufferedAmount < BACKPRESSURE_THRESHOLD / 2) {
+            console.log(`[BACKPRESSURE] Drained - resuming PTY for session ${sessionId}`);
             clearInterval(checkDrain);
+            session.drainInterval = null;
             draining = false;
+            isPaused = false;
             terminal.resume();
-            console.log(`[BACKPRESSURE] Resumed PTY for ${worktreeName}`);
+            // Notify client
+            try {
+              ws.send(JSON.stringify({
+                type: 'status',
+                message: '',
+                paused: false
+              }));
+            } catch (e) {
+              console.error('[BACKPRESSURE] Failed to send resume notification:', e.message);
+            }
           }
-        }, 100);
+        }, BACKPRESSURE_CHECK_INTERVAL);
+
+        // Store interval reference for cleanup
+        session.drainInterval = checkDrain;
       }
     } else {
       ws.send(data);
@@ -2128,32 +2176,77 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
         console.log(`Resized PTY for ${worktreeName} to ${msg.cols}x${msg.rows}`);
       } else {
         // Valid JSON but not a control message (e.g., single digits "1", "2")
-        // Treat as terminal input
+        // Treat as terminal input - but ignore during backpressure pause
+        if (isPaused) {
+          console.log(`[TERMINAL] Ignoring input during backpressure pause for session ${sessionId}`);
+          return;
+        }
         terminal.write(data.toString());
       }
     } catch (e) {
-      // Not JSON, treat as terminal input
+      // Not JSON, treat as terminal input - but ignore during backpressure pause
+      if (isPaused) {
+        console.log(`[TERMINAL] Ignoring input during backpressure pause for session ${sessionId}`);
+        return;
+      }
       terminal.write(data.toString());
     }
   });
 
   // Handle WebSocket errors
   ws.on('error', (error) => {
-    console.error(`WebSocket error for ${worktreeName} (session: ${sessionId}):`, error.message);
-    // Don't destroy the session - let it reconnect
+    console.error(`[TERMINAL] WebSocket error for ${worktreeName} (session: ${sessionId}):`, error.message);
+
+    // Clean up drain interval if exists
+    if (session && session.drainInterval) {
+      clearInterval(session.drainInterval);
+      session.drainInterval = null;
+    }
+
+    // Ensure PTY is resumed
+    if (session && session.terminal) {
+      session.terminal.resume();
+    }
+
+    // Don't destroy the session - allow reconnection
   });
 
   // Cleanup on close
   ws.on('close', () => {
-    console.log(`Terminal connection closed for worktree: ${worktreeName} (session: ${sessionId})`);
-    terminal.removeListener('data', onData);
-    session.activeListener = null;
+    console.log(`[TERMINAL] Connection closed for worktree: ${worktreeName} (session: ${sessionId})`);
+
+    // Clean up drain interval if exists
+    if (session && session.drainInterval) {
+      clearInterval(session.drainInterval);
+      session.drainInterval = null;
+    }
+
+    // Ensure PTY is resumed if it was paused
+    if (session && session.terminal) {
+      session.terminal.resume();
+    }
+
+    // Remove existing listeners
+    if (session && session.activeListener) {
+      terminal.removeListener('data', session.activeListener);
+      session.activeListener = null;
+    }
+
     // Detach client but keep session alive for reconnection
     manager.ptyManager.detachClient(sessionId);
   });
 
   // Send initial connection message with session ID
   const sessionName = command === 'codex' ? 'Codex' : command === 'shell' ? 'Shell' : 'Claude Code';
+
+  // Send session ID as structured JSON for client to save
+  ws.send(JSON.stringify({
+    type: 'session',
+    sessionId: sessionId,
+    sessionName: sessionName
+  }));
+
+  // Also send visual confirmation in terminal
   ws.send(`\r\n\x1b[32mConnected to ${sessionName} session (ID: ${sessionId.slice(0, 8)})\x1b[0m\r\n`);
 }
 
