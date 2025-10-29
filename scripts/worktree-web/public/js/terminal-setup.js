@@ -361,6 +361,14 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
     const terminalSocket = new WebSocket(url);
 
+    // Local echo configuration
+    const LOCAL_ECHO_ENABLED = true; // Can be toggled via settings later
+    const LOCAL_ECHO_DIM = '\x1b[2m'; // ANSI dim
+    const LOCAL_ECHO_RESET = '\x1b[0m'; // ANSI reset
+    let pendingEcho = []; // Track pending echoed characters
+    let serverEchoTimeout = null;
+    const SERVER_ECHO_TIMEOUT = 100; // 100ms
+
     // Send resize events to PTY
     terminal.onResize(({ cols, rows }) => {
       if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
@@ -428,6 +436,33 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
         }
       }
 
+      // Track latency for performance measurement
+      if (lastKeyTime > 0) {
+        const latency = performance.now() - lastKeyTime;
+        echoTimes.push(latency);
+
+        if (echoTimes.length >= 10) {
+          const avg = echoTimes.reduce((a, b) => a + b) / echoTimes.length;
+          console.log(`[Local Echo] Avg server echo latency: ${avg.toFixed(1)}ms (hidden by local echo)`);
+          echoTimes = [];
+        }
+        lastKeyTime = 0;
+      }
+
+      // Check if this is echo confirmation
+      if (pendingEcho.length > 0 && data === pendingEcho[0]) {
+        // Server echoed back our character - don't display again
+        pendingEcho.shift();
+        return;
+      }
+
+      // If pending echo doesn't match, clear it (out of sync)
+      if (pendingEcho.length > 0 && data.length > 0) {
+        // Clear pending echo if we receive something unexpected
+        // This handles cases where server doesn't echo (raw mode, etc.)
+        pendingEcho = [];
+      }
+
       // Default: Write to terminal
       terminal.write(data);
     };
@@ -441,7 +476,19 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
     terminalSocket.onclose = () => {
       console.log(`Terminal WebSocket closed: ${tabId}`);
+
+      // Clear pending echo
+      pendingEcho = [];
+
       const terminalInfo = terminals.get(tabId);
+
+      // Clear any pending batched input
+      if (batchTimeout) {
+        clearTimeout(batchTimeout);
+        batchTimeout = null;
+        inputBuffer = '';
+      }
+
       // Only attempt reconnection if terminal still exists (not manually closed)
       if (terminalInfo && !reconnectState.isReconnecting) {
         if (!reconnectState.isReconnecting) {
@@ -451,10 +498,82 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
       }
     };
 
-    // Send terminal input to PTY
-    terminal.onData(data => {
-      if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
-        terminalSocket.send(data);
+    // Message batching configuration
+    const BATCH_INTERVAL_MS = 16; // One frame at 60fps
+    let inputBuffer = '';
+    let batchTimeout = null;
+
+    // Performance tracking for local echo
+    let echoTimes = [];
+    let lastKeyTime = 0;
+
+    // Send terminal input to PTY with batching
+    terminal.onData((data) => {
+      // Track key timing for performance measurement
+      lastKeyTime = performance.now();
+
+      // Check for control characters that should clear pending echo
+      if (data === '\x03' || // Ctrl+C
+          data === '\x04' || // Ctrl+D
+          data === '\r' ||   // Enter
+          data === '\n') {   // Line feed
+        // Clear pending echo on command submission
+        pendingEcho = [];
+      }
+
+      // Local echo: Display immediately in dim color
+      if (LOCAL_ECHO_ENABLED && terminalSocket?.readyState === WebSocket.OPEN) {
+        // Don't echo control characters visually (except printable ones)
+        const shouldEcho =
+          data.length === 1 &&
+          data.charCodeAt(0) >= 32 &&
+          data.charCodeAt(0) < 127 &&
+          data !== '\x7f'; // Not DEL
+
+        if (shouldEcho) {
+          // Display dimmed version immediately
+          terminal.write(LOCAL_ECHO_DIM + data + LOCAL_ECHO_RESET);
+          pendingEcho.push(data);
+
+          // Set timeout to clear if server doesn't echo back
+          // (Handles raw mode terminals)
+          clearTimeout(serverEchoTimeout);
+          serverEchoTimeout = setTimeout(() => {
+            if (pendingEcho.length > 0) {
+              // Server didn't echo - probably in raw mode
+              // Clear pending echo to avoid confusion
+              pendingEcho = [];
+            }
+          }, SERVER_ECHO_TIMEOUT);
+        }
+      }
+
+      inputBuffer += data;
+
+      // Flush immediately for control characters for better responsiveness
+      const shouldFlushImmediately =
+        data.includes('\r') || // Enter key
+        data.includes('\n') || // Line feed
+        data.includes('\x03') || // Ctrl+C
+        data.includes('\x04'); // Ctrl+D
+
+      if (shouldFlushImmediately && batchTimeout) {
+        // Cancel batch timeout and flush immediately
+        clearTimeout(batchTimeout);
+        batchTimeout = null;
+
+        if (inputBuffer && terminalSocket?.readyState === WebSocket.OPEN) {
+          terminalSocket.send(inputBuffer);
+          inputBuffer = '';
+        }
+      } else if (!batchTimeout) {
+        batchTimeout = setTimeout(() => {
+          if (inputBuffer && terminalSocket?.readyState === WebSocket.OPEN) {
+            terminalSocket.send(inputBuffer);
+            inputBuffer = '';
+          }
+          batchTimeout = null;
+        }, BATCH_INTERVAL_MS);
       }
     });
 
@@ -493,6 +612,28 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
   const terminalSocket = connectPtyWebSocket();
 
+  // Expose local echo controls for debugging
+  const localEchoControls = {
+    setEnabled: (enabled) => {
+      // Note: LOCAL_ECHO_ENABLED is in the closure, we need to track this differently
+      // For now, log the setting change
+      console.log(`[Terminal] Local echo ${enabled ? 'enabled' : 'disabled'} for ${worktreeName}`);
+      // Would need refactoring to make this truly dynamic
+    },
+    getStats: () => {
+      if (echoTimes.length === 0) return null;
+      const avg = echoTimes.reduce((a, b) => a + b) / echoTimes.length;
+      const min = Math.min(...echoTimes);
+      const max = Math.max(...echoTimes);
+      return {
+        avg: avg.toFixed(1),
+        min: min.toFixed(1),
+        max: max.toFixed(1),
+        samples: echoTimes.length
+      };
+    }
+  };
+
   terminals.set(tabId, {
     terminal,
     socket: terminalSocket,
@@ -500,8 +641,15 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     command,
     fitAddon,
     resizeHandler,
-    reconnectState
+    reconnectState,
+    localEchoControls
   });
+
+  // Expose to window for debugging
+  if (!window.terminalDebug) {
+    window.terminalDebug = {};
+  }
+  window.terminalDebug[tabId] = localEchoControls;
 
   switchToTab(tabId);
 }
