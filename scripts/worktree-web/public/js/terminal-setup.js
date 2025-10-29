@@ -107,6 +107,110 @@ function removeReconnectionOverlay(panel) {
   if (overlay) {
     overlay.remove();
   }
+
+
+/**
+ * Clipboard notification helper
+ * Shows a temporary notification for clipboard operations
+ */
+function showClipboardNotification(message) {
+  // Create temporary notification
+  const notification = document.createElement('div');
+  notification.textContent = message;
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #4caf50;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 10001;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    animation: slideIn 0.3s ease-out;
+  `;
+
+  document.body.appendChild(notification);
+
+  // Remove after 2 seconds
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease-out';
+    setTimeout(() => notification.remove(), 300);
+  }, 2000);
+}
+
+/**
+ * Context menu helper
+ * Shows a simple context menu for copy/paste
+ */
+function showContextMenu(x, y, items) {
+  // Remove existing menu if any
+  const existingMenu = document.querySelector('.terminal-context-menu');
+  if (existingMenu) existingMenu.remove();
+
+  const menu = document.createElement('div');
+  menu.className = 'terminal-context-menu';
+  menu.style.cssText = `
+    position: fixed;
+    left: ${x}px;
+    top: ${y}px;
+    background: #2d2d2d;
+    border: 1px solid #454545;
+    border-radius: 4px;
+    padding: 4px 0;
+    z-index: 10000;
+    min-width: 120px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  `;
+
+  items.forEach(item => {
+    const menuItem = document.createElement('div');
+    menuItem.textContent = item.label;
+    menuItem.style.cssText = `
+      padding: 6px 12px;
+      cursor: pointer;
+      color: #d4d4d4;
+      font-size: 13px;
+    `;
+    menuItem.addEventListener('mouseenter', () => {
+      menuItem.style.background = '#3d3d3d';
+    });
+    menuItem.addEventListener('mouseleave', () => {
+      menuItem.style.background = 'transparent';
+    });
+    menuItem.addEventListener('click', () => {
+      item.action();
+      menu.remove();
+    });
+    menu.appendChild(menuItem);
+  });
+
+  document.body.appendChild(menu);
+
+  // Remove menu on click outside
+  setTimeout(() => {
+    document.addEventListener('click', () => menu.remove(), { once: true });
+  }, 0);
+}
+
+// Add CSS animations for notifications
+if (!document.getElementById('terminal-clipboard-styles')) {
+  const style = document.createElement('style');
+  style.id = 'terminal-clipboard-styles';
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 }
 
 /**
@@ -144,6 +248,104 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
   }
 
   terminal.open(panel.querySelector('.terminal-wrapper'));
+
+  // Copy/Paste keyboard shortcuts
+  terminal.attachCustomKeyEventHandler((event) => {
+    // Copy: Cmd+C (Mac) or Ctrl+Shift+C (Linux/Windows)
+    const isCopy = (
+      (event.metaKey && event.key === 'c' && !event.shiftKey && !event.ctrlKey) || // Mac: Cmd+C
+      (event.ctrlKey && event.shiftKey && event.key === 'C') // Linux/Win: Ctrl+Shift+C
+    );
+
+    if (isCopy && terminal.hasSelection()) {
+      // Copy selection to clipboard
+      const selection = terminal.getSelection();
+      navigator.clipboard.writeText(selection).then(() => {
+        console.log('[Terminal] Copied to clipboard:', selection.substring(0, 50) + (selection.length > 50 ? '...' : ''));
+        showClipboardNotification('Copied to clipboard');
+      }).catch(err => {
+        console.error('[Terminal] Copy failed:', err);
+        terminal.write('\r\n\x1b[31mCopy failed: clipboard access denied\x1b[0m\r\n');
+      });
+
+      // Clear selection after copy (matches native terminal behavior)
+      terminal.clearSelection();
+
+      return false; // Prevent default
+    }
+
+    // Paste: Cmd+V (Mac) or Ctrl+Shift+V (Linux/Windows)
+    const isPaste = (
+      (event.metaKey && event.key === 'v' && !event.shiftKey && !event.ctrlKey) || // Mac: Cmd+V
+      (event.ctrlKey && event.shiftKey && event.key === 'V') // Linux/Win: Ctrl+Shift+V
+    );
+
+    if (isPaste) {
+      event.preventDefault(); // Prevent default paste behavior
+
+      navigator.clipboard.readText().then(text => {
+        if (text) {
+          // Send pasted text through onData handler (will be sent to PTY)
+          terminal.paste(text);
+          console.log(`[Terminal] Pasted ${text.length} characters`);
+          showClipboardNotification(`Pasted ${text.length} character${text.length === 1 ? '' : 's'}`);
+        }
+      }).catch(err => {
+        console.error('[Terminal] Paste failed:', err);
+        terminal.write('\r\n\x1b[31mPaste failed: clipboard access denied\x1b[0m\r\n');
+      });
+
+      return false; // Prevent default
+    }
+
+    // Let all other keys pass through (including Ctrl+C for SIGINT)
+    return true;
+  });
+
+  // Right-click context menu for copy/paste
+  const terminalElement = terminal.element;
+
+  terminalElement.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+
+    // Check if there's a selection
+    if (terminal.hasSelection()) {
+      // Create context menu with Copy option
+      showContextMenu(event.clientX, event.clientY, [
+        {
+          label: 'Copy',
+          action: () => {
+            const selection = terminal.getSelection();
+            navigator.clipboard.writeText(selection).then(() => {
+              console.log('[Terminal] Copied via context menu');
+              showClipboardNotification('Copied to clipboard');
+              terminal.clearSelection();
+            }).catch(err => {
+              console.error('[Terminal] Copy failed:', err);
+            });
+          }
+        }
+      ]);
+    } else {
+      // Create context menu with Paste option
+      showContextMenu(event.clientX, event.clientY, [
+        {
+          label: 'Paste',
+          action: () => {
+            navigator.clipboard.readText().then(text => {
+              if (text) {
+                terminal.paste(text);
+                console.log('[Terminal] Pasted via context menu');
+                showClipboardNotification('Pasted from clipboard');
+              }
+            }).catch(err => {
+              console.error('[Terminal] Paste failed:', err);
+            });
+          }
+        }
+      ]);
+    }
+  });
 
   // Fit terminal after delay to ensure toolbar is rendered
   setTimeout(() => fitAddon.fit(), isCombinedLogs ? 100 : 150);
@@ -353,6 +555,10 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   // Connect WebSocket for PTY
   const wsUrl = `ws://${window.location.host}/terminal/${worktreeName}?command=${command}`;
 
+  // Performance tracking for local echo (outer scope for access by getStats)
+  let echoTimes = [];
+  let lastKeyTime = 0;
+
   function connectPtyWebSocket() {
     // If we have a session ID from previous connection, try to reconnect to it
     const url = reconnectState.sessionId
@@ -502,10 +708,6 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     const BATCH_INTERVAL_MS = 16; // One frame at 60fps
     let inputBuffer = '';
     let batchTimeout = null;
-
-    // Performance tracking for local echo
-    let echoTimes = [];
-    let lastKeyTime = 0;
 
     // Send terminal input to PTY with batching
     terminal.onData((data) => {
