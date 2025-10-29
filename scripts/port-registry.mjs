@@ -10,6 +10,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
+import lockfile from 'proper-lockfile';
 
 const execAsync = promisify(exec);
 
@@ -189,5 +190,94 @@ export class PortRegistry {
     }
 
     return synced;
+  }
+
+  /**
+   * Execute a function with file locking to ensure atomic operations
+   * @param {Function} fn - Function to execute while holding the lock
+   * @returns {Promise<any>} Result of the function
+   */
+  async _withLock(fn) {
+    let release;
+    try {
+      // Ensure registry file exists before locking
+      if (!existsSync(this.registryDir)) {
+        mkdirSync(this.registryDir, { recursive: true });
+      }
+      if (!existsSync(this.registryFile)) {
+        writeFileSync(this.registryFile, '{}');
+      }
+
+      release = await lockfile.lock(this.registryFile, {
+        retries: {
+          retries: 10,
+          minTimeout: 100,
+          maxTimeout: 2000
+        }
+      });
+
+      // Reload state after acquiring lock
+      this.ports = this.load();
+
+      const result = await fn();
+
+      // Save after operation completes
+      this.save();
+
+      return result;
+    } finally {
+      if (release) await release();
+    }
+  }
+
+  /**
+   * Allocate multiple ports atomically for a worktree
+   * This prevents race conditions when multiple processes allocate ports simultaneously
+   * @param {string} worktreeName - Name of the worktree
+   * @param {Object<string, number>} services - Map of service names to base ports
+   * @returns {Promise<Object<string, number>>} Map of service names to allocated ports
+   */
+  async allocateAtomic(worktreeName, services) {
+    return this._withLock(async () => {
+      const allocated = {};
+
+      for (const [serviceName, basePort] of Object.entries(services)) {
+        const key = `${worktreeName}:${serviceName}`;
+
+        // Return existing port if already allocated
+        if (this.ports[key]) {
+          allocated[serviceName] = this.ports[key];
+          continue;
+        }
+
+        // Find next available port
+        let port = basePort;
+        const usedPorts = new Set(Object.values(this.ports));
+
+        while (usedPorts.has(port) || this.isPortInUseSync(port)) {
+          port++;
+          usedPorts.add(port);
+        }
+
+        this.ports[key] = port;
+        allocated[serviceName] = port;
+      }
+
+      return allocated;
+    });
+  }
+
+  /**
+   * Release all ports for a worktree atomically
+   * @param {string} worktreeName - Name of the worktree
+   * @returns {Promise<void>}
+   */
+  async releaseAtomic(worktreeName) {
+    return this._withLock(async () => {
+      const keys = Object.keys(this.ports).filter(k => k.startsWith(`${worktreeName}:`));
+      for (const key of keys) {
+        delete this.ports[key];
+      }
+    });
   }
 }

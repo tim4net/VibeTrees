@@ -190,6 +190,10 @@ See [docs/performance-optimization.md](docs/performance-optimization.md) for det
 - Orphaned containers: `sudo docker compose down -v`
 - Stale worktrees: `git worktree prune`
 - Stuck tmux: `npm run kill && npm start`
+- **Hanging tests** (legacy issue, fixed in vitest.config.mjs):
+  - If you encounter orphaned workers: `pkill -9 -f "vitest/dist/workers/forks.js"`
+  - Fixed by: `forceExit: true` + proper pool configuration in vitest.config.mjs
+  - Config ensures graceful worker cleanup even on test failures/timeouts
 
 **Related docs**:
 - `worktree-manager.test.README.md` - Test suite documentation

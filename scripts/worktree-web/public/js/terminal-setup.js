@@ -330,13 +330,24 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
     terminalSocket.onmessage = (event) => {
       try {
-        // Check if message contains session ID
+        // Check if message contains session ID or status update
         const data = JSON.parse(event.data);
         if (data.type === 'session' && data.sessionId) {
           reconnectState.sessionId = data.sessionId;
           // Save session ID to sessionStorage for persistence across page refreshes
           saveTerminalSession(worktreeName, command, data.sessionId);
           console.log(`PTY session ID: ${data.sessionId}`);
+          return;
+        }
+        if (data.type === 'status') {
+          // Handle backpressure status messages
+          if (data.paused) {
+            console.warn(`[BACKPRESSURE] Terminal output paused: ${data.message}`);
+            terminal.write(`\r\n\x1b[33m${data.message}\x1b[0m\r\n`);
+          } else if (data.message === '') {
+            console.log(`[BACKPRESSURE] Terminal output resumed`);
+            terminal.write(`\r\n\x1b[32mOutput resumed\x1b[0m\r\n`);
+          }
           return;
         }
       } catch (e) {

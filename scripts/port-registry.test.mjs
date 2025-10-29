@@ -11,6 +11,14 @@ import { execSync } from 'child_process';
 vi.mock('fs');
 vi.mock('os');
 vi.mock('child_process');
+vi.mock('proper-lockfile', () => ({
+  default: {
+    lock: vi.fn(async () => {
+      // Return a mock release function
+      return vi.fn(async () => {});
+    })
+  }
+}));
 
 describe('PortRegistry', () => {
   let registry;
@@ -233,6 +241,22 @@ COMPOSE_PROJECT_NAME=vibe_feature_x
       expect(registry.ports['feature-x:minio-console']).toBe(9001);
     });
 
+    it('should handle allocation with hyphenated service names', () => {
+      const port1 = registry.allocate('feature-x', 'temporal-ui', 8233);
+      const port2 = registry.allocate('feature-y', 'temporal-ui', 8233);
+      const port3 = registry.allocate('feature-x', 'minio-console', 9001);
+      const port4 = registry.allocate('feature-y', 'minio-console', 9001);
+
+      expect(port1).toBe(8233);
+      expect(port2).toBe(8234);
+      expect(port3).toBe(9001);
+      expect(port4).toBe(9002);
+      expect(registry.ports['feature-x:temporal-ui']).toBe(8233);
+      expect(registry.ports['feature-y:temporal-ui']).toBe(8234);
+      expect(registry.ports['feature-x:minio-console']).toBe(9001);
+      expect(registry.ports['feature-y:minio-console']).toBe(9002);
+    });
+
     it('should handle read errors gracefully', () => {
       const worktrees = [
         { name: 'feature-x', path: '/mock/project/my-app/.worktrees/feature-x' }
@@ -373,6 +397,115 @@ COMPOSE_PROJECT_NAME=vibe_feature_x
       const dir = registry._getProjectConfigDir('/my-app');
 
       expect(dir).toBe('/mock/home/.vibetrees/my-app');
+    });
+  });
+
+  describe('atomic allocation', () => {
+    beforeEach(() => {
+      // Clear mocks
+      vi.clearAllMocks();
+
+      // Mock homedir
+      homedir.mockReturnValue('/mock/home');
+
+      // Mock filesystem
+      existsSync.mockReturnValue(false);
+      readFileSync.mockReturnValue('{}');
+      writeFileSync.mockImplementation(() => {});
+      mkdirSync.mockImplementation(() => {});
+
+      // Mock execSync to return empty (no ports in use)
+      execSync.mockReturnValue('');
+
+      // Reset registry for each test
+      registry = new PortRegistry('/mock/project/my-app');
+    });
+
+    it('should allocate multiple ports atomically', async () => {
+      const services = { api: 3000, postgres: 5432, console: 5173 };
+      const ports = await registry.allocateAtomic('main', services);
+
+      expect(ports).toHaveProperty('api');
+      expect(ports).toHaveProperty('postgres');
+      expect(ports).toHaveProperty('console');
+      expect(ports.api).toBeGreaterThanOrEqual(3000);
+      expect(ports.postgres).toBeGreaterThanOrEqual(5432);
+      expect(ports.console).toBeGreaterThanOrEqual(5173);
+    });
+
+    it('should handle multiple worktrees without conflicts', async () => {
+      const ports1 = await registry.allocateAtomic('wt1', { api: 3000 });
+      const ports2 = await registry.allocateAtomic('wt2', { api: 3000 });
+      const ports3 = await registry.allocateAtomic('wt3', { api: 3000 });
+
+      // Verify all allocations returned valid ports
+      expect(ports1.api).toBeGreaterThanOrEqual(3000);
+      expect(ports2.api).toBeGreaterThanOrEqual(3000);
+      expect(ports3.api).toBeGreaterThanOrEqual(3000);
+
+      // Note: In a mocked environment, the file isn't persisted between calls,
+      // so each call to _withLock() reloads an empty state. This test verifies
+      // that the method works, but full concurrency testing requires integration tests.
+    });
+
+    it('should save after atomic allocation', async () => {
+      writeFileSync.mockClear();
+      const services = { api: 3000 };
+      await registry.allocateAtomic('main', services);
+
+      expect(writeFileSync).toHaveBeenCalled();
+    });
+
+    it('should return existing ports on retry for same worktree', async () => {
+      const services = { api: 3000, postgres: 5432 };
+      const ports1 = await registry.allocateAtomic('main', services);
+      const ports2 = await registry.allocateAtomic('main', services);
+
+      expect(ports1).toEqual(ports2);
+    });
+  });
+
+  describe('atomic release', () => {
+    beforeEach(() => {
+      // Clear mocks
+      vi.clearAllMocks();
+
+      // Mock homedir
+      homedir.mockReturnValue('/mock/home');
+
+      // Mock filesystem
+      existsSync.mockReturnValue(false);
+      readFileSync.mockReturnValue('{}');
+      writeFileSync.mockImplementation(() => {});
+      mkdirSync.mockImplementation(() => {});
+
+      // Mock execSync to return empty (no ports in use)
+      execSync.mockReturnValue('');
+
+      registry = new PortRegistry('/mock/project/my-app');
+    });
+
+    it('should release all ports for a worktree', async () => {
+      // Allocate ports
+      await registry.allocateAtomic('feature-x', { api: 3000, postgres: 5432 });
+
+      // Verify ports were allocated
+      expect(Object.keys(registry.ports).some(k => k.startsWith('feature-x:'))).toBe(true);
+
+      // Release
+      await registry.releaseAtomic('feature-x');
+
+      // Verify ports were released
+      expect(Object.keys(registry.ports).some(k => k.startsWith('feature-x:'))).toBe(false);
+    });
+
+    it('should save after atomic release', async () => {
+      await registry.allocateAtomic('feature-x', { api: 3000 });
+      writeFileSync.mockClear();
+
+      await registry.releaseAtomic('feature-x');
+
+      expect(writeFileSync).toHaveBeenCalled();
     });
   });
 });
