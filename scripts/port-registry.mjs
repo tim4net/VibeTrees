@@ -8,6 +8,10 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { exec, execSync } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export class PortRegistry {
   /**
@@ -62,6 +66,42 @@ export class PortRegistry {
     writeFileSync(this.registryFile, JSON.stringify(this.ports, null, 2));
   }
 
+  /**
+   * Check if a port is in use on the system
+   * @param {number} port - Port number to check
+   * @returns {Promise<boolean>} True if port is in use
+   */
+  async isPortInUse(port) {
+    try {
+      // Use lsof to check if port is in use (works on macOS and Linux)
+      const { stdout } = await execAsync(`lsof -i :${port} -sTCP:LISTEN -t`);
+      return stdout.trim().length > 0;
+    } catch (error) {
+      // lsof returns non-zero exit code when port is not in use
+      return false;
+    }
+  }
+
+  /**
+   * Check if a port is in use on the system (synchronous version)
+   * Falls back to registry-only check on error
+   * @param {number} port - Port number to check
+   * @returns {boolean} True if port is in use
+   */
+  isPortInUseSync(port) {
+    try {
+      // Use lsof to check if port is in use (works on macOS and Linux)
+      const output = execSync(`lsof -i :${port} -sTCP:LISTEN -t 2>/dev/null || true`, {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      });
+      return output.trim().length > 0;
+    } catch (error) {
+      // Fallback to false on error (permission issues, lsof not available, etc.)
+      return false;
+    }
+  }
+
   allocate(worktreeName, service, basePort) {
     const key = `${worktreeName}:${service}`;
 
@@ -74,7 +114,7 @@ export class PortRegistry {
     let port = basePort;
     const usedPorts = new Set(Object.values(this.ports));
 
-    while (usedPorts.has(port)) {
+    while (usedPorts.has(port) || this.isPortInUseSync(port)) {
       port++;
     }
 
@@ -101,5 +141,53 @@ export class PortRegistry {
       }
     }
     return result;
+  }
+
+  /**
+   * Sync port registry with existing worktrees by reading their .env files
+   * This ensures new projects don't conflict with existing worktree ports
+   * @param {Array<{name: string, path: string}>} worktrees - List of worktrees
+   */
+  syncFromWorktrees(worktrees) {
+    let synced = 0;
+
+    for (const worktree of worktrees) {
+      const envPath = join(worktree.path, '.env');
+
+      if (!existsSync(envPath)) {
+        continue;
+      }
+
+      try {
+        const envContent = readFileSync(envPath, 'utf-8');
+        const lines = envContent.split('\n');
+
+        for (const line of lines) {
+          // Parse PORT environment variables (e.g., POSTGRES_PORT=5432)
+          const match = line.match(/^([A-Z_]+)_PORT=(\d+)$/);
+          if (match) {
+            const [, serviceName, port] = match;
+            // Convert env var format back to service name: POSTGRES_PORT -> postgres
+            const service = serviceName.toLowerCase().replace(/_/g, '-');
+            const key = `${worktree.name}:${service}`;
+
+            // Only sync if not already in registry
+            if (!this.ports[key]) {
+              this.ports[key] = parseInt(port, 10);
+              synced++;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`[PortRegistry] Failed to read .env from ${worktree.name}: ${error.message}`);
+      }
+    }
+
+    if (synced > 0) {
+      this.save();
+      console.log(`[PortRegistry] Synced ${synced} port allocations from existing worktrees`);
+    }
+
+    return synced;
   }
 }

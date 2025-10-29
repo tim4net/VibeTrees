@@ -182,6 +182,22 @@ class WorktreeManager {
     this.cacheManager = new CacheManager();
     this.importer = new WorktreeImporter(rootDir, this.portRegistry, runtime);
     this.diagnostics = new DiagnosticRunner(rootDir, this.portRegistry, runtime);
+
+    // Sync port registry with existing worktrees on startup
+    this._syncPortRegistry();
+  }
+
+  /**
+   * Sync port registry with existing worktrees
+   * This ensures the registry knows about ports used by existing worktrees
+   */
+  _syncPortRegistry() {
+    try {
+      const worktrees = this.listWorktrees();
+      this.portRegistry.syncFromWorktrees(worktrees);
+    } catch (error) {
+      console.warn(`[WorktreeManager] Failed to sync port registry: ${error.message}`);
+    }
   }
 
   /**
