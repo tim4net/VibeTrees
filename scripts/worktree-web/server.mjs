@@ -17,6 +17,8 @@ import { CacheManager } from '../cache-manager.mjs';
 import { FirewallHelper } from '../firewall-helper.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// Package root directory (where package.json lives)
+const packageRoot = join(__dirname, '..', '..');
 // Use current working directory as project root (supports multiple instances)
 const rootDir = process.cwd();
 
@@ -69,17 +71,34 @@ async function findAvailablePort(startPort, endPort, host = '127.0.0.1') {
 
 /**
  * Check if required dependencies are installed
+ * Checks both package root (global install) and current directory (local dev)
  */
 function checkDependencies() {
   const requiredDeps = ['express', 'ws', 'node-pty'];
-  const nodeModulesPath = join(rootDir, 'node_modules');
+
+  // Try package root first (global installation)
+  const packageNodeModules = join(packageRoot, 'node_modules');
+  let allDepsFound = true;
 
   for (const dep of requiredDeps) {
-    const depPath = join(nodeModulesPath, dep);
+    const depPath = join(packageNodeModules, dep);
+    if (!existsSync(depPath)) {
+      allDepsFound = false;
+      break;
+    }
+  }
+
+  if (allDepsFound) return true;
+
+  // Try current directory (local development)
+  const localNodeModules = join(rootDir, 'node_modules');
+  for (const dep of requiredDeps) {
+    const depPath = join(localNodeModules, dep);
     if (!existsSync(depPath)) {
       return false;
     }
   }
+
   return true;
 }
 
@@ -90,14 +109,18 @@ function ensureDependencies() {
   if (!checkDependencies()) {
     console.log('📦 Installing web server dependencies...');
     try {
+      // Determine install location: package root if it has package.json, else current dir
+      const installDir = existsSync(join(packageRoot, 'package.json')) ? packageRoot : rootDir;
+
       execSync('npm install', {
-        cwd: rootDir,
+        cwd: installDir,
         stdio: 'inherit',
         encoding: 'utf-8'
       });
       console.log('✓ Dependencies installed\n');
     } catch (error) {
       console.error('Failed to install dependencies:', error.message);
+      console.error('Try running: npm install -g vibetrees');
       process.exit(1);
     }
   }
