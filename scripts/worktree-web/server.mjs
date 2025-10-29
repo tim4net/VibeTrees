@@ -3132,7 +3132,7 @@ function createApp() {
       }
 
       // Destroy the session
-      manager.ptyManager.destroySession(sessionId);
+      await manager.ptyManager.destroySession(sessionId);
       console.log(`Successfully killed terminal session: ${sessionId} (${worktreeName}:${command})`);
       res.json({ success: true });
     } catch (error) {

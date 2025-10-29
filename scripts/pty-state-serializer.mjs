@@ -84,4 +84,21 @@ export class PTYStateSerializer {
       return null;
     }
   }
+
+  /**
+   * Delete state from filesystem
+   * @param {string} sessionId - Session ID
+   */
+  async deleteState(sessionId) {
+    const sessionDir = path.join(this.baseDir, sessionId);
+
+    try {
+      await fs.promises.rm(sessionDir, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore errors if directory doesn't exist
+      if (error.code !== 'ENOENT') {
+        console.error(`Error deleting session state: ${error.message}`);
+      }
+    }
+  }
 }
