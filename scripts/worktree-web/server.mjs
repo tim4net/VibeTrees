@@ -2278,15 +2278,8 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
 
   // OPTIMIZED: Minimal overhead message handler
   const messageHandler = (data) => {
-    // Fast type check - handle Buffer efficiently
-    if (Buffer.isBuffer(data)) {
-      if (!isPaused) {
-        terminal.write(data);
-      }
-      return;
-    }
-
-    const dataStr = data.toString();
+    // Convert Buffer to string for unified processing
+    const dataStr = Buffer.isBuffer(data) ? data.toString() : data.toString();
 
     // OPTIMIZED: Detect control messages by prefix (avoids full JSON parse for normal input)
     if (dataStr.length > 8 && dataStr[0] === '{' && dataStr.slice(0, 8) === '{"type":') {
