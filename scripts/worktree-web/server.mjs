@@ -371,9 +371,18 @@ class WorktreeManager {
       });
 
       // Send port registry data to worker
+      // Get all worktree names from synchronous call first
+      const syncWorktrees = execSync('git worktree list --porcelain', {
+        encoding: 'utf-8',
+        cwd: rootDir
+      });
       const portRegistryData = {};
-      for (const [worktreeName] of this.portRegistry._registry.entries()) {
-        portRegistryData[worktreeName] = this.portRegistry.getWorktreePorts(worktreeName);
+      const lines = syncWorktrees.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('branch ')) {
+          const branch = line.substring('branch '.length).replace('refs/heads/', '');
+          portRegistryData[branch] = this.portRegistry.getWorktreePorts(branch);
+        }
       }
 
       worker.postMessage({
