@@ -150,6 +150,21 @@ Intelligent sync with automatic change detection and service management.
 - `GET /api/worktrees/:name/conflicts`
 - `POST /api/worktrees/:name/conflicts/resolve`
 
+### Sync-on-Create
+Automatic staleness detection when creating worktrees from 'main'.
+
+**Automatic staleness detection** when creating worktrees from 'main':
+- Checks if main is behind origin before worktree creation
+- Prompts user: "main is X commits behind. Sync? [Yes/No/Cancel]"
+- Blocks creation if main has uncommitted changes
+- Uses AIConflictResolver for simple conflicts during sync
+
+**Workflow**: Check staleness → Prompt user → Sync (if needed) → Create worktree
+
+**API**: POST /api/worktrees returns 409 if sync needed. Include `?force=true` to skip check.
+
+See [docs/sync-on-create.md](docs/sync-on-create.md) for details.
+
 ### Database Workflow
 Import/export with schema validation (PostgreSQL only).
 
@@ -199,6 +214,7 @@ See [docs/performance-optimization.md](docs/performance-optimization.md) for det
 - `worktree-manager.test.README.md` - Test suite documentation
 - `docs/mcp-integration.md` - MCP server details
 - `docs/adding-agents.md` - Custom agent guide
+- `docs/sync-on-create.md` - Sync-on-create feature
 - `docs/database-workflow.md` - Database operations
 - `docs/terminal-persistence.md` - Terminal session recovery
 - `docs/performance-optimization.md` - Performance profiling
