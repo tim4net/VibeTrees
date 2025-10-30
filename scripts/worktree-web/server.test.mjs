@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { checkMainStaleness } from './server.mjs';
+import { checkMainStaleness, checkMainDirtyState } from './server.mjs';
 
 /**
  * Minimal WorktreeWebManager mock for testing extractPortsFromDockerStatus
@@ -314,5 +314,29 @@ describe('checkMainStaleness', () => {
     const result = checkMainStaleness(mockExec);
 
     expect(result.behind).toBe(0);
+  });
+});
+
+describe('checkMainDirtyState', () => {
+  it('should detect uncommitted changes', () => {
+    const mockExec = vi.fn()
+      .mockReturnValueOnce(' M scripts/foo.mjs\n?? newfile.txt\n'); // git status
+
+    const result = checkMainDirtyState(mockExec);
+
+    expect(result.isDirty).toBe(true);
+    expect(mockExec).toHaveBeenCalledWith(
+      'git status --porcelain',
+      expect.objectContaining({ cwd: expect.any(String) })
+    );
+  });
+
+  it('should return false when main is clean', () => {
+    const mockExec = vi.fn()
+      .mockReturnValueOnce(''); // git status empty
+
+    const result = checkMainDirtyState(mockExec);
+
+    expect(result.isDirty).toBe(false);
   });
 });

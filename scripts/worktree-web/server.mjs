@@ -105,6 +105,26 @@ export function checkMainStaleness(execFn = execSync) {
 }
 
 /**
+ * Check if main worktree has uncommitted changes
+ * @param {Function} execFn - Function to execute git commands (for testing)
+ * @returns {{ isDirty: boolean }} Object indicating if main has uncommitted changes
+ */
+export function checkMainDirtyState(execFn = execSync) {
+  try {
+    const output = execFn('git status --porcelain', {
+      cwd: rootDir,
+      encoding: 'utf8'
+    });
+
+    const isDirty = output.trim().length > 0;
+    return { isDirty };
+  } catch (error) {
+    console.error('Error checking main dirty state:', error.message);
+    return { isDirty: false, error: error.message };
+  }
+}
+
+/**
  * Check if required dependencies are installed
  * Checks both package root (global install) and current directory (local dev)
  */
