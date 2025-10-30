@@ -2296,23 +2296,19 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
 
         // Handle resize control message
         if (msg.type === 'resize' && msg.cols && msg.rows) {
-          console.log(`[TERMINAL] Resize detected: ${msg.cols}x${msg.rows} - NOT writing to PTY`);
           terminal.resize(msg.cols, msg.rows);
           return;
         }
 
         // Unknown/unsupported control message - ignore it
-        console.warn('[TERMINAL] Unknown control message type:', msg.type);
         return;
       } catch (e) {
         // Malformed JSON that looks like control message - ignore it
-        console.warn('[TERMINAL] Malformed control message:', dataStr.substring(0, 100));
         return;
       }
     }
 
     // Default: terminal input
-    console.log(`[TERMINAL] Writing to PTY: ${dataStr.substring(0, 50)}${dataStr.length > 50 ? '...' : ''}`);
     if (!isPaused) {
       terminal.write(dataStr);
     }
