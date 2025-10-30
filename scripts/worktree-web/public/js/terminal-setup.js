@@ -532,6 +532,19 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   // Fit terminal after delay
   setTimeout(() => fitAddon.fit(), 100);
 
+  // Pause polling when terminal is focused (prevents interruptions)
+  terminal.onFocus(() => {
+    if (window.pollingManager) {
+      window.pollingManager.pauseForTerminal();
+    }
+  });
+
+  terminal.onBlur(() => {
+    if (window.pollingManager) {
+      window.pollingManager.resumeFromTerminal();
+    }
+  });
+
   // Handle window resize
   const resizeHandler = () => {
     if (activeTabId === tabId) {
