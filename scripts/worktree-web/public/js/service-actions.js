@@ -269,7 +269,7 @@ window.executeClose = async function() {
 
   // For now, just use simple delete
   // TODO: Implement data import functionality
-  if (!confirm(`Close worktree "${name}"? This will stop services and remove the worktree.`)) {
+  if (!confirm(`Close worktree "${name}"?\n\nThis will:\n- Stop all services\n- Delete all volumes and data (databases, uploads, etc.)\n- Remove the worktree\n\nThis cannot be undone.`)) {
     return;
   }
 
