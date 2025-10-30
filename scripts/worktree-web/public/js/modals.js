@@ -196,7 +196,7 @@ export async function createWorktree(event, force = false) {
               showToast('Checking for updates...');
               await syncWorktree('main');
               showToast('Creating worktree...');
-              await createWorktree(null, false);
+              await createWorktree(null, true);
               resolve();
             } catch (error) {
               reject(error);
