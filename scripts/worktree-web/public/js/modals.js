@@ -10,6 +10,21 @@ let branchSelector = null;
 let agentSelector = null;
 
 /**
+ * Show toast notification
+ * @param {string} message - Message to display
+ * @param {number} duration - Duration in milliseconds (default: 3000)
+ */
+function showToast(message, duration = 3000) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.style.display = 'block';
+
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, duration);
+}
+
+/**
  * Show create worktree modal
  */
 export function showCreateModal() {
@@ -178,7 +193,9 @@ export async function createWorktree(event, force = false) {
           if (action === 'yes') {
             // Sync then retry
             try {
+              showToast('Checking for updates...');
               await syncWorktree('main');
+              showToast('Creating worktree...');
               await createWorktree(null, false);
               resolve();
             } catch (error) {
@@ -243,21 +260,28 @@ function showSyncModal(data, callback) {
  * Sync a worktree with remote
  */
 async function syncWorktree(name) {
-  console.log(`Syncing ${name}...`);
+  showToast(`Syncing ${name}...`);
 
-  const response = await fetch(`/api/worktrees/${name}/sync`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ strategy: 'merge' })
-  });
+  try {
+    const response = await fetch(`/api/worktrees/${name}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strategy: 'merge' })
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Sync failed');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Sync failed');
+    }
+
+    const result = await response.json();
+    showToast(`${name} synced successfully`, 2000);
+    return result;
+
+  } catch (error) {
+    showToast(`Sync failed: ${error.message}`, 5000);
+    throw error;
   }
-
-  console.log(`${name} synced successfully`);
-  return await response.json();
 }
 
 /**

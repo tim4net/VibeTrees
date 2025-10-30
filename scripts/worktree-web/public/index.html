@@ -742,6 +742,34 @@
   <!-- Application JavaScript (ES6 Module) -->
   <script type="module" src="/js/main.js?v=2"></script>
 
+  <!-- Toast notification -->
+  <div id="toast" class="toast" style="display: none;"></div>
+
+  <style>
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: #333;
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 4px;
+    z-index: 2000;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  </style>
+
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
