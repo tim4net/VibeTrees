@@ -2514,9 +2514,11 @@ function createApp() {
   app.get('/api/version', (req, res) => {
     try {
       const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf-8'));
+      const projectName = basename(process.cwd());
       res.json({
         version: packageJson.version,
-        name: packageJson.name
+        name: packageJson.name,
+        projectName
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to read version' });

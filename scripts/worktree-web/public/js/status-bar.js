@@ -54,6 +54,12 @@ async function loadVersion() {
       versionEl.textContent = `v${data.version}`;
       console.log('[status-bar] Version loaded:', data.version);
     }
+
+    // Update browser title with project name
+    if (data.projectName) {
+      document.title = `${data.projectName} - VibeTrees`;
+      console.log('[status-bar] Browser title updated:', data.projectName);
+    }
   } catch (error) {
     console.error('[status-bar] Failed to load version:', error);
     // Keep default "v1.0.0" if fetch fails
