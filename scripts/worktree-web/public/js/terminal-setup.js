@@ -527,19 +527,21 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     console.warn(`[Terminal] WebGL not available for ${worktreeName}, using canvas:`, e.message);
   }
 
-  terminal.open(panel.querySelector('.terminal-wrapper'));
+  const terminalWrapper = panel.querySelector('.terminal-wrapper');
+  terminal.open(terminalWrapper);
 
   // Fit terminal after delay
   setTimeout(() => fitAddon.fit(), 100);
 
   // Pause polling when terminal is focused (prevents interruptions)
-  terminal.onFocus(() => {
+  // Use DOM events since xterm doesn't expose onFocus/onBlur
+  terminalWrapper.addEventListener('focusin', () => {
     if (window.pollingManager) {
       window.pollingManager.pauseForTerminal();
     }
   });
 
-  terminal.onBlur(() => {
+  terminalWrapper.addEventListener('focusout', () => {
     if (window.pollingManager) {
       window.pollingManager.resumeFromTerminal();
     }
