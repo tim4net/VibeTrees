@@ -2131,6 +2131,7 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
     }
 
     // Check backpressure only for large outputs (>10KB)
+    // Use event-driven approach instead of polling to avoid blocking event loop
     if (data.length > 10000 && ws.bufferedAmount > BACKPRESSURE_THRESHOLD) {
       if (!draining) {
         draining = true;
@@ -2149,60 +2150,34 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
           console.error('[BACKPRESSURE] Failed to send pause notification:', e.message);
         }
 
-        // Resume when buffer drains
+        // Event-driven drain handling - no polling!
         const pauseStart = Date.now();
-        const checkDrain = setInterval(() => {
-          if (ws.readyState !== 1) {
-            clearInterval(checkDrain);
-            session.drainInterval = null;
-            draining = false;
-            isPaused = false;
-            return;
-          }
+        const drainTimeout = setTimeout(() => {
+          // Safety timeout after 30s
+          console.warn(`[BACKPRESSURE] Timeout after ${BACKPRESSURE_TIMEOUT}ms - force resuming PTY for session ${sessionId}`);
+          draining = false;
+          isPaused = false;
+          terminal.resume();
+          try {
+            ws.send(JSON.stringify({ type: 'status', message: '', paused: false }));
+          } catch (e) {}
+        }, BACKPRESSURE_TIMEOUT);
 
-          // Force resume after timeout
-          if (Date.now() - pauseStart > BACKPRESSURE_TIMEOUT) {
-            console.warn(`[BACKPRESSURE] Timeout after ${BACKPRESSURE_TIMEOUT}ms - force resuming PTY for session ${sessionId}`);
-            clearInterval(checkDrain);
-            session.drainInterval = null;
-            draining = false;
-            isPaused = false;
-            terminal.resume();
-            // Notify client
-            try {
-              ws.send(JSON.stringify({
-                type: 'status',
-                message: '',
-                paused: false
-              }));
-            } catch (e) {
-              console.error('[BACKPRESSURE] Failed to send resume notification:', e.message);
-            }
-            return;
-          }
-
+        // Use 'drain' event instead of polling
+        const drainHandler = () => {
           if (ws.bufferedAmount < BACKPRESSURE_THRESHOLD / 2) {
-            console.log(`[BACKPRESSURE] Drained - resuming PTY for session ${sessionId}`);
-            clearInterval(checkDrain);
-            session.drainInterval = null;
+            console.log(`[BACKPRESSURE] Drained - resuming PTY for session ${sessionId} (took ${Date.now() - pauseStart}ms)`);
+            clearTimeout(drainTimeout);
+            ws.off('drain', drainHandler);
             draining = false;
             isPaused = false;
             terminal.resume();
-            // Notify client
             try {
-              ws.send(JSON.stringify({
-                type: 'status',
-                message: '',
-                paused: false
-              }));
-            } catch (e) {
-              console.error('[BACKPRESSURE] Failed to send resume notification:', e.message);
-            }
+              ws.send(JSON.stringify({ type: 'status', message: '', paused: false }));
+            } catch (e) {}
           }
-        }, BACKPRESSURE_CHECK_INTERVAL);
-
-        // Store interval reference for cleanup
-        session.drainInterval = checkDrain;
+        };
+        ws.on('drain', drainHandler);
       }
       return; // Don't send during backpressure
     }
