@@ -6,6 +6,7 @@
  */
 
 import { execSync, spawn } from 'child_process';
+import { Worker } from 'worker_threads';
 import fs from 'fs';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import path from 'path';
@@ -337,6 +338,55 @@ class WorktreeManager {
     });
   }
 
+  /**
+   * List worktrees asynchronously using worker thread (non-blocking)
+   * @returns {Promise<Array>} Array of worktree objects
+   */
+  async listWorktreesAsync() {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(join(__dirname, '..', 'worktree-list-worker.mjs'));
+
+      const timeout = setTimeout(() => {
+        worker.terminate();
+        console.warn('[listWorktreesAsync] Worker timeout - falling back to sync');
+        resolve(this.listWorktrees());
+      }, 5000);
+
+      worker.on('message', (result) => {
+        clearTimeout(timeout);
+        worker.terminate();
+        if (result.success) {
+          resolve(result.worktrees);
+        } else {
+          console.error('[listWorktreesAsync] Worker error:', result.error);
+          resolve(this.listWorktrees());
+        }
+      });
+
+      worker.on('error', (error) => {
+        clearTimeout(timeout);
+        worker.terminate();
+        console.error('[listWorktreesAsync] Worker error:', error);
+        resolve(this.listWorktrees());
+      });
+
+      // Send port registry data to worker
+      const portRegistryData = {};
+      for (const [worktreeName] of this.portRegistry._registry.entries()) {
+        portRegistryData[worktreeName] = this.portRegistry.getWorktreePorts(worktreeName);
+      }
+
+      worker.postMessage({
+        portRegistry: portRegistryData,
+        rootDir: rootDir
+      });
+    });
+  }
+
+  /**
+   * List worktrees synchronously (blocking - use listWorktreesAsync for API calls)
+   * @returns {Array} Array of worktree objects
+   */
   listWorktrees() {
     try {
       const output = execSync('git worktree list --porcelain', { encoding: 'utf-8' });
@@ -2374,8 +2424,10 @@ function createApp() {
     });
   });
 
-  app.get('/api/worktrees', (req, res) => {
-    res.json(manager.listWorktrees());
+  app.get('/api/worktrees', async (req, res) => {
+    // Use async worker thread version to avoid blocking event loop
+    const worktrees = await manager.listWorktreesAsync();
+    res.json(worktrees);
   });
 
   app.post('/api/worktrees', async (req, res) => {
