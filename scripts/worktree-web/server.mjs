@@ -615,8 +615,19 @@ class WorktreeManager {
 
       statuses.push(...containers.map(c => {
         // Extract service name from Labels string (Docker returns labels as comma-separated string)
-        const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
-        const serviceName = serviceMatch ? serviceMatch[1] : c.Names.split('-').slice(0, -1).join('-');
+        const serviceMatch = c.Labels ? c.Labels.match(/com\.docker\.compose\.service=([^,]+)/) : null;
+        let serviceName = serviceMatch ? serviceMatch[1] : null;
+
+        // Fallback: parse from container name if label extraction failed
+        if (!serviceName && c.Names) {
+          const parts = c.Names.split('-');
+          serviceName = parts.length > 1 ? parts.slice(0, -1).join('-') : parts[0];
+        }
+
+        // Last resort: use container ID
+        if (!serviceName) {
+          serviceName = c.ID ? c.ID.substring(0, 12) : 'unknown';
+        }
 
         return {
           name: serviceName,
