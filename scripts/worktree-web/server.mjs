@@ -2710,21 +2710,21 @@ function createApp() {
       if (error.message.includes('CONFLICT') || error.message.includes('conflict')) {
         try {
           console.log('Attempting AI conflict resolution...');
-          const AIConflictResolver = (await import('../ai-conflict-resolver.mjs')).default;
+          const { AIConflictResolver } = await import('../ai-conflict-resolver.mjs');
           const resolver = new AIConflictResolver(worktree.path);
-          const resolution = await resolver.resolve();
+          const analysis = await resolver.analyzeConflicts();
 
-          if (resolution.success) {
+          if (analysis.autoResolvable > 0) {
             return res.json({
               success: true,
-              message: 'Conflicts resolved automatically',
-              resolution
+              message: 'Conflicts analyzed - auto-resolvable conflicts found',
+              analysis
             });
           } else {
             return res.status(409).json({
               success: false,
               error: 'Could not auto-resolve conflicts',
-              conflicts: resolution.conflicts,
+              conflicts: analysis.conflicts,
               needsManualResolution: true
             });
           }

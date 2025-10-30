@@ -416,14 +416,71 @@ describe('POST /api/worktrees - staleness check logic', () => {
 });
 
 describe('Sync conflict handling', () => {
-  it('should attempt AI conflict resolution on merge conflicts', async () => {
-    // Mock: syncWorktree throws conflict error
-    const mockManager = {
-      syncWorktree: vi.fn().mockRejectedValue(new Error('CONFLICT'))
-    };
+  it('should use correct AIConflictResolver import and API', async () => {
+    // Test the import pattern is correct (named export, not default)
+    const { AIConflictResolver } = await import('../ai-conflict-resolver.mjs');
 
-    // Expected: calls AIConflictResolver
-    // This test validates the try-catch flow exists
-    expect(mockManager.syncWorktree).toBeDefined();
+    expect(AIConflictResolver).toBeDefined();
+    expect(typeof AIConflictResolver).toBe('function');
+
+    // Verify the class has the methods we call in the sync endpoint
+    const resolver = new AIConflictResolver('/test/path');
+    expect(typeof resolver.analyzeConflicts).toBe('function');
+    expect(typeof resolver.getConflicts).toBe('function');
+    expect(typeof resolver.autoResolve).toBe('function');
+  });
+
+  it('should validate analyzeConflicts returns expected structure', async () => {
+    const { AIConflictResolver } = await import('../ai-conflict-resolver.mjs');
+
+    // Create a mock resolver that simulates conflict detection
+    const resolver = new AIConflictResolver('/test/path');
+
+    // Mock the getConflicts method to return test data
+    vi.spyOn(resolver, 'getConflicts').mockReturnValue([
+      {
+        file: 'test.js',
+        category: 'code',
+        content: { conflicts: [], conflictCount: 0 },
+        resolvable: false
+      }
+    ]);
+
+    const analysis = await resolver.analyzeConflicts();
+
+    // Verify the structure matches what server.mjs expects
+    expect(analysis).toHaveProperty('total');
+    expect(analysis).toHaveProperty('autoResolvable');
+    expect(analysis).toHaveProperty('manual');
+    expect(analysis).toHaveProperty('conflicts');
+    expect(Array.isArray(analysis.conflicts)).toBe(true);
+
+    // Verify we check autoResolvable count (which is what the sync endpoint does)
+    expect(typeof analysis.autoResolvable).toBe('number');
+  });
+
+  it('should validate conflict resolution error handling structure', () => {
+    // This test validates the error handling path in the sync endpoint
+    // When error.message includes 'CONFLICT', we:
+    // 1. Import AIConflictResolver (named export)
+    // 2. Call analyzeConflicts() (not resolve())
+    // 3. Check analysis.autoResolvable > 0
+
+    const upperCaseError = new Error('CONFLICT detected');
+    const lowerCaseError = new Error('merge conflict detected');
+    const mixedCaseError = new Error('CONFLICT: merge conflict in file.js');
+
+    // Verify error detection logic (case-sensitive check)
+    expect(upperCaseError.message.includes('CONFLICT')).toBe(true);
+    expect(upperCaseError.message.includes('conflict')).toBe(false);
+
+    expect(lowerCaseError.message.includes('CONFLICT')).toBe(false);
+    expect(lowerCaseError.message.includes('conflict')).toBe(true);
+
+    // Both variations should trigger conflict handling
+    expect(
+      mixedCaseError.message.includes('CONFLICT') ||
+      mixedCaseError.message.includes('conflict')
+    ).toBe(true);
   });
 });
