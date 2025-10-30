@@ -97,14 +97,20 @@ function getDockerStatus(path, name) {
       .map(line => JSON.parse(line))
       .filter(c => !c.Names.endsWith('-init')); // Filter out init containers
 
-    return containers.map(c => ({
-      Service: c.Labels['com.docker.compose.service'] || c.Names.split('-').slice(0, -1).join('-'),
-      Name: c.Names,
-      State: c.State,
-      Status: c.Status,
-      state: c.State.toLowerCase(),
-      Publishers: c.Ports ? parseDockerPorts(c.Ports) : []
-    }));
+    return containers.map(c => {
+      // Extract service name from Labels string (Docker returns labels as comma-separated string)
+      const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
+      const serviceName = serviceMatch ? serviceMatch[1] : c.Names.split('-').slice(0, -1).join('-');
+
+      return {
+        Service: serviceName,
+        Name: c.Names,
+        State: c.State,
+        Status: c.Status,
+        state: c.State.toLowerCase(),
+        Publishers: c.Ports ? parseDockerPorts(c.Ports) : []
+      };
+    });
   } catch (error) {
     return [];
   }

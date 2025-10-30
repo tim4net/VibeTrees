@@ -613,12 +613,18 @@ class WorktreeManager {
         .map(line => JSON.parse(line))
         .filter(c => !c.Names.endsWith('-init')); // Filter out init containers
 
-      statuses.push(...containers.map(c => ({
-        name: c.Labels['com.docker.compose.service'] || c.Names.split('-').slice(0, -1).join('-'),
-        state: c.State,
-        status: c.Status,
-        ports: c.Ports ? c.Ports.split(',').map(p => p.trim()) : []
-      })));
+      statuses.push(...containers.map(c => {
+        // Extract service name from Labels string (Docker returns labels as comma-separated string)
+        const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
+        const serviceName = serviceMatch ? serviceMatch[1] : c.Names.split('-').slice(0, -1).join('-');
+
+        return {
+          name: serviceName,
+          state: c.State,
+          status: c.Status,
+          ports: c.Ports ? c.Ports.split(',').map(p => p.trim()) : []
+        };
+      }));
     } catch {
       // Docker services might not be running or docker not available
     }
