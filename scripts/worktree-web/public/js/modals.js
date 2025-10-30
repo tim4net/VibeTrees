@@ -221,20 +221,20 @@ function showSyncModal(data, callback) {
   const message = document.getElementById('syncModalMessage');
 
   message.textContent = data.message || 'Sync required';
-  modal.style.display = 'flex';
+  modal.classList.add('active');
 
   document.getElementById('syncYesBtn').onclick = () => {
-    modal.style.display = 'none';
+    modal.classList.remove('active');
     callback('yes');
   };
 
   document.getElementById('syncNoBtn').onclick = () => {
-    modal.style.display = 'none';
+    modal.classList.remove('active');
     callback('no');
   };
 
   document.getElementById('syncCancelBtn').onclick = () => {
-    modal.style.display = 'none';
+    modal.classList.remove('active');
     callback('cancel');
   };
 }
