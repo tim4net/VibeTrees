@@ -18,6 +18,7 @@ import { PerformanceOptimizer } from '../performance-optimizer.mjs';
 import { CacheManager } from '../cache-manager.mjs';
 import { FirewallHelper } from '../firewall-helper.mjs';
 import { ServiceConfig } from '../service-config.mjs';
+import { InitializationManager } from '../initialization-manager.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Package root directory (where package.json lives)
@@ -186,6 +187,7 @@ class WorktreeManager {
     this.cacheManager = new CacheManager();
     this.importer = new WorktreeImporter(rootDir, this.portRegistry, runtime);
     this.diagnostics = new DiagnosticRunner(rootDir, this.portRegistry, runtime);
+    this.initializationManager = new InitializationManager();
 
     // Sync port registry with existing worktrees on startup
     this._syncPortRegistry();
@@ -2409,6 +2411,16 @@ function createApp() {
   });
 
   // API Routes
+  app.get('/api/initialization/status', (req, res) => {
+    res.json(manager.initializationManager?.getStatus() || {
+      initialized: true,
+      overallProgress: 100,
+      totalTasks: 0,
+      completedTasks: 0,
+      tasks: []
+    });
+  });
+
   app.get('/api/worktrees', (req, res) => {
     res.json(manager.listWorktrees());
   });
@@ -3417,6 +3429,187 @@ function createApp() {
 }
 
 /**
+ * Background initialization of heavy operations
+ * Runs after server is listening to make startup feel instant
+ */
+async function initializeInBackground(manager) {
+  const initManager = manager.initializationManager;
+
+  // Listen to initialization events for logging
+  initManager.on('task:started', ({ id, description }) => {
+    console.log(`🔄 ${description}...`);
+  });
+
+  initManager.on('task:completed', ({ id, description, duration }) => {
+    console.log(`✓ ${description} (${duration}ms)`);
+  });
+
+  initManager.on('task:failed', ({ id, description, error }) => {
+    console.error(`✗ ${description}: ${error}`);
+  });
+
+  initManager.on('initialized', ({ totalTime, successfulTasks, failedTasks }) => {
+    console.log('\n✅ Background initialization complete!');
+    console.log(`   Total time: ${(totalTime / 1000).toFixed(2)}s`);
+    console.log(`   Successful: ${successfulTasks}, Failed: ${failedTasks}\n`);
+
+    // Notify all connected clients that initialization is complete
+    const status = initManager.getStatus();
+    manager.clients.forEach(client => {
+      if (client.readyState === 1) {
+        client.send(JSON.stringify({
+          type: 'initialization:complete',
+          status
+        }));
+      }
+    });
+  });
+
+  // Execute tasks in parallel where possible
+  await Promise.all([
+    // Task 1: Sync GitHub branches
+    initManager.executeTask(
+      'github-sync',
+      'Syncing GitHub branches',
+      async (updateProgress) => {
+        updateProgress(10, 'Fetching worktree list');
+        const worktrees = manager.listWorktrees();
+
+        updateProgress(20, 'Checking remote branches');
+        let pushedCount = 0;
+        const totalWorktrees = worktrees.filter(w => w.branch !== 'main').length;
+
+        // Process worktrees in parallel for speed
+        await Promise.all(worktrees.map(async (worktree, index) => {
+          if (worktree.branch === 'main') return;
+
+          try {
+            // Check if remote branch exists
+            const remoteBranches = execSync('git branch -r', {
+              cwd: worktree.path,
+              encoding: 'utf-8'
+            });
+
+            const remoteBranchExists = remoteBranches.includes(`origin/${worktree.branch}`);
+            if (!remoteBranchExists) {
+              updateProgress(
+                20 + (60 * (index + 1) / totalWorktrees),
+                `Pushing ${worktree.name} to GitHub`
+              );
+
+              // Push branch to GitHub
+              execSync(`git push -u origin "${worktree.branch}"`, {
+                cwd: worktree.path,
+                stdio: 'pipe'
+              });
+              pushedCount++;
+            }
+          } catch (error) {
+            console.warn(`Failed to sync ${worktree.name}: ${error.message}`);
+          }
+        }));
+
+        updateProgress(90, 'Finalizing sync');
+        return { pushedCount, totalWorktrees };
+      },
+      5000 // Estimated 5 seconds
+    ),
+
+    // Task 2: Auto-start containers
+    initManager.executeTask(
+      'container-startup',
+      'Starting Docker containers',
+      async (updateProgress) => {
+        updateProgress(10, 'Scanning worktrees');
+        const worktrees = manager.listWorktrees();
+
+        // Identify worktrees that need container startup
+        const worktreesToStart = worktrees.filter(worktree => {
+          const servicesRunning = worktree.dockerStatus.filter(s => s.state === 'running').length;
+          const servicesTotal = worktree.dockerStatus.length;
+          const hasServices = Object.keys(worktree.ports).length > 0;
+          return hasServices && servicesRunning < servicesTotal;
+        });
+
+        if (worktreesToStart.length === 0) {
+          updateProgress(100, 'No containers to start');
+          return { started: 0, total: worktrees.length };
+        }
+
+        updateProgress(20, `Starting containers for ${worktreesToStart.length} worktrees`);
+
+        // Start containers in parallel for speed
+        const results = await Promise.all(
+          worktreesToStart.map(async (worktree, index) => {
+            try {
+              updateProgress(
+                20 + (70 * (index + 1) / worktreesToStart.length),
+                `Starting ${worktree.name}`
+              );
+
+              const result = await manager.startServices(worktree.name);
+              return { worktree: worktree.name, success: result.success, error: result.error };
+            } catch (error) {
+              return { worktree: worktree.name, success: false, error: error.message };
+            }
+          })
+        );
+
+        updateProgress(95, 'Finalizing container startup');
+
+        const successCount = results.filter(r => r.success).length;
+        return { started: successCount, total: worktreesToStart.length, results };
+      },
+      10000 // Estimated 10 seconds
+    ),
+
+    // Task 3: Warm up caches
+    initManager.executeTask(
+      'cache-warmup',
+      'Warming up caches',
+      async (updateProgress) => {
+        updateProgress(20, 'Loading dependency caches');
+
+        // Pre-load common dependency caches
+        try {
+          await manager.cacheManager.warmup();
+          updateProgress(60, 'Caches loaded');
+        } catch (error) {
+          updateProgress(60, 'Cache warmup skipped');
+        }
+
+        updateProgress(100, 'Ready');
+        return { warmed: true };
+      },
+      2000 // Estimated 2 seconds
+    )
+  ]);
+
+  // Additional sequential tasks that depend on above
+  await initManager.executeTask(
+    'final-setup',
+    'Finalizing setup',
+    async (updateProgress) => {
+      updateProgress(50, 'Broadcasting status');
+
+      // Send status update to all connected clients
+      manager.clients.forEach(client => {
+        if (client.readyState === 1) {
+          client.send(JSON.stringify({
+            type: 'worktrees:updated',
+            worktrees: manager.listWorktrees()
+          }));
+        }
+      });
+
+      updateProgress(100, 'Complete');
+      return { complete: true };
+    },
+    1000
+  );
+}
+
+/**
  * Check all worktrees and create missing GitHub branches on startup
  */
 async function syncGitHubBranches(manager) {
@@ -3652,14 +3845,7 @@ async function startServer() {
 
       console.log('');
 
-      // Sync GitHub branches for all worktrees
-      await syncGitHubBranches(manager);
-
-      // Auto-start containers for all worktrees
-      console.log('🔍 Checking for stopped containers...\n');
-      await autoStartContainers(manager);
-
-      // Auto-open browser
+      // Auto-open browser immediately
       const url = `http://localhost:${PORT}`;
       const start = process.platform === 'darwin' ? 'open' :
                     process.platform === 'win32' ? 'start' : 'xdg-open';
@@ -3669,6 +3855,10 @@ async function startServer() {
       } catch (err) {
         console.log('Could not auto-open browser. Please visit the URL manually.');
       }
+
+      // Start background initialization
+      console.log('🔄 Starting background initialization...\n');
+      initializeInBackground(manager);
     });
   } catch (error) {
     console.error('\n❌ Failed to start server:', error);
