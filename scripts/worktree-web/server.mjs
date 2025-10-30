@@ -2281,20 +2281,23 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
 
     const dataStr = data.toString();
 
-    // OPTIMIZED: More efficient JSON detection
+    // OPTIMIZED: Detect control messages by prefix (avoids full JSON parse for normal input)
     if (dataStr.length > 8 && dataStr[0] === '{' && dataStr.slice(0, 8) === '{"type":') {
+      // Anything starting with {"type": is a control message - parse and handle it
       try {
-        // Only parse for resize (most common control message)
-        if (dataStr.includes('"resize"')) {
-          const msg = JSON.parse(dataStr);
-          if (msg.type === 'resize' && msg.cols && msg.rows) {
-            terminal.resize(msg.cols, msg.rows);
-          }
-          // Always return for control messages - don't write them to terminal
+        const msg = JSON.parse(dataStr);
+
+        // Handle resize control message
+        if (msg.type === 'resize' && msg.cols && msg.rows) {
+          terminal.resize(msg.cols, msg.rows);
           return;
         }
+
+        // Unknown/unsupported control message - ignore it
+        console.warn('[TERMINAL] Unknown control message type:', msg.type);
+        return;
       } catch (e) {
-        // Not valid JSON control message - ignore it
+        // Malformed JSON that looks like control message - ignore it
         console.warn('[TERMINAL] Malformed control message:', dataStr.substring(0, 100));
         return;
       }
