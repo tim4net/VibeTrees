@@ -124,11 +124,6 @@ export class PTYSessionManager {
 
     session.pty = ptyProcess;
 
-    // Start auto-save interval
-    session.autoSaveTimer = setInterval(async () => {
-      await this._autoSaveSession(sessionId);
-    }, this.autoSaveInterval);
-
     return ptyProcess;
   }
 
@@ -139,11 +134,6 @@ export class PTYSessionManager {
   async destroySession(sessionId) {
     const session = this._sessions.get(sessionId);
     if (session) {
-      // Clear auto-save timer
-      if (session.autoSaveTimer) {
-        clearInterval(session.autoSaveTimer);
-      }
-
       // Remove active listener if exists
       if (session.pty && session.activeListener) {
         session.pty.removeListener('data', session.activeListener);
@@ -188,18 +178,6 @@ export class PTYSessionManager {
     }
 
     return orphans;
-  }
-
-  /**
-   * Auto-save session state (private)
-   * @param {string} sessionId - Session ID
-   */
-  async _autoSaveSession(sessionId) {
-    const session = this._sessions.get(sessionId);
-    if (session && session.pty) {
-      const state = this.serializer.captureState(sessionId, session.pty);
-      await this.serializer.saveState(state);
-    }
   }
 
   /**

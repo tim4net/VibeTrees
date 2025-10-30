@@ -2109,13 +2109,27 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   let draining = false;
   let isPaused = false;
 
+  // Smart output buffering: batch small outputs, send large ones immediately
+  let outputBuffer = '';
+  let outputTimer = null;
+  const OUTPUT_BATCH_MS = 8; // Half a frame at 60fps
+  const LARGE_OUTPUT_THRESHOLD = 1024; // 1KB - send immediately if larger
+
+  const flushOutput = () => {
+    if (outputBuffer && ws.readyState === 1) {
+      ws.send(outputBuffer);
+      outputBuffer = '';
+    }
+    outputTimer = null;
+  };
+
   const onData = (data) => {
     if (ws.readyState !== 1) { // Not WebSocket.OPEN
       return;
     }
 
-    // Check backpressure - if buffer is too full, pause PTY temporarily
-    if (ws.bufferedAmount > BACKPRESSURE_THRESHOLD) {
+    // Check backpressure only for large outputs (>10KB)
+    if (data.length > 10000 && ws.bufferedAmount > BACKPRESSURE_THRESHOLD) {
       if (!draining) {
         draining = true;
         isPaused = true;
@@ -2188,8 +2202,27 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
         // Store interval reference for cleanup
         session.drainInterval = checkDrain;
       }
-    } else {
+      return; // Don't send during backpressure
+    }
+
+    // Fast path: Send large outputs immediately
+    if (data.length > LARGE_OUTPUT_THRESHOLD) {
+      // Flush any pending buffer first
+      if (outputBuffer) {
+        ws.send(outputBuffer);
+        outputBuffer = '';
+        if (outputTimer) {
+          clearTimeout(outputTimer);
+          outputTimer = null;
+        }
+      }
       ws.send(data);
+    } else {
+      // Batch small outputs (typical terminal output)
+      outputBuffer += data;
+      if (!outputTimer) {
+        outputTimer = setTimeout(flushOutput, OUTPUT_BATCH_MS);
+      }
     }
   };
 
@@ -2206,30 +2239,31 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   ws.on('message', (data) => {
     const writeStart = ENABLE_PROFILING ? process.hrtime.bigint() : null;
 
-    try {
-      const msg = JSON.parse(data.toString());
-      // Only treat as control message if it's an object with a type field
-      if (typeof msg === 'object' && msg !== null && msg.type === 'resize' && msg.cols && msg.rows) {
-        terminal.resize(msg.cols, msg.rows);
-        console.log(`Resized PTY for ${worktreeName} to ${msg.cols}x${msg.rows}`);
-        return; // Don't measure resize latency
-      } else {
-        // Valid JSON but not a control message (e.g., single digits "1", "2")
-        // Treat as terminal input - but ignore during backpressure pause
-        if (isPaused) {
-          console.log(`[TERMINAL] Ignoring input during backpressure pause for session ${sessionId}`);
-          return;
+    const dataStr = data.toString();
+
+    // Fast path: Only parse if it's a control message (starts with '{"type":')
+    // 99% of messages are terminal input, avoid expensive JSON.parse()
+    if (dataStr.startsWith('{"type":')) {
+      try {
+        const msg = JSON.parse(dataStr);
+        // Handle resize control message
+        if (msg.type === 'resize' && msg.cols && msg.rows) {
+          terminal.resize(msg.cols, msg.rows);
+          console.log(`Resized PTY for ${worktreeName} to ${msg.cols}x${msg.rows}`);
+          return; // Don't measure resize latency
         }
-        terminal.write(data.toString());
+        // Other control messages can be added here
+      } catch (e) {
+        // JSON-like but invalid, treat as terminal input
       }
-    } catch (e) {
-      // Not JSON, treat as terminal input - but ignore during backpressure pause
-      if (isPaused) {
-        console.log(`[TERMINAL] Ignoring input during backpressure pause for session ${sessionId}`);
-        return;
-      }
-      terminal.write(data.toString());
     }
+
+    // Default: Treat as terminal input - but ignore during backpressure pause
+    if (isPaused) {
+      console.log(`[TERMINAL] Ignoring input during backpressure pause for session ${sessionId}`);
+      return;
+    }
+    terminal.write(dataStr);
 
     // Measure PTY write latency (only if profiling enabled)
     if (ENABLE_PROFILING && writeStart) {

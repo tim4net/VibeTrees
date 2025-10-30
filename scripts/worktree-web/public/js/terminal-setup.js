@@ -607,9 +607,9 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     terminalSocket.onmessage = (event) => {
       const data = event.data;
 
-      // Fast path: Quick check if message looks like JSON
-      // Most messages are terminal data (don't start with '{')
-      if (data.length > 0 && data[0] === '{') {
+      // Fast path: Only parse if it's a control message (starts with '{"type":')
+      // 99% of messages are terminal data, avoid expensive JSON.parse()
+      if (data.startsWith('{"type":')) {
         try {
           const msg = JSON.parse(data);
 
@@ -741,25 +741,15 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
       }
     };
 
-    // Message batching configuration
-    const BATCH_INTERVAL_MS = 16; // One frame at 60fps
-    let inputBuffer = '';
-    let batchTimeout = null;
-
     // Performance tracking (enabled by server via session message)
     let profilingEnabled = false;
-    let inputTimestamps = new Map(); // Track when each character was typed
     let latencyMeasurements = [];
     let lastLatencyReport = Date.now();
 
-    // Send terminal input to PTY with batching
+    // Send terminal input to PTY immediately (no batching)
     terminal.onData((data) => {
       // Track key timing for performance measurement
       lastKeyTime = performance.now();
-
-      // Store timestamp for this input with unique ID
-      const inputId = `${Date.now()}-${Math.random()}`;
-      inputTimestamps.set(inputId, performance.now());
 
       // Check for control characters that should clear pending echo
       if (data === '\x03' || // Ctrl+C
@@ -797,32 +787,9 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
         }
       }
 
-      inputBuffer += data;
-
-      // Flush immediately for control characters for better responsiveness
-      const shouldFlushImmediately =
-        data.includes('\r') || // Enter key
-        data.includes('\n') || // Line feed
-        data.includes('\x03') || // Ctrl+C
-        data.includes('\x04'); // Ctrl+D
-
-      if (shouldFlushImmediately && batchTimeout) {
-        // Cancel batch timeout and flush immediately
-        clearTimeout(batchTimeout);
-        batchTimeout = null;
-
-        if (inputBuffer && terminalSocket?.readyState === WebSocket.OPEN) {
-          terminalSocket.send(inputBuffer);
-          inputBuffer = '';
-        }
-      } else if (!batchTimeout) {
-        batchTimeout = setTimeout(() => {
-          if (inputBuffer && terminalSocket?.readyState === WebSocket.OPEN) {
-            terminalSocket.send(inputBuffer);
-            inputBuffer = '';
-          }
-          batchTimeout = null;
-        }, BATCH_INTERVAL_MS);
+      // Send immediately - no batching delay
+      if (terminalSocket?.readyState === WebSocket.OPEN) {
+        terminalSocket.send(data);
       }
     });
 

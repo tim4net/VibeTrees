@@ -176,40 +176,8 @@ describe('PTYSessionManager', () => {
     });
   });
 
-  describe('Periodic State Capture', () => {
-    it('should start auto-save interval when session created', () => {
-      vi.useFakeTimers();
-      const mockSerializer = {
-        captureState: vi.fn(),
-        saveState: vi.fn()
-      };
-      const manager = new PTYSessionManager({ serializer: mockSerializer, autoSaveInterval: 5000 });
-
-      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
-      manager.spawnPTY(sessionId, { command: 'bash', args: [], cols: 80, rows: 24 });
-
-      const session = manager.getSession(sessionId);
-      expect(session.autoSaveTimer).toBeDefined();
-
-      vi.useRealTimers();
-    });
-
-    it('should clear auto-save interval when session destroyed', async () => {
-      const mockSerializer = {
-        captureState: vi.fn(),
-        saveState: vi.fn(),
-        deleteState: vi.fn().mockResolvedValue(undefined)
-      };
-      const manager = new PTYSessionManager({ serializer: mockSerializer, autoSaveInterval: 5000 });
-
-      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
-      manager.spawnPTY(sessionId, { command: 'bash', args: [], cols: 80, rows: 24 });
-      await manager.destroySession(sessionId);
-
-      expect(manager.hasSession(sessionId)).toBe(false);
-      expect(mockSerializer.deleteState).toHaveBeenCalledWith(sessionId);
-    });
-  });
+  // Note: Auto-save feature was removed for performance reasons
+  // (was causing 10-50ms freezes every 5 seconds)
 
   describe('Session Recovery', () => {
     it('should recover session from saved state', async () => {
