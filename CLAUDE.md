@@ -6,7 +6,7 @@ AI guidance for working with **VibeTrees** - a web-based orchestration tool for 
 
 ```bash
 npm run web              # Start web UI (localhost:3335)
-npm test                 # Run test suite (468 tests)
+npm test                 # Run test suite (621 tests)
 npm run test:watch       # Watch mode
 ```
 
@@ -15,7 +15,7 @@ npm run test:watch       # Watch mode
 - **TDD**: Write tests first, implement minimal code to pass
 - **DRY**: Extract shared logic into reusable modules
 - **SOLID**: Single responsibility, proper separation of concerns
-- **468 tests**: Comprehensive coverage maintained
+- **621 tests**: Comprehensive coverage maintained
 
 ## Architecture
 
@@ -150,6 +150,20 @@ Intelligent sync with automatic change detection and service management.
 - `GET /api/worktrees/:name/conflicts`
 - `POST /api/worktrees/:name/conflicts/resolve`
 
+### Sync-on-Create
+
+**Automatic staleness detection** when creating worktrees from 'main':
+- Checks if main is behind origin before worktree creation
+- Prompts user: "main is X commits behind. Sync? [Yes/No/Cancel]"
+- Blocks creation if main has uncommitted changes
+- Uses AIConflictResolver for simple conflicts during sync
+
+**Workflow**: Check staleness → Prompt user → Sync (if needed) → Create worktree
+
+**API**: POST /api/worktrees returns 409 if sync needed. Include `?force=true` to skip check.
+
+See [docs/sync-on-create.md](docs/sync-on-create.md) for details.
+
 ### Database Workflow
 Import/export with schema validation (PostgreSQL only).
 
@@ -199,6 +213,7 @@ See [docs/performance-optimization.md](docs/performance-optimization.md) for det
 - `worktree-manager.test.README.md` - Test suite documentation
 - `docs/mcp-integration.md` - MCP server details
 - `docs/adding-agents.md` - Custom agent guide
+- `docs/sync-on-create.md` - Sync-on-create feature
 - `docs/database-workflow.md` - Database operations
 - `docs/terminal-persistence.md` - Terminal session recovery
 - `docs/performance-optimization.md` - Performance profiling

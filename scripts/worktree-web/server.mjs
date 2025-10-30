@@ -76,6 +76,55 @@ async function findAvailablePort(startPort, endPort, host = '127.0.0.1') {
 }
 
 /**
+ * Check if main branch is behind remote
+ * @param {Function} execFn - Function to execute git commands (for testing)
+ * @returns {{ behind: number }} Object with commits behind count
+ */
+export function checkMainStaleness(execFn = execSync) {
+  // Wrapper to handle both test mock (string only) and real execSync (string + options)
+  const exec = (cmd) => {
+    if (execFn === execSync) {
+      return execFn(cmd, { cwd: rootDir, encoding: 'utf8' });
+    }
+    return execFn(cmd);
+  };
+
+  try {
+    // Fetch latest from origin
+    exec('git fetch origin main');
+
+    // Count commits behind
+    const output = exec('git rev-list --count main..origin/main');
+
+    const behind = parseInt(output.trim(), 10);
+    return { behind: isNaN(behind) ? 0 : behind };
+  } catch (error) {
+    console.error('Error checking main staleness:', error.message);
+    return { behind: 0, error: error.message };
+  }
+}
+
+/**
+ * Check if main worktree has uncommitted changes
+ * @param {Function} execFn - Function to execute git commands (for testing)
+ * @returns {{ isDirty: boolean }} Object indicating if main has uncommitted changes
+ */
+export function checkMainDirtyState(execFn = execSync) {
+  try {
+    const output = execFn('git status --porcelain', {
+      cwd: rootDir,
+      encoding: 'utf8'
+    });
+
+    const isDirty = output.trim().length > 0;
+    return { isDirty };
+  } catch (error) {
+    console.error('Error checking main dirty state:', error.message);
+    return { isDirty: false, error: error.message };
+  }
+}
+
+/**
  * Check if required dependencies are installed
  * Checks both package root (global install) and current directory (local dev)
  */
@@ -2451,7 +2500,36 @@ function createApp() {
 
   app.post('/api/worktrees', async (req, res) => {
     const { branchName, fromBranch } = req.body;
-    const result = await manager.createWorktree(branchName, fromBranch || 'main');
+    const force = req.query.force === 'true';
+    const baseBranch = fromBranch || 'main';
+
+    // Only check staleness for 'main' branch
+    if (baseBranch === 'main' && !force) {
+      // Check for dirty state first
+      const dirtyCheck = checkMainDirtyState();
+      if (dirtyCheck.isDirty) {
+        return res.status(409).json({
+          needsSync: false,
+          hasDirtyState: true,
+          commitsBehind: 0,
+          message: 'Cannot sync: main has uncommitted changes. Please commit or stash changes first.'
+        });
+      }
+
+      // Check if main is behind
+      const stalenessCheck = checkMainStaleness();
+      if (stalenessCheck.behind > 0) {
+        return res.status(409).json({
+          needsSync: true,
+          hasDirtyState: false,
+          commitsBehind: stalenessCheck.behind,
+          message: `main is ${stalenessCheck.behind} commit${stalenessCheck.behind > 1 ? 's' : ''} behind origin/main`
+        });
+      }
+    }
+
+    // Proceed with normal worktree creation
+    const result = await manager.createWorktree(branchName, baseBranch);
     res.json(result);
   });
 
@@ -2627,6 +2705,40 @@ function createApp() {
       res.json(result);
     } catch (error) {
       console.error('Error syncing worktree:', error);
+
+      // Check if it's a merge conflict
+      if (error.message.includes('CONFLICT') || error.message.includes('conflict')) {
+        try {
+          console.log('Attempting AI conflict resolution...');
+          const { AIConflictResolver } = await import('../ai-conflict-resolver.mjs');
+          const resolver = new AIConflictResolver(worktree.path);
+          const analysis = await resolver.analyzeConflicts();
+
+          if (analysis.autoResolvable > 0) {
+            return res.json({
+              success: true,
+              message: 'Conflicts analyzed - auto-resolvable conflicts found',
+              analysis
+            });
+          } else {
+            return res.status(409).json({
+              success: false,
+              error: 'Could not auto-resolve conflicts',
+              conflicts: analysis.conflicts,
+              needsManualResolution: true
+            });
+          }
+        } catch (resolveError) {
+          console.error('AI conflict resolution failed:', resolveError);
+          return res.status(409).json({
+            success: false,
+            error: 'Conflict resolution failed: ' + resolveError.message,
+            needsManualResolution: true
+          });
+        }
+      }
+
+      // Other errors
       res.status(500).json({
         success: false,
         error: error.message

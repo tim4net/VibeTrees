@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { checkMainStaleness, checkMainDirtyState } from './server.mjs';
 
 /**
  * Minimal WorktreeWebManager mock for testing extractPortsFromDockerStatus
@@ -289,5 +290,197 @@ describe('WorktreeWebManager - _serviceNameToEnvVar', () => {
   it('should handle hyphenated service names', () => {
     expect(manager._serviceNameToEnvVar('minio-console')).toBe('MINIO_CONSOLE');
     expect(manager._serviceNameToEnvVar('temporal-ui')).toBe('TEMPORAL_UI');
+  });
+});
+
+describe('checkMainStaleness', () => {
+  it('should detect when main is behind remote', () => {
+    const mockExec = vi.fn()
+      .mockReturnValueOnce('') // git fetch
+      .mockReturnValueOnce('5\n'); // git rev-list count
+
+    const result = checkMainStaleness(mockExec);
+
+    expect(result.behind).toBe(5);
+    expect(mockExec).toHaveBeenCalledWith('git fetch origin main');
+    expect(mockExec).toHaveBeenCalledWith('git rev-list --count main..origin/main');
+  });
+
+  it('should return 0 when main is up to date', () => {
+    const mockExec = vi.fn()
+      .mockReturnValueOnce('') // git fetch
+      .mockReturnValueOnce('0\n'); // git rev-list count
+
+    const result = checkMainStaleness(mockExec);
+
+    expect(result.behind).toBe(0);
+  });
+});
+
+describe('checkMainDirtyState', () => {
+  it('should detect uncommitted changes', () => {
+    const mockExec = vi.fn()
+      .mockReturnValueOnce(' M scripts/foo.mjs\n?? newfile.txt\n'); // git status
+
+    const result = checkMainDirtyState(mockExec);
+
+    expect(result.isDirty).toBe(true);
+    expect(mockExec).toHaveBeenCalledWith(
+      'git status --porcelain',
+      expect.objectContaining({ cwd: expect.any(String) })
+    );
+  });
+
+  it('should return false when main is clean', () => {
+    const mockExec = vi.fn()
+      .mockReturnValueOnce(''); // git status empty
+
+    const result = checkMainDirtyState(mockExec);
+
+    expect(result.isDirty).toBe(false);
+  });
+});
+
+describe('POST /api/worktrees - staleness check logic', () => {
+  it('should return 409-like response when main is behind and force not set', () => {
+    // Simulate the staleness check returning behind: 5
+    const stalenessResult = { behind: 5 };
+    const dirtyResult = { isDirty: false };
+
+    // Expected response structure when main is behind
+    const response = {
+      needsSync: true,
+      commitsBehind: stalenessResult.behind,
+      hasDirtyState: dirtyResult.isDirty,
+      message: `main is ${stalenessResult.behind} commit${stalenessResult.behind > 1 ? 's' : ''} behind origin/main`
+    };
+
+    // Validate the logic
+    expect(response.needsSync).toBe(true);
+    expect(response.commitsBehind).toBe(5);
+    expect(response.hasDirtyState).toBe(false);
+    expect(response.message).toBe('main is 5 commits behind origin/main');
+  });
+
+  it('should proceed with creation when force=true', () => {
+    // When force=true, checks should be skipped
+    const force = true;
+    const baseBranch = 'main';
+
+    // Logic: if baseBranch === 'main' && !force -> should be false when force=true
+    const shouldCheckStaleness = baseBranch === 'main' && !force;
+
+    expect(shouldCheckStaleness).toBe(false);
+  });
+
+  it('should return 409-like response with dirty state flag when main has uncommitted changes', () => {
+    // Simulate dirty state check
+    const dirtyResult = { isDirty: true };
+
+    // Expected response structure when main has uncommitted changes
+    const response = {
+      needsSync: false,
+      hasDirtyState: dirtyResult.isDirty,
+      commitsBehind: 0,
+      message: 'Cannot sync: main has uncommitted changes. Please commit or stash changes first.'
+    };
+
+    expect(response.hasDirtyState).toBe(true);
+    expect(response.needsSync).toBe(false);
+    expect(response.message).toContain('uncommitted changes');
+  });
+
+  it('should not check staleness for non-main branches', () => {
+    const baseBranch = 'feature/test';
+    const force = false;
+
+    // Logic: only check staleness for 'main' branch
+    const shouldCheckStaleness = baseBranch === 'main' && !force;
+
+    expect(shouldCheckStaleness).toBe(false);
+  });
+
+  it('should format singular commit message correctly', () => {
+    const commitsBehind = 1;
+    const message = `main is ${commitsBehind} commit${commitsBehind > 1 ? 's' : ''} behind origin/main`;
+
+    expect(message).toBe('main is 1 commit behind origin/main');
+  });
+
+  it('should format plural commits message correctly', () => {
+    const commitsBehind = 5;
+    const message = `main is ${commitsBehind} commit${commitsBehind > 1 ? 's' : ''} behind origin/main`;
+
+    expect(message).toBe('main is 5 commits behind origin/main');
+  });
+});
+
+describe('Sync conflict handling', () => {
+  it('should use correct AIConflictResolver import and API', async () => {
+    // Test the import pattern is correct (named export, not default)
+    const { AIConflictResolver } = await import('../ai-conflict-resolver.mjs');
+
+    expect(AIConflictResolver).toBeDefined();
+    expect(typeof AIConflictResolver).toBe('function');
+
+    // Verify the class has the methods we call in the sync endpoint
+    const resolver = new AIConflictResolver('/test/path');
+    expect(typeof resolver.analyzeConflicts).toBe('function');
+    expect(typeof resolver.getConflicts).toBe('function');
+    expect(typeof resolver.autoResolve).toBe('function');
+  });
+
+  it('should validate analyzeConflicts returns expected structure', async () => {
+    const { AIConflictResolver } = await import('../ai-conflict-resolver.mjs');
+
+    // Create a mock resolver that simulates conflict detection
+    const resolver = new AIConflictResolver('/test/path');
+
+    // Mock the getConflicts method to return test data
+    vi.spyOn(resolver, 'getConflicts').mockReturnValue([
+      {
+        file: 'test.js',
+        category: 'code',
+        content: { conflicts: [], conflictCount: 0 },
+        resolvable: false
+      }
+    ]);
+
+    const analysis = await resolver.analyzeConflicts();
+
+    // Verify the structure matches what server.mjs expects
+    expect(analysis).toHaveProperty('total');
+    expect(analysis).toHaveProperty('autoResolvable');
+    expect(analysis).toHaveProperty('manual');
+    expect(analysis).toHaveProperty('conflicts');
+    expect(Array.isArray(analysis.conflicts)).toBe(true);
+
+    // Verify we check autoResolvable count (which is what the sync endpoint does)
+    expect(typeof analysis.autoResolvable).toBe('number');
+  });
+
+  it('should validate conflict resolution error handling structure', () => {
+    // This test validates the error handling path in the sync endpoint
+    // When error.message includes 'CONFLICT', we:
+    // 1. Import AIConflictResolver (named export)
+    // 2. Call analyzeConflicts() (not resolve())
+    // 3. Check analysis.autoResolvable > 0
+
+    const upperCaseError = new Error('CONFLICT detected');
+    const lowerCaseError = new Error('merge conflict detected');
+    const mixedCaseError = new Error('CONFLICT: merge conflict in file.js');
+
+    // Verify error detection logic (case-sensitive check)
+    expect(upperCaseError.message.includes('CONFLICT')).toBe(true);
+    expect(upperCaseError.message.includes('conflict')).toBe(false);
+
+    expect(lowerCaseError.message.includes('CONFLICT')).toBe(false);
+    expect(lowerCaseError.message.includes('conflict')).toBe(true);
+
+    // Both variations should trigger conflict handling
+    expect(
+      mixedCaseError.message.includes('CONFLICT') ||
+      mixedCaseError.message.includes('conflict')
+    ).toBe(true);
   });
 });

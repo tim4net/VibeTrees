@@ -10,6 +10,21 @@ let branchSelector = null;
 let agentSelector = null;
 
 /**
+ * Show toast notification
+ * @param {string} message - Message to display
+ * @param {number} duration - Duration in milliseconds (default: 3000)
+ */
+function showToast(message, duration = 3000) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.style.display = 'block';
+
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, duration);
+}
+
+/**
  * Show create worktree modal
  */
 export function showCreateModal() {
@@ -95,10 +110,12 @@ export function hideCreateModal() {
 }
 
 /**
- * Create a new worktree
+ * Create a new worktree (with optional force flag)
  */
-export async function createWorktree(event) {
-  event.preventDefault();
+export async function createWorktree(event, force = false) {
+  if (event) {
+    event.preventDefault();
+  }
 
   // Determine which tab is active
   const isNewBranch = document.getElementById('new-branch-tab').classList.contains('active');
@@ -148,11 +165,53 @@ export async function createWorktree(event) {
       payload.fromBranch = fromBranch;
     }
 
-    const response = await fetch('/api/worktrees', {
+    const url = force ? '/api/worktrees?force=true' : '/api/worktrees';
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
+    if (response.status === 409) {
+      const data = await response.json();
+
+      // Re-enable buttons since we're showing a modal
+      document.getElementById('create-button').disabled = false;
+      document.getElementById('cancel-button').disabled = false;
+      document.getElementById('create-progress').classList.remove('active');
+
+      // Check if dirty state
+      if (data.hasDirtyState) {
+        alert('Cannot sync: main has uncommitted changes. Please commit or stash changes first.');
+        return;
+      }
+
+      // Show sync prompt
+      return new Promise((resolve, reject) => {
+        showSyncModal(data, async (action) => {
+          if (action === 'yes') {
+            // Sync then retry
+            try {
+              showToast('Checking for updates...');
+              await syncWorktree('main');
+              showToast('Creating worktree...');
+              await createWorktree(null, true);
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          } else if (action === 'no') {
+            // Force create
+            await createWorktree(null, true);
+            resolve();
+          } else {
+            // Cancel
+            reject(new Error('User cancelled'));
+          }
+        });
+      });
+    }
 
     const result = await response.json();
 
@@ -168,6 +227,71 @@ export async function createWorktree(event) {
     document.getElementById('create-button').disabled = false;
     document.getElementById('cancel-button').disabled = false;
     document.getElementById('create-progress').classList.remove('active');
+  }
+}
+
+/**
+ * Show sync modal and handle user choice
+ */
+function showSyncModal(data, callback) {
+  const modal = document.getElementById('syncModal');
+  const message = document.getElementById('syncModalMessage');
+
+  message.textContent = data.message || 'Sync required';
+  modal.classList.add('active');
+
+  document.getElementById('syncYesBtn').onclick = () => {
+    modal.classList.remove('active');
+    callback('yes');
+  };
+
+  document.getElementById('syncNoBtn').onclick = () => {
+    modal.classList.remove('active');
+    callback('no');
+  };
+
+  document.getElementById('syncCancelBtn').onclick = () => {
+    modal.classList.remove('active');
+    callback('cancel');
+  };
+}
+
+/**
+ * Sync a worktree with remote
+ */
+async function syncWorktree(name) {
+  showToast(`Syncing ${name}...`);
+
+  try {
+    const response = await fetch(`/api/worktrees/${name}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strategy: 'merge' })
+    });
+
+    const result = await response.json();
+
+    if (response.status === 409) {
+      // Conflict that couldn't be auto-resolved
+      throw new Error(result.error || 'Sync encountered conflicts that require manual resolution');
+    }
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Sync failed');
+    }
+
+    // Check if AI resolved conflicts
+    if (result.resolution) {
+      showToast(`${name} synced (conflicts auto-resolved)`, 3000);
+    } else {
+      showToast(`${name} synced successfully`, 2000);
+    }
+
+    return result;
+
+  } catch (error) {
+    showToast(`Sync failed: ${error.message}`, 5000);
+    throw error;
   }
 }
 
