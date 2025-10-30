@@ -151,7 +151,6 @@ Intelligent sync with automatic change detection and service management.
 - `POST /api/worktrees/:name/conflicts/resolve`
 
 ### Sync-on-Create
-Automatic staleness detection when creating worktrees from 'main'.
 
 **Automatic staleness detection** when creating worktrees from 'main':
 - Checks if main is behind origin before worktree creation
