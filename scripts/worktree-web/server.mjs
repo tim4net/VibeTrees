@@ -1069,19 +1069,25 @@ class WorktreeManager {
       this.profiler.end(portsId);
 
       // Write .env file for docker-compose (quick, do before slow operations)
+      // Only write if .env doesn't already exist (preserve user customizations)
       const envFilePath = join(worktreePath, '.env');
-      const projectName = `vibe_${worktreeName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      if (!existsSync(envFilePath)) {
+        const projectName = `vibe_${worktreeName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-      // Generate env content dynamically from discovered ports
-      let envContent = `COMPOSE_PROJECT_NAME=${projectName}\n`;
-      for (const [serviceName, port] of Object.entries(ports)) {
-        // Convert service name to env var format: api-gateway -> API_PORT
-        const envVarBase = this._serviceNameToEnvVar(serviceName);
-        const envVarName = `${envVarBase}_PORT`;
-        envContent += `${envVarName}=${port}\n`;
+        // Generate env content dynamically from discovered ports
+        let envContent = `COMPOSE_PROJECT_NAME=${projectName}\n`;
+        for (const [serviceName, port] of Object.entries(ports)) {
+          // Convert service name to env var format: api-gateway -> API_PORT
+          const envVarBase = this._serviceNameToEnvVar(serviceName);
+          const envVarName = `${envVarBase}_PORT`;
+          envContent += `${envVarName}=${port}\n`;
+        }
+
+        writeFileSync(envFilePath, envContent);
+        console.log(`✓ Created .env file for ${worktreeName}`);
+      } else {
+        console.log(`✓ Using existing .env file for ${worktreeName}`);
       }
-
-      writeFileSync(envFilePath, envContent);
 
       // Generate MCP server configuration for this worktree
       const mcpId = this.profiler.start('mcp-discovery', totalId);
@@ -1635,22 +1641,26 @@ class WorktreeManager {
     const ports = this.discoverAndAllocatePorts(worktreeName, worktree.path);
 
     try {
-      // Write .env file for docker-compose to use
+      // Only write .env file if it doesn't exist (preserve user customizations)
       const envFilePath = join(worktree.path, '.env');
-      // Use a unique project name to avoid container name conflicts
-      const projectName = `vibe_${worktreeName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      if (!existsSync(envFilePath)) {
+        // Use a unique project name to avoid container name conflicts
+        const projectName = `vibe_${worktreeName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-      // Generate env content dynamically from discovered ports
-      let envContent = `COMPOSE_PROJECT_NAME=${projectName}\n`;
-      for (const [serviceName, port] of Object.entries(ports)) {
-        // Convert service name to env var format: api-gateway -> API_PORT
-        const envVarBase = this._serviceNameToEnvVar(serviceName);
-        const envVarName = `${envVarBase}_PORT`;
-        envContent += `${envVarName}=${port}\n`;
+        // Generate env content dynamically from discovered ports
+        let envContent = `COMPOSE_PROJECT_NAME=${projectName}\n`;
+        for (const [serviceName, port] of Object.entries(ports)) {
+          // Convert service name to env var format: api-gateway -> API_PORT
+          const envVarBase = this._serviceNameToEnvVar(serviceName);
+          const envVarName = `${envVarBase}_PORT`;
+          envContent += `${envVarName}=${port}\n`;
+        }
+
+        writeFileSync(envFilePath, envContent);
+        console.log(`✓ Created .env file for ${worktreeName}`);
+      } else {
+        console.log(`✓ Using existing .env file for ${worktreeName}`);
       }
-
-      writeFileSync(envFilePath, envContent);
-      console.log(`✓ Wrote .env file for ${worktreeName}`);
 
       // Start Docker services
       const output = runtime.execCompose('--env-file .env up -d', {
