@@ -6,6 +6,7 @@
  */
 
 import { execSync, spawn } from 'child_process';
+import { Worker } from 'worker_threads';
 import fs from 'fs';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import path from 'path';
@@ -18,6 +19,7 @@ import { PerformanceOptimizer } from '../performance-optimizer.mjs';
 import { CacheManager } from '../cache-manager.mjs';
 import { FirewallHelper } from '../firewall-helper.mjs';
 import { ServiceConfig } from '../service-config.mjs';
+import { InitializationManager } from '../initialization-manager.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Package root directory (where package.json lives)
@@ -186,6 +188,7 @@ class WorktreeManager {
     this.cacheManager = new CacheManager();
     this.importer = new WorktreeImporter(rootDir, this.portRegistry, runtime);
     this.diagnostics = new DiagnosticRunner(rootDir, this.portRegistry, runtime);
+    this.initializationManager = new InitializationManager();
 
     // Sync port registry with existing worktrees on startup
     this._syncPortRegistry();
@@ -335,6 +338,64 @@ class WorktreeManager {
     });
   }
 
+  /**
+   * List worktrees asynchronously using worker thread (non-blocking)
+   * @returns {Promise<Array>} Array of worktree objects
+   */
+  async listWorktreesAsync() {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(join(__dirname, '..', 'worktree-list-worker.mjs'));
+
+      const timeout = setTimeout(() => {
+        worker.terminate();
+        console.warn('[listWorktreesAsync] Worker timeout - falling back to sync');
+        resolve(this.listWorktrees());
+      }, 5000);
+
+      worker.on('message', (result) => {
+        clearTimeout(timeout);
+        worker.terminate();
+        if (result.success) {
+          resolve(result.worktrees);
+        } else {
+          console.error('[listWorktreesAsync] Worker error:', result.error);
+          resolve(this.listWorktrees());
+        }
+      });
+
+      worker.on('error', (error) => {
+        clearTimeout(timeout);
+        worker.terminate();
+        console.error('[listWorktreesAsync] Worker error:', error);
+        resolve(this.listWorktrees());
+      });
+
+      // Send port registry data to worker
+      // Get all worktree names from synchronous call first
+      const syncWorktrees = execSync('git worktree list --porcelain', {
+        encoding: 'utf-8',
+        cwd: rootDir
+      });
+      const portRegistryData = {};
+      const lines = syncWorktrees.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('branch ')) {
+          const branch = line.substring('branch '.length).replace('refs/heads/', '');
+          portRegistryData[branch] = this.portRegistry.getWorktreePorts(branch);
+        }
+      }
+
+      worker.postMessage({
+        portRegistry: portRegistryData,
+        rootDir: rootDir
+      });
+    });
+  }
+
+  /**
+   * List worktrees synchronously (blocking - use listWorktreesAsync for API calls)
+   * @returns {Array} Array of worktree objects
+   */
   listWorktrees() {
     try {
       const output = execSync('git worktree list --porcelain', { encoding: 'utf-8' });
@@ -2100,6 +2161,13 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       terminal.removeListener('data', session.activeListener);
       session.activeListener = null;
     }
+
+    // Clean up old WebSocket message handler to prevent duplicates
+    if (session.activeMessageHandler && session.activeWs) {
+      session.activeWs.removeListener('message', session.activeMessageHandler);
+      session.activeMessageHandler = null;
+      session.activeWs = null;
+    }
   }
 
   // Forward PTY output to WebSocket with backpressure handling
@@ -2109,13 +2177,28 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   let draining = false;
   let isPaused = false;
 
+  // Smart output buffering: batch small outputs, send large ones immediately
+  let outputBuffer = '';
+  let outputTimer = null;
+  const OUTPUT_BATCH_MS = 4; // Quarter frame at 60fps for lower latency
+  const LARGE_OUTPUT_THRESHOLD = 512; // 512 bytes - send immediately if larger
+
+  const flushOutput = () => {
+    if (outputBuffer && ws.readyState === 1) {
+      ws.send(outputBuffer);
+      outputBuffer = '';
+    }
+    outputTimer = null;
+  };
+
   const onData = (data) => {
     if (ws.readyState !== 1) { // Not WebSocket.OPEN
       return;
     }
 
-    // Check backpressure - if buffer is too full, pause PTY temporarily
-    if (ws.bufferedAmount > BACKPRESSURE_THRESHOLD) {
+    // Check backpressure only for large outputs (>10KB)
+    // Use event-driven approach instead of polling to avoid blocking event loop
+    if (data.length > 10000 && ws.bufferedAmount > BACKPRESSURE_THRESHOLD) {
       if (!draining) {
         draining = true;
         isPaused = true;
@@ -2133,63 +2216,56 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
           console.error('[BACKPRESSURE] Failed to send pause notification:', e.message);
         }
 
-        // Resume when buffer drains
+        // Event-driven drain handling - no polling!
         const pauseStart = Date.now();
-        const checkDrain = setInterval(() => {
-          if (ws.readyState !== 1) {
-            clearInterval(checkDrain);
-            session.drainInterval = null;
-            draining = false;
-            isPaused = false;
-            return;
-          }
+        const drainTimeout = setTimeout(() => {
+          // Safety timeout after 30s
+          console.warn(`[BACKPRESSURE] Timeout after ${BACKPRESSURE_TIMEOUT}ms - force resuming PTY for session ${sessionId}`);
+          draining = false;
+          isPaused = false;
+          terminal.resume();
+          try {
+            ws.send(JSON.stringify({ type: 'status', message: '', paused: false }));
+          } catch (e) {}
+        }, BACKPRESSURE_TIMEOUT);
 
-          // Force resume after timeout
-          if (Date.now() - pauseStart > BACKPRESSURE_TIMEOUT) {
-            console.warn(`[BACKPRESSURE] Timeout after ${BACKPRESSURE_TIMEOUT}ms - force resuming PTY for session ${sessionId}`);
-            clearInterval(checkDrain);
-            session.drainInterval = null;
-            draining = false;
-            isPaused = false;
-            terminal.resume();
-            // Notify client
-            try {
-              ws.send(JSON.stringify({
-                type: 'status',
-                message: '',
-                paused: false
-              }));
-            } catch (e) {
-              console.error('[BACKPRESSURE] Failed to send resume notification:', e.message);
-            }
-            return;
-          }
-
+        // Use 'drain' event instead of polling
+        const drainHandler = () => {
           if (ws.bufferedAmount < BACKPRESSURE_THRESHOLD / 2) {
-            console.log(`[BACKPRESSURE] Drained - resuming PTY for session ${sessionId}`);
-            clearInterval(checkDrain);
-            session.drainInterval = null;
+            console.log(`[BACKPRESSURE] Drained - resuming PTY for session ${sessionId} (took ${Date.now() - pauseStart}ms)`);
+            clearTimeout(drainTimeout);
+            ws.off('drain', drainHandler);
             draining = false;
             isPaused = false;
             terminal.resume();
-            // Notify client
             try {
-              ws.send(JSON.stringify({
-                type: 'status',
-                message: '',
-                paused: false
-              }));
-            } catch (e) {
-              console.error('[BACKPRESSURE] Failed to send resume notification:', e.message);
-            }
+              ws.send(JSON.stringify({ type: 'status', message: '', paused: false }));
+            } catch (e) {}
           }
-        }, BACKPRESSURE_CHECK_INTERVAL);
-
-        // Store interval reference for cleanup
-        session.drainInterval = checkDrain;
+        };
+        ws.on('drain', drainHandler);
       }
-    } else {
+      return; // Don't send during backpressure
+    }
+
+    // Fast path: Send large outputs immediately
+    if (data.length > LARGE_OUTPUT_THRESHOLD) {
+      // Flush any pending buffer first
+      if (outputBuffer) {
+        ws.send(outputBuffer);
+        outputBuffer = '';
+        if (outputTimer) {
+          clearTimeout(outputTimer);
+          outputTimer = null;
+        }
+      }
       ws.send(data);
+    } else {
+      // Batch small outputs (typical terminal output)
+      outputBuffer += data;
+      if (!outputTimer) {
+        outputTimer = setTimeout(flushOutput, OUTPUT_BATCH_MS);
+      }
     }
   };
 
@@ -2198,62 +2274,51 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   // Store listener reference for cleanup
   session.activeListener = onData;
 
-  // Performance tracking for PTY writes (only if profiling enabled)
-  let ptyWriteLatencies = ENABLE_PROFILING ? [] : null;
-  let lastPtyLatencyReport = Date.now();
 
-  // Handle WebSocket messages (both terminal input and control messages)
-  ws.on('message', (data) => {
-    const writeStart = ENABLE_PROFILING ? process.hrtime.bigint() : null;
 
-    try {
-      const msg = JSON.parse(data.toString());
-      // Only treat as control message if it's an object with a type field
-      if (typeof msg === 'object' && msg !== null && msg.type === 'resize' && msg.cols && msg.rows) {
-        terminal.resize(msg.cols, msg.rows);
-        console.log(`Resized PTY for ${worktreeName} to ${msg.cols}x${msg.rows}`);
-        return; // Don't measure resize latency
-      } else {
-        // Valid JSON but not a control message (e.g., single digits "1", "2")
-        // Treat as terminal input - but ignore during backpressure pause
-        if (isPaused) {
-          console.log(`[TERMINAL] Ignoring input during backpressure pause for session ${sessionId}`);
+  // OPTIMIZED: Minimal overhead message handler
+  const messageHandler = (data) => {
+    // Fast type check - handle Buffer efficiently
+    if (Buffer.isBuffer(data)) {
+      if (!isPaused) {
+        terminal.write(data);
+      }
+      return;
+    }
+
+    const dataStr = data.toString();
+
+    // OPTIMIZED: Detect control messages by prefix (avoids full JSON parse for normal input)
+    if (dataStr.length > 8 && dataStr[0] === '{' && dataStr.slice(0, 8) === '{"type":') {
+      // Anything starting with {"type": is a control message - parse and handle it
+      try {
+        const msg = JSON.parse(dataStr);
+
+        // Handle resize control message
+        if (msg.type === 'resize' && msg.cols && msg.rows) {
+          terminal.resize(msg.cols, msg.rows);
           return;
         }
-        terminal.write(data.toString());
-      }
-    } catch (e) {
-      // Not JSON, treat as terminal input - but ignore during backpressure pause
-      if (isPaused) {
-        console.log(`[TERMINAL] Ignoring input during backpressure pause for session ${sessionId}`);
+
+        // Unknown/unsupported control message - ignore it
+        return;
+      } catch (e) {
+        // Malformed JSON that looks like control message - ignore it
         return;
       }
-      terminal.write(data.toString());
     }
 
-    // Measure PTY write latency (only if profiling enabled)
-    if (ENABLE_PROFILING && writeStart) {
-      const writeEnd = process.hrtime.bigint();
-      const latencyNs = Number(writeEnd - writeStart);
-      const latencyMs = latencyNs / 1_000_000;
-      ptyWriteLatencies.push(latencyMs);
-
-      // Report stats every 10 seconds
-      if (Date.now() - lastPtyLatencyReport > 10000 && ptyWriteLatencies.length > 0) {
-        const sorted = [...ptyWriteLatencies].sort((a, b) => a - b);
-        const avg = sorted.reduce((a, b) => a + b) / sorted.length;
-        const p50 = sorted[Math.floor(sorted.length * 0.5)];
-        const p95 = sorted[Math.floor(sorted.length * 0.95)];
-        const p99 = sorted[Math.floor(sorted.length * 0.99)];
-        const max = sorted[sorted.length - 1];
-
-        console.log(`[PTY Latency] ${worktreeName}:${command} n=${sorted.length} avg=${avg.toFixed(2)}ms p50=${p50.toFixed(2)}ms p95=${p95.toFixed(2)}ms p99=${p99.toFixed(2)}ms max=${max.toFixed(2)}ms`);
-
-        ptyWriteLatencies = [];
-        lastPtyLatencyReport = Date.now();
-      }
+    // Default: terminal input
+    if (!isPaused) {
+      terminal.write(dataStr);
     }
-  });
+  };
+
+  ws.on('message', messageHandler);
+
+  // Store handler reference for cleanup on reconnect
+  session.activeMessageHandler = messageHandler;
+  session.activeWs = ws;
 
   // Handle WebSocket errors
   ws.on('error', (error) => {
@@ -2375,8 +2440,20 @@ function createApp() {
   });
 
   // API Routes
-  app.get('/api/worktrees', (req, res) => {
-    res.json(manager.listWorktrees());
+  app.get('/api/initialization/status', (req, res) => {
+    res.json(manager.initializationManager?.getStatus() || {
+      initialized: true,
+      overallProgress: 100,
+      totalTasks: 0,
+      completedTasks: 0,
+      tasks: []
+    });
+  });
+
+  app.get('/api/worktrees', async (req, res) => {
+    // Use async worker thread version to avoid blocking event loop
+    const worktrees = await manager.listWorktreesAsync();
+    res.json(worktrees);
   });
 
   app.post('/api/worktrees', async (req, res) => {
@@ -3383,6 +3460,187 @@ function createApp() {
 }
 
 /**
+ * Background initialization of heavy operations
+ * Runs after server is listening to make startup feel instant
+ */
+async function initializeInBackground(manager) {
+  const initManager = manager.initializationManager;
+
+  // Listen to initialization events for logging
+  initManager.on('task:started', ({ id, description }) => {
+    console.log(`🔄 ${description}...`);
+  });
+
+  initManager.on('task:completed', ({ id, description, duration }) => {
+    console.log(`✓ ${description} (${duration}ms)`);
+  });
+
+  initManager.on('task:failed', ({ id, description, error }) => {
+    console.error(`✗ ${description}: ${error}`);
+  });
+
+  initManager.on('initialized', ({ totalTime, successfulTasks, failedTasks }) => {
+    console.log('\n✅ Background initialization complete!');
+    console.log(`   Total time: ${(totalTime / 1000).toFixed(2)}s`);
+    console.log(`   Successful: ${successfulTasks}, Failed: ${failedTasks}\n`);
+
+    // Notify all connected clients that initialization is complete
+    const status = initManager.getStatus();
+    manager.clients.forEach(client => {
+      if (client.readyState === 1) {
+        client.send(JSON.stringify({
+          type: 'initialization:complete',
+          status
+        }));
+      }
+    });
+  });
+
+  // Execute tasks in parallel where possible
+  await Promise.all([
+    // Task 1: Sync GitHub branches
+    initManager.executeTask(
+      'github-sync',
+      'Syncing GitHub branches',
+      async (updateProgress) => {
+        updateProgress(10, 'Fetching worktree list');
+        const worktrees = manager.listWorktrees();
+
+        updateProgress(20, 'Checking remote branches');
+        let pushedCount = 0;
+        const totalWorktrees = worktrees.filter(w => w.branch !== 'main').length;
+
+        // Process worktrees in parallel for speed
+        await Promise.all(worktrees.map(async (worktree, index) => {
+          if (worktree.branch === 'main') return;
+
+          try {
+            // Check if remote branch exists
+            const remoteBranches = execSync('git branch -r', {
+              cwd: worktree.path,
+              encoding: 'utf-8'
+            });
+
+            const remoteBranchExists = remoteBranches.includes(`origin/${worktree.branch}`);
+            if (!remoteBranchExists) {
+              updateProgress(
+                20 + (60 * (index + 1) / totalWorktrees),
+                `Pushing ${worktree.name} to GitHub`
+              );
+
+              // Push branch to GitHub
+              execSync(`git push -u origin "${worktree.branch}"`, {
+                cwd: worktree.path,
+                stdio: 'pipe'
+              });
+              pushedCount++;
+            }
+          } catch (error) {
+            console.warn(`Failed to sync ${worktree.name}: ${error.message}`);
+          }
+        }));
+
+        updateProgress(90, 'Finalizing sync');
+        return { pushedCount, totalWorktrees };
+      },
+      5000 // Estimated 5 seconds
+    ),
+
+    // Task 2: Auto-start containers
+    initManager.executeTask(
+      'container-startup',
+      'Starting Docker containers',
+      async (updateProgress) => {
+        updateProgress(10, 'Scanning worktrees');
+        const worktrees = manager.listWorktrees();
+
+        // Identify worktrees that need container startup
+        const worktreesToStart = worktrees.filter(worktree => {
+          const servicesRunning = worktree.dockerStatus.filter(s => s.state === 'running').length;
+          const servicesTotal = worktree.dockerStatus.length;
+          const hasServices = Object.keys(worktree.ports).length > 0;
+          return hasServices && servicesRunning < servicesTotal;
+        });
+
+        if (worktreesToStart.length === 0) {
+          updateProgress(100, 'No containers to start');
+          return { started: 0, total: worktrees.length };
+        }
+
+        updateProgress(20, `Starting containers for ${worktreesToStart.length} worktrees`);
+
+        // Start containers in parallel for speed
+        const results = await Promise.all(
+          worktreesToStart.map(async (worktree, index) => {
+            try {
+              updateProgress(
+                20 + (70 * (index + 1) / worktreesToStart.length),
+                `Starting ${worktree.name}`
+              );
+
+              const result = await manager.startServices(worktree.name);
+              return { worktree: worktree.name, success: result.success, error: result.error };
+            } catch (error) {
+              return { worktree: worktree.name, success: false, error: error.message };
+            }
+          })
+        );
+
+        updateProgress(95, 'Finalizing container startup');
+
+        const successCount = results.filter(r => r.success).length;
+        return { started: successCount, total: worktreesToStart.length, results };
+      },
+      10000 // Estimated 10 seconds
+    ),
+
+    // Task 3: Warm up caches
+    initManager.executeTask(
+      'cache-warmup',
+      'Warming up caches',
+      async (updateProgress) => {
+        updateProgress(20, 'Loading dependency caches');
+
+        // Pre-load common dependency caches
+        try {
+          await manager.cacheManager.warmup();
+          updateProgress(60, 'Caches loaded');
+        } catch (error) {
+          updateProgress(60, 'Cache warmup skipped');
+        }
+
+        updateProgress(100, 'Ready');
+        return { warmed: true };
+      },
+      2000 // Estimated 2 seconds
+    )
+  ]);
+
+  // Additional sequential tasks that depend on above
+  await initManager.executeTask(
+    'final-setup',
+    'Finalizing setup',
+    async (updateProgress) => {
+      updateProgress(50, 'Broadcasting status');
+
+      // Send status update to all connected clients
+      manager.clients.forEach(client => {
+        if (client.readyState === 1) {
+          client.send(JSON.stringify({
+            type: 'worktrees:updated',
+            worktrees: manager.listWorktrees()
+          }));
+        }
+      });
+
+      updateProgress(100, 'Complete');
+      return { complete: true };
+    },
+    1000
+  );
+}
+
+/**
  * Check all worktrees and create missing GitHub branches on startup
  */
 async function syncGitHubBranches(manager) {
@@ -3618,14 +3876,7 @@ async function startServer() {
 
       console.log('');
 
-      // Sync GitHub branches for all worktrees
-      await syncGitHubBranches(manager);
-
-      // Auto-start containers for all worktrees
-      console.log('🔍 Checking for stopped containers...\n');
-      await autoStartContainers(manager);
-
-      // Auto-open browser
+      // Auto-open browser immediately
       const url = `http://localhost:${PORT}`;
       const start = process.platform === 'darwin' ? 'open' :
                     process.platform === 'win32' ? 'start' : 'xdg-open';
@@ -3635,6 +3886,10 @@ async function startServer() {
       } catch (err) {
         console.log('Could not auto-open browser. Please visit the URL manually.');
       }
+
+      // Start background initialization
+      console.log('🔄 Starting background initialization...\n');
+      initializeInBackground(manager);
     });
   } catch (error) {
     console.error('\n❌ Failed to start server:', error);

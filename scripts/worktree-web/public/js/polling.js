@@ -5,11 +5,12 @@
 
 class PollingManager {
   constructor() {
-    this.VISIBLE_INTERVAL = 15000;    // 15 seconds when tab is visible
-    this.HIDDEN_INTERVAL = 120000;    // 2 minutes when tab is hidden
+    this.VISIBLE_INTERVAL = 60000;    // 60 seconds when tab is visible (reduced load)
+    this.HIDDEN_INTERVAL = 300000;    // 5 minutes when tab is hidden
     this.intervalId = null;
     this.isPolling = false;
     this.currentInterval = this.VISIBLE_INTERVAL;
+    this.terminalFocused = false;
 
     // Bind methods to maintain 'this' context
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
@@ -97,10 +98,30 @@ class PollingManager {
   }
 
   /**
+   * Pause polling when terminal is focused (prevents interruptions during typing)
+   */
+  pauseForTerminal() {
+    this.terminalFocused = true;
+  }
+
+  /**
+   * Resume polling when terminal loses focus
+   */
+  resumeFromTerminal() {
+    this.terminalFocused = false;
+  }
+
+  /**
    * Refresh worktree data
    */
   refresh() {
     if (!this.isPolling) return;
+
+    // Skip refresh if terminal is focused (prevents interrupting typing)
+    if (this.terminalFocused) {
+      console.log('[PollingManager] Skipping refresh - terminal is focused');
+      return;
+    }
 
     console.log('[PollingManager] Refreshing worktree data...');
 

@@ -222,10 +222,10 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     fontSize: 12,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: {
-      background: '#0d1117',
+      background: '#0a0e13',
       foreground: '#c9d1d9',
       cursor: '#c9d1d9',
-      cursorAccent: '#0d1117'
+      cursorAccent: '#0a0e13'
     },
     allowProposedApi: true,
     scrollback: 50000, // Increase for logs
@@ -499,10 +499,10 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     fontSize: 13,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: {
-      background: '#1e1e1e',
+      background: '#0a0e13',
       foreground: '#d4d4d4',
       cursor: '#d4d4d4',
-      cursorAccent: '#1e1e1e',
+      cursorAccent: '#0a0e13',
       selection: 'rgba(255, 255, 255, 0.3)'
     },
     allowProposedApi: true,
@@ -527,10 +527,25 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     console.warn(`[Terminal] WebGL not available for ${worktreeName}, using canvas:`, e.message);
   }
 
-  terminal.open(panel.querySelector('.terminal-wrapper'));
+  const terminalWrapper = panel.querySelector('.terminal-wrapper');
+  terminal.open(terminalWrapper);
 
   // Fit terminal after delay
   setTimeout(() => fitAddon.fit(), 100);
+
+  // Pause polling when terminal is focused (prevents interruptions)
+  // Use DOM events since xterm doesn't expose onFocus/onBlur
+  terminalWrapper.addEventListener('focusin', () => {
+    if (window.pollingManager) {
+      window.pollingManager.pauseForTerminal();
+    }
+  });
+
+  terminalWrapper.addEventListener('focusout', () => {
+    if (window.pollingManager) {
+      window.pollingManager.resumeFromTerminal();
+    }
+  });
 
   // Handle window resize
   const resizeHandler = () => {
@@ -555,9 +570,7 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   // Connect WebSocket for PTY
   const wsUrl = `ws://${window.location.host}/terminal/${worktreeName}?command=${command}`;
 
-  // Performance tracking for local echo (outer scope for access by getStats)
-  let echoTimes = [];
-  let lastKeyTime = 0;
+
 
   function connectPtyWebSocket() {
     // If we have a session ID from previous connection, try to reconnect to it
@@ -567,13 +580,7 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
     const terminalSocket = new WebSocket(url);
 
-    // Local echo configuration
-    const LOCAL_ECHO_ENABLED = false; // DISABLED: Causing ghosting/duplication issues
-    const LOCAL_ECHO_DIM = '\x1b[2m'; // ANSI dim
-    const LOCAL_ECHO_RESET = '\x1b[0m'; // ANSI reset
-    let pendingEcho = []; // Track pending echoed characters
-    let serverEchoTimeout = null;
-    const SERVER_ECHO_TIMEOUT = 100; // 100ms
+
 
     // Send resize events to PTY
     terminal.onResize(({ cols, rows }) => {
@@ -607,9 +614,8 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     terminalSocket.onmessage = (event) => {
       const data = event.data;
 
-      // Fast path: Quick check if message looks like JSON
-      // Most messages are terminal data (don't start with '{')
-      if (data.length > 0 && data[0] === '{') {
+      // OPTIMIZED: Check for JSON more efficiently
+      if (data.length > 8 && data[0] === '{' && data.slice(0, 8) === '{"type":') {
         try {
           const msg = JSON.parse(data);
 
@@ -663,48 +669,9 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
         }
       }
 
-      // Track latency for performance measurement (only if profiling enabled)
-      if (profilingEnabled && lastKeyTime > 0) {
-        const latency = performance.now() - lastKeyTime;
-        echoTimes.push(latency);
-        latencyMeasurements.push(latency);
 
-        if (echoTimes.length >= 10) {
-          const avg = echoTimes.reduce((a, b) => a + b) / echoTimes.length;
-          console.log(`[Latency] Avg server echo: ${avg.toFixed(1)}ms`);
-          echoTimes = [];
-        }
-        lastKeyTime = 0;
-      }
 
-      // Report detailed latency stats every 10 seconds (only if profiling enabled)
-      if (profilingEnabled && Date.now() - lastLatencyReport > 10000 && latencyMeasurements.length > 0) {
-        const sorted = [...latencyMeasurements].sort((a, b) => a - b);
-        const avg = sorted.reduce((a, b) => a + b) / sorted.length;
-        const p50 = sorted[Math.floor(sorted.length * 0.5)];
-        const p95 = sorted[Math.floor(sorted.length * 0.95)];
-        const p99 = sorted[Math.floor(sorted.length * 0.99)];
-        const max = sorted[sorted.length - 1];
 
-        console.log(`[Latency Stats] n=${sorted.length} avg=${avg.toFixed(1)}ms p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms p99=${p99.toFixed(1)}ms max=${max.toFixed(1)}ms`);
-
-        latencyMeasurements = [];
-        lastLatencyReport = Date.now();
-      }
-
-      // Check if this is echo confirmation
-      if (pendingEcho.length > 0 && data === pendingEcho[0]) {
-        // Server echoed back our character - don't display again
-        pendingEcho.shift();
-        return;
-      }
-
-      // If pending echo doesn't match, clear it (out of sync)
-      if (pendingEcho.length > 0 && data.length > 0) {
-        // Clear pending echo if we receive something unexpected
-        // This handles cases where server doesn't echo (raw mode, etc.)
-        pendingEcho = [];
-      }
 
       // Default: Write to terminal
       terminal.write(data);
@@ -741,88 +708,22 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
       }
     };
 
-    // Message batching configuration
-    const BATCH_INTERVAL_MS = 16; // One frame at 60fps
-    let inputBuffer = '';
-    let batchTimeout = null;
-
     // Performance tracking (enabled by server via session message)
     let profilingEnabled = false;
-    let inputTimestamps = new Map(); // Track when each character was typed
     let latencyMeasurements = [];
     let lastLatencyReport = Date.now();
 
-    // Send terminal input to PTY with batching
+    // Send terminal input to PTY immediately (no batching)
     terminal.onData((data) => {
-      // Track key timing for performance measurement
-      lastKeyTime = performance.now();
+    
 
-      // Store timestamp for this input with unique ID
-      const inputId = `${Date.now()}-${Math.random()}`;
-      inputTimestamps.set(inputId, performance.now());
 
-      // Check for control characters that should clear pending echo
-      if (data === '\x03' || // Ctrl+C
-          data === '\x04' || // Ctrl+D
-          data === '\r' ||   // Enter
-          data === '\n') {   // Line feed
-        // Clear pending echo on command submission
-        pendingEcho = [];
-      }
 
-      // Local echo: Display immediately in dim color
-      if (LOCAL_ECHO_ENABLED && terminalSocket?.readyState === WebSocket.OPEN) {
-        // Don't echo control characters visually (except printable ones)
-        const shouldEcho =
-          data.length === 1 &&
-          data.charCodeAt(0) >= 32 &&
-          data.charCodeAt(0) < 127 &&
-          data !== '\x7f'; // Not DEL
 
-        if (shouldEcho) {
-          // Display dimmed version immediately
-          terminal.write(LOCAL_ECHO_DIM + data + LOCAL_ECHO_RESET);
-          pendingEcho.push(data);
 
-          // Set timeout to clear if server doesn't echo back
-          // (Handles raw mode terminals)
-          clearTimeout(serverEchoTimeout);
-          serverEchoTimeout = setTimeout(() => {
-            if (pendingEcho.length > 0) {
-              // Server didn't echo - probably in raw mode
-              // Clear pending echo to avoid confusion
-              pendingEcho = [];
-            }
-          }, SERVER_ECHO_TIMEOUT);
-        }
-      }
-
-      inputBuffer += data;
-
-      // Flush immediately for control characters for better responsiveness
-      const shouldFlushImmediately =
-        data.includes('\r') || // Enter key
-        data.includes('\n') || // Line feed
-        data.includes('\x03') || // Ctrl+C
-        data.includes('\x04'); // Ctrl+D
-
-      if (shouldFlushImmediately && batchTimeout) {
-        // Cancel batch timeout and flush immediately
-        clearTimeout(batchTimeout);
-        batchTimeout = null;
-
-        if (inputBuffer && terminalSocket?.readyState === WebSocket.OPEN) {
-          terminalSocket.send(inputBuffer);
-          inputBuffer = '';
-        }
-      } else if (!batchTimeout) {
-        batchTimeout = setTimeout(() => {
-          if (inputBuffer && terminalSocket?.readyState === WebSocket.OPEN) {
-            terminalSocket.send(inputBuffer);
-            inputBuffer = '';
-          }
-          batchTimeout = null;
-        }, BATCH_INTERVAL_MS);
+      // Send immediately - no batching delay
+      if (terminalSocket?.readyState === WebSocket.OPEN) {
+        terminalSocket.send(data);
       }
     });
 
