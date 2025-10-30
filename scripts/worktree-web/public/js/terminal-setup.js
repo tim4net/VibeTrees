@@ -687,17 +687,7 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     terminalSocket.onclose = () => {
       console.log(`Terminal WebSocket closed: ${tabId}`);
 
-      // Clear pending echo
-      pendingEcho = [];
-
       const terminalInfo = terminals.get(tabId);
-
-      // Clear any pending batched input
-      if (batchTimeout) {
-        clearTimeout(batchTimeout);
-        batchTimeout = null;
-        inputBuffer = '';
-      }
 
       // Only attempt reconnection if terminal still exists (not manually closed)
       if (terminalInfo && !reconnectState.isReconnecting) {
