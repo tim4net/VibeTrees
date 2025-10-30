@@ -75,18 +75,59 @@ function processWorktree(worktree, portRegistry, rootDir) {
 
 function getDockerStatus(path, name) {
   try {
-    const output = execSync('docker compose ps --format json 2>/dev/null', {
-      cwd: path,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    // Use label-based filtering to find containers by working directory
+    // This works even if COMPOSE_PROJECT_NAME has changed since containers were started
+    // Try with sudo first (most common setup), fall back to non-sudo
+    let output;
+    try {
+      output = execSync(`sudo docker ps -a --filter "label=com.docker.compose.project.working_dir=${path}" --format json 2>/dev/null`, {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+    } catch {
+      // Try without sudo
+      output = execSync(`docker ps -a --filter "label=com.docker.compose.project.working_dir=${path}" --format json 2>/dev/null`, {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+    }
 
-    return output.trim().split('\n')
+    const containers = output.trim().split('\n')
       .filter(line => line.trim())
-      .map(line => JSON.parse(line));
+      .map(line => JSON.parse(line))
+      .filter(c => !c.Names.endsWith('-init')); // Filter out init containers
+
+    return containers.map(c => ({
+      Service: c.Labels['com.docker.compose.service'] || c.Names.split('-').slice(0, -1).join('-'),
+      Name: c.Names,
+      State: c.State,
+      Status: c.Status,
+      state: c.State.toLowerCase(),
+      Publishers: c.Ports ? parseDockerPorts(c.Ports) : []
+    }));
   } catch (error) {
     return [];
   }
+}
+
+function parseDockerPorts(portsString) {
+  if (!portsString) return [];
+
+  // Parse Docker ports format: "0.0.0.0:5432->5432/tcp, :::5432->5432/tcp"
+  const publishers = [];
+  const portMappings = portsString.split(',').map(p => p.trim());
+
+  for (const mapping of portMappings) {
+    const match = mapping.match(/(?:[\d.]+|:::)?:?(\d+)->(\d+)/);
+    if (match) {
+      publishers.push({
+        PublishedPort: parseInt(match[1], 10),
+        TargetPort: parseInt(match[2], 10)
+      });
+    }
+  }
+
+  return publishers;
 }
 
 function extractPortsFromDockerStatus(dockerStatus) {

@@ -599,27 +599,28 @@ class WorktreeManager {
       return statuses; // No compose file, no containers
     }
 
-    // Get Docker container statuses
+    // Get Docker container statuses using label-based filtering
+    // This works even if COMPOSE_PROJECT_NAME has changed since containers were started
     try {
-      const output = runtime.execCompose('ps -a --format json', {
-        cwd: worktreePath,
+      // Use docker ps with label filter to find containers by working directory
+      const output = runtime.exec(`ps -a --filter "label=com.docker.compose.project.working_dir=${worktreePath}" --format json`, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
-      const services = output.trim().split('\n')
+      const containers = output.trim().split('\n')
         .filter(line => line.trim())
         .map(line => JSON.parse(line))
-        .filter(svc => !svc.Service.endsWith('-init')); // Filter out init containers
+        .filter(c => !c.Names.endsWith('-init')); // Filter out init containers
 
-      statuses.push(...services.map(svc => ({
-        name: svc.Service,
-        state: svc.State,
-        status: svc.Status,
-        ports: svc.Publishers?.map(p => `${p.PublishedPort}→${p.TargetPort}`) || []
+      statuses.push(...containers.map(c => ({
+        name: c.Labels['com.docker.compose.service'] || c.Names.split('-').slice(0, -1).join('-'),
+        state: c.State,
+        status: c.Status,
+        ports: c.Ports ? c.Ports.split(',').map(p => p.trim()) : []
       })));
     } catch {
-      // Docker services might not be running
+      // Docker services might not be running or docker not available
     }
 
     return statuses;
