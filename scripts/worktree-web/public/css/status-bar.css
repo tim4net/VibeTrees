@@ -239,3 +239,22 @@
     animation: none;
   }
 }
+
+/* Status bar spacer - pushes version to far right */
+.status-spacer {
+  flex: 1;
+}
+
+/* Version display */
+.status-segment.version {
+  opacity: 0.6;
+  font-size: 11px;
+  cursor: default;
+  padding: 4px 6px;
+}
+
+.status-segment.version:hover {
+  opacity: 0.8;
+  background: transparent;
+  color: #8b949e;
+}

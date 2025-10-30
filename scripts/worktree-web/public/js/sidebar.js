@@ -132,8 +132,12 @@ function renderWorktreeCards(worktrees, container) {
       statusText = 'Partial';
     }
 
-    const statusBadge = `<span class="status-badge ${statusClass}" onclick="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})" oncontextmenu="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})">${statusText} <i data-lucide="chevron-down" class="status-badge-chevron"></i></span>`;
+    // Hide status badge completely when there are no services
+    const statusBadge = servicesTotal > 0
+      ? `<span class="status-badge ${statusClass}" onclick="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})" oncontextmenu="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})">${statusText} <i data-lucide="chevron-down" class="status-badge-chevron"></i></span>`
+      : '';
 
+    // Hide ports section entirely when there are no services
     const portsHtml = wt.dockerStatus.length > 0
       ? wt.dockerStatus.map(container => {
           const portValue = wt.ports[container.name];
@@ -148,7 +152,7 @@ function renderWorktreeCards(worktrees, container) {
             </div>
           `;
         }).join('')
-      : '<div class="port"><span class="port-label">No containers</span></div>';
+      : '';
 
     // Determine icon based on whether this is the main worktree or has commits
     // Main worktree or worktrees with at least 1 commit get tree-pine
@@ -199,6 +203,13 @@ function renderWorktreeCards(worktrees, container) {
     const agentIcon = agentIcons[currentAgent] || '🤖';
     const agentName = agentNames[currentAgent] || currentAgent;
 
+    // Show branch as subheading if it differs from worktree name
+    const branchSubheading = wt.branch && wt.branch !== wt.name
+      ? `<div class="worktree-branch" style="font-size: 11px; color: #8b949e; margin-left: 24px; margin-top: 2px;">
+           <i data-lucide="git-branch" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${wt.branch}
+         </div>`
+      : '';
+
     return `
       <div class="worktree-card ${isActive ? 'active selected' : ''} ${gitStatusClass}" data-name="${wt.name}" onclick="selectWorktree('${wt.name}')">
         <div class="worktree-header">
@@ -206,13 +217,13 @@ function renderWorktreeCards(worktrees, container) {
             <div class="worktree-title" oncontextmenu="showWorktreeContextMenu(event, '${wt.name}', ${isMain}); event.stopPropagation();" style="cursor: context-menu;">
               ${iconHtml}<span>${wt.name}</span>
             </div>
+            ${branchSubheading}
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
             ${statusBadge}
           </div>
         </div>
-
-        <div class="ports">${portsHtml}</div>
+        ${portsHtml ? `<div class="ports">${portsHtml}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -236,12 +247,22 @@ function renderVerticalTabs(worktrees, container) {
           statusClass = 'restarting';
         }
 
+        // Hide status indicator when there are no services
+        const statusIndicator = servicesTotal > 0
+          ? `<span class="status-indicator ${statusClass}"></span>`
+          : '';
+
+        // Show branch in tooltip if it differs from worktree name
+        const tooltipText = wt.branch && wt.branch !== wt.name
+          ? `${wt.name} (${wt.branch})`
+          : wt.name;
+
         return `
           <div class="vertical-tab ${isActive ? 'active' : ''}"
                onclick="selectWorktree('${wt.name}')"
                ondblclick="appState.toggleSidebar()"
-               title="${wt.name} (${wt.branch})">
-            <span class="status-indicator ${statusClass}"></span>
+               title="${tooltipText}">
+            ${statusIndicator}
             <span>${wt.name}</span>
           </div>
         `;

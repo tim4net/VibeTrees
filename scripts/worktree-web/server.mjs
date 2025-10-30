@@ -459,8 +459,9 @@ class WorktreeManager {
           current.branch = line.substring('branch '.length).replace('refs/heads/', '');
         } else if (line === '') {
           if (current.path) {
-            // Use branch name as worktree name (not directory name)
-            current.name = current.branch || basename(current.path);
+            // Use 'main' for root worktree or main branch, otherwise use directory name
+            const isRootWorktree = !current.path.includes('.worktrees');
+            current.name = (isRootWorktree || current.branch === 'main') ? 'main' : basename(current.path);
             current.ports = this.portRegistry.getWorktreePorts(current.name);
             current.dockerStatus = this.getDockerStatus(current.path, current.name);
 
@@ -491,8 +492,9 @@ class WorktreeManager {
       }
 
       if (current.path) {
-        // Use branch name as worktree name (not directory name)
-        current.name = current.branch || basename(current.path);
+        // Use 'main' for root worktree or main branch, otherwise use directory name
+        const isRootWorktree = !current.path.includes('.worktrees');
+        current.name = (isRootWorktree || current.branch === 'main') ? 'main' : basename(current.path);
         current.ports = this.portRegistry.getWorktreePorts(current.name);
         current.dockerStatus = this.getDockerStatus(current.path, current.name);
 
@@ -1593,9 +1595,9 @@ class WorktreeManager {
     }
 
     try {
-      // Stop services
+      // Stop services and clean up images
       try {
-        runtime.execCompose('--env-file .env down -v', {
+        runtime.execCompose('--env-file .env down -v --rmi local', {
           cwd: worktree.path,
           stdio: 'pipe'
         });
@@ -2490,6 +2492,18 @@ function createApp() {
       completedTasks: 0,
       tasks: []
     });
+  });
+
+  app.get('/api/version', (req, res) => {
+    try {
+      const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf-8'));
+      res.json({
+        version: packageJson.version,
+        name: packageJson.name
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to read version' });
+    }
   });
 
   app.get('/api/worktrees', async (req, res) => {

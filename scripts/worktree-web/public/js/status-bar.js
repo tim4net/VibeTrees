@@ -37,6 +37,27 @@ export function initStatusBar() {
     console.log('[status-bar] No worktree selected, hiding status bar');
     hideStatusBar();
   }
+
+  // Load and display version
+  loadVersion();
+}
+
+/**
+ * Load version from API and display in status bar
+ */
+async function loadVersion() {
+  try {
+    const response = await fetch('/api/version');
+    const data = await response.json();
+    const versionEl = document.querySelector('.version-text');
+    if (versionEl && data.version) {
+      versionEl.textContent = `v${data.version}`;
+      console.log('[status-bar] Version loaded:', data.version);
+    }
+  } catch (error) {
+    console.error('[status-bar] Failed to load version:', error);
+    // Keep default "v1.0.0" if fetch fails
+  }
 }
 
 /**

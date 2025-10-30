@@ -44,7 +44,9 @@ parentPort.on('message', ({ portRegistry, rootDir }) => {
 });
 
 function processWorktree(worktree, portRegistry, rootDir) {
-  worktree.name = worktree.branch || basename(worktree.path);
+  // Use 'main' for root worktree or main branch, otherwise use directory name
+  const isRootWorktree = !worktree.path.includes('.worktrees');
+  worktree.name = (isRootWorktree || worktree.branch === 'main') ? 'main' : basename(worktree.path);
   worktree.ports = portRegistry[worktree.name] || {};
 
   // Get Docker status

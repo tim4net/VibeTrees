@@ -182,7 +182,9 @@ export class OptimizedWorktreeManager {
           current.branch = line.substring('branch '.length).replace('refs/heads/', '');
         } else if (line === '') {
           if (current.path) {
-            current.name = basename(current.path);
+            // Use 'main' for root worktree or main branch, otherwise use directory name
+            const isRootWorktree = !current.path.includes('.worktrees');
+            current.name = (isRootWorktree || current.branch === 'main') ? 'main' : basename(current.path);
             current.ports = this.baseManager.portRegistry.getWorktreePorts(current.name);
 
             // Use cached status getters
@@ -197,7 +199,9 @@ export class OptimizedWorktreeManager {
 
       // Handle last worktree
       if (current.path) {
-        current.name = basename(current.path);
+        // Use 'main' for root worktree or main branch, otherwise use directory name
+        const isRootWorktree = !current.path.includes('.worktrees');
+        current.name = (isRootWorktree || current.branch === 'main') ? 'main' : basename(current.path);
         current.ports = this.baseManager.portRegistry.getWorktreePorts(current.name);
         current.dockerStatus = this.getDockerStatus(current.path, current.name);
         current.gitStatus = this.getGitStatus(current.path);
