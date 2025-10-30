@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { checkMainStaleness } from './server.mjs';
 
 /**
  * Minimal WorktreeWebManager mock for testing extractPortsFromDockerStatus
@@ -289,5 +290,29 @@ describe('WorktreeWebManager - _serviceNameToEnvVar', () => {
   it('should handle hyphenated service names', () => {
     expect(manager._serviceNameToEnvVar('minio-console')).toBe('MINIO_CONSOLE');
     expect(manager._serviceNameToEnvVar('temporal-ui')).toBe('TEMPORAL_UI');
+  });
+});
+
+describe('checkMainStaleness', () => {
+  it('should detect when main is behind remote', () => {
+    const mockExec = vi.fn()
+      .mockReturnValueOnce('') // git fetch
+      .mockReturnValueOnce('5\n'); // git rev-list count
+
+    const result = checkMainStaleness(mockExec);
+
+    expect(result.behind).toBe(5);
+    expect(mockExec).toHaveBeenCalledWith('git fetch origin main');
+    expect(mockExec).toHaveBeenCalledWith('git rev-list --count main..origin/main');
+  });
+
+  it('should return 0 when main is up to date', () => {
+    const mockExec = vi.fn()
+      .mockReturnValueOnce('') // git fetch
+      .mockReturnValueOnce('0\n'); // git rev-list count
+
+    const result = checkMainStaleness(mockExec);
+
+    expect(result.behind).toBe(0);
   });
 });

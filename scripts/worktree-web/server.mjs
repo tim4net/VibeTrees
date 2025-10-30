@@ -76,6 +76,35 @@ async function findAvailablePort(startPort, endPort, host = '127.0.0.1') {
 }
 
 /**
+ * Check if main branch is behind remote
+ * @param {Function} execFn - Function to execute git commands (for testing)
+ * @returns {{ behind: number }} Object with commits behind count
+ */
+export function checkMainStaleness(execFn = execSync) {
+  // Wrapper to handle both test mock (string only) and real execSync (string + options)
+  const exec = (cmd) => {
+    if (execFn === execSync) {
+      return execFn(cmd, { cwd: rootDir, encoding: 'utf8' });
+    }
+    return execFn(cmd);
+  };
+
+  try {
+    // Fetch latest from origin
+    exec('git fetch origin main');
+
+    // Count commits behind
+    const output = exec('git rev-list --count main..origin/main');
+
+    const behind = parseInt(output.trim(), 10);
+    return { behind: isNaN(behind) ? 0 : behind };
+  } catch (error) {
+    console.error('Error checking main staleness:', error.message);
+    return { behind: 0, error: error.message };
+  }
+}
+
+/**
  * Check if required dependencies are installed
  * Checks both package root (global install) and current directory (local dev)
  */
