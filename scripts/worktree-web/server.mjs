@@ -2289,11 +2289,14 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
           const msg = JSON.parse(dataStr);
           if (msg.type === 'resize' && msg.cols && msg.rows) {
             terminal.resize(msg.cols, msg.rows);
-            return;
           }
+          // Always return for control messages - don't write them to terminal
+          return;
         }
       } catch (e) {
-        // Not valid JSON, treat as input
+        // Not valid JSON control message - ignore it
+        console.warn('[TERMINAL] Malformed control message:', dataStr.substring(0, 100));
+        return;
       }
     }
 
