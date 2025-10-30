@@ -2161,6 +2161,13 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       terminal.removeListener('data', session.activeListener);
       session.activeListener = null;
     }
+
+    // Clean up old WebSocket message handler to prevent duplicates
+    if (session.activeMessageHandler && session.activeWs) {
+      session.activeWs.removeListener('message', session.activeMessageHandler);
+      session.activeMessageHandler = null;
+      session.activeWs = null;
+    }
   }
 
   // Forward PTY output to WebSocket with backpressure handling
@@ -2270,7 +2277,7 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
 
 
   // OPTIMIZED: Minimal overhead message handler
-  ws.on('message', (data) => {
+  const messageHandler = (data) => {
     // Fast type check - handle Buffer efficiently
     if (Buffer.isBuffer(data)) {
       if (!isPaused) {
@@ -2289,6 +2296,7 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
 
         // Handle resize control message
         if (msg.type === 'resize' && msg.cols && msg.rows) {
+          console.log(`[TERMINAL] Resize detected: ${msg.cols}x${msg.rows} - NOT writing to PTY`);
           terminal.resize(msg.cols, msg.rows);
           return;
         }
@@ -2304,10 +2312,17 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
     }
 
     // Default: terminal input
+    console.log(`[TERMINAL] Writing to PTY: ${dataStr.substring(0, 50)}${dataStr.length > 50 ? '...' : ''}`);
     if (!isPaused) {
       terminal.write(dataStr);
     }
-  });
+  };
+
+  ws.on('message', messageHandler);
+
+  // Store handler reference for cleanup on reconnect
+  session.activeMessageHandler = messageHandler;
+  session.activeWs = ws;
 
   // Handle WebSocket errors
   ws.on('error', (error) => {
