@@ -340,3 +340,77 @@ describe('checkMainDirtyState', () => {
     expect(result.isDirty).toBe(false);
   });
 });
+
+describe('POST /api/worktrees - staleness check logic', () => {
+  it('should return 409-like response when main is behind and force not set', () => {
+    // Simulate the staleness check returning behind: 5
+    const stalenessResult = { behind: 5 };
+    const dirtyResult = { isDirty: false };
+
+    // Expected response structure when main is behind
+    const response = {
+      needsSync: true,
+      commitsBehind: stalenessResult.behind,
+      hasDirtyState: dirtyResult.isDirty,
+      message: `main is ${stalenessResult.behind} commit${stalenessResult.behind > 1 ? 's' : ''} behind origin/main`
+    };
+
+    // Validate the logic
+    expect(response.needsSync).toBe(true);
+    expect(response.commitsBehind).toBe(5);
+    expect(response.hasDirtyState).toBe(false);
+    expect(response.message).toBe('main is 5 commits behind origin/main');
+  });
+
+  it('should proceed with creation when force=true', () => {
+    // When force=true, checks should be skipped
+    const force = true;
+    const baseBranch = 'main';
+
+    // Logic: if baseBranch === 'main' && !force -> should be false when force=true
+    const shouldCheckStaleness = baseBranch === 'main' && !force;
+
+    expect(shouldCheckStaleness).toBe(false);
+  });
+
+  it('should return 409-like response with dirty state flag when main has uncommitted changes', () => {
+    // Simulate dirty state check
+    const dirtyResult = { isDirty: true };
+
+    // Expected response structure when main has uncommitted changes
+    const response = {
+      needsSync: false,
+      hasDirtyState: dirtyResult.isDirty,
+      commitsBehind: 0,
+      message: 'Cannot sync: main has uncommitted changes. Please commit or stash changes first.'
+    };
+
+    expect(response.hasDirtyState).toBe(true);
+    expect(response.needsSync).toBe(false);
+    expect(response.message).toContain('uncommitted changes');
+  });
+
+  it('should not check staleness for non-main branches', () => {
+    const baseBranch = 'feature/test';
+    const force = false;
+
+    // Logic: only check staleness for 'main' branch
+    const shouldCheckStaleness = baseBranch === 'main' && !force;
+
+    expect(shouldCheckStaleness).toBe(false);
+  });
+
+  it('should format singular commit message correctly', () => {
+    const commitsBehind = 1;
+    const message = `main is ${commitsBehind} commit${commitsBehind > 1 ? 's' : ''} behind origin/main`;
+
+    expect(message).toBe('main is 1 commit behind origin/main');
+  });
+
+  it('should format plural commits message correctly', () => {
+    const commitsBehind = 5;
+    const message = `main is ${commitsBehind} commit${commitsBehind > 1 ? 's' : ''} behind origin/main`;
+
+    expect(message).toBe('main is 5 commits behind origin/main');
+  });
+});

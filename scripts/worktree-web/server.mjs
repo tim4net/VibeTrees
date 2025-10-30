@@ -2500,7 +2500,36 @@ function createApp() {
 
   app.post('/api/worktrees', async (req, res) => {
     const { branchName, fromBranch } = req.body;
-    const result = await manager.createWorktree(branchName, fromBranch || 'main');
+    const force = req.query.force === 'true';
+    const baseBranch = fromBranch || 'main';
+
+    // Only check staleness for 'main' branch
+    if (baseBranch === 'main' && !force) {
+      // Check for dirty state first
+      const dirtyCheck = checkMainDirtyState();
+      if (dirtyCheck.isDirty) {
+        return res.status(409).json({
+          needsSync: false,
+          hasDirtyState: true,
+          commitsBehind: 0,
+          message: 'Cannot sync: main has uncommitted changes. Please commit or stash changes first.'
+        });
+      }
+
+      // Check if main is behind
+      const stalenessCheck = checkMainStaleness();
+      if (stalenessCheck.behind > 0) {
+        return res.status(409).json({
+          needsSync: true,
+          hasDirtyState: false,
+          commitsBehind: stalenessCheck.behind,
+          message: `main is ${stalenessCheck.behind} commit${stalenessCheck.behind > 1 ? 's' : ''} behind origin/main`
+        });
+      }
+    }
+
+    // Proceed with normal worktree creation
+    const result = await manager.createWorktree(branchName, baseBranch);
     res.json(result);
   });
 
