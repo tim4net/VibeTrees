@@ -555,9 +555,7 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   // Connect WebSocket for PTY
   const wsUrl = `ws://${window.location.host}/terminal/${worktreeName}?command=${command}`;
 
-  // Performance tracking for local echo (outer scope for access by getStats)
-  let echoTimes = [];
-  let lastKeyTime = 0;
+
 
   function connectPtyWebSocket() {
     // If we have a session ID from previous connection, try to reconnect to it
@@ -567,13 +565,7 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
     const terminalSocket = new WebSocket(url);
 
-    // Local echo configuration
-    const LOCAL_ECHO_ENABLED = false; // DISABLED: Causing ghosting/duplication issues
-    const LOCAL_ECHO_DIM = '\x1b[2m'; // ANSI dim
-    const LOCAL_ECHO_RESET = '\x1b[0m'; // ANSI reset
-    let pendingEcho = []; // Track pending echoed characters
-    let serverEchoTimeout = null;
-    const SERVER_ECHO_TIMEOUT = 100; // 100ms
+
 
     // Send resize events to PTY
     terminal.onResize(({ cols, rows }) => {
@@ -607,9 +599,8 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     terminalSocket.onmessage = (event) => {
       const data = event.data;
 
-      // Fast path: Only parse if it's a control message (starts with '{"type":')
-      // 99% of messages are terminal data, avoid expensive JSON.parse()
-      if (data.startsWith('{"type":')) {
+      // OPTIMIZED: Check for JSON more efficiently
+      if (data.length > 8 && data[0] === '{' && data.slice(0, 8) === '{"type":') {
         try {
           const msg = JSON.parse(data);
 
@@ -663,48 +654,9 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
         }
       }
 
-      // Track latency for performance measurement (only if profiling enabled)
-      if (profilingEnabled && lastKeyTime > 0) {
-        const latency = performance.now() - lastKeyTime;
-        echoTimes.push(latency);
-        latencyMeasurements.push(latency);
 
-        if (echoTimes.length >= 10) {
-          const avg = echoTimes.reduce((a, b) => a + b) / echoTimes.length;
-          console.log(`[Latency] Avg server echo: ${avg.toFixed(1)}ms`);
-          echoTimes = [];
-        }
-        lastKeyTime = 0;
-      }
 
-      // Report detailed latency stats every 10 seconds (only if profiling enabled)
-      if (profilingEnabled && Date.now() - lastLatencyReport > 10000 && latencyMeasurements.length > 0) {
-        const sorted = [...latencyMeasurements].sort((a, b) => a - b);
-        const avg = sorted.reduce((a, b) => a + b) / sorted.length;
-        const p50 = sorted[Math.floor(sorted.length * 0.5)];
-        const p95 = sorted[Math.floor(sorted.length * 0.95)];
-        const p99 = sorted[Math.floor(sorted.length * 0.99)];
-        const max = sorted[sorted.length - 1];
 
-        console.log(`[Latency Stats] n=${sorted.length} avg=${avg.toFixed(1)}ms p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms p99=${p99.toFixed(1)}ms max=${max.toFixed(1)}ms`);
-
-        latencyMeasurements = [];
-        lastLatencyReport = Date.now();
-      }
-
-      // Check if this is echo confirmation
-      if (pendingEcho.length > 0 && data === pendingEcho[0]) {
-        // Server echoed back our character - don't display again
-        pendingEcho.shift();
-        return;
-      }
-
-      // If pending echo doesn't match, clear it (out of sync)
-      if (pendingEcho.length > 0 && data.length > 0) {
-        // Clear pending echo if we receive something unexpected
-        // This handles cases where server doesn't echo (raw mode, etc.)
-        pendingEcho = [];
-      }
 
       // Default: Write to terminal
       terminal.write(data);
@@ -748,44 +700,11 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
     // Send terminal input to PTY immediately (no batching)
     terminal.onData((data) => {
-      // Track key timing for performance measurement
-      lastKeyTime = performance.now();
+    
 
-      // Check for control characters that should clear pending echo
-      if (data === '\x03' || // Ctrl+C
-          data === '\x04' || // Ctrl+D
-          data === '\r' ||   // Enter
-          data === '\n') {   // Line feed
-        // Clear pending echo on command submission
-        pendingEcho = [];
-      }
 
-      // Local echo: Display immediately in dim color
-      if (LOCAL_ECHO_ENABLED && terminalSocket?.readyState === WebSocket.OPEN) {
-        // Don't echo control characters visually (except printable ones)
-        const shouldEcho =
-          data.length === 1 &&
-          data.charCodeAt(0) >= 32 &&
-          data.charCodeAt(0) < 127 &&
-          data !== '\x7f'; // Not DEL
 
-        if (shouldEcho) {
-          // Display dimmed version immediately
-          terminal.write(LOCAL_ECHO_DIM + data + LOCAL_ECHO_RESET);
-          pendingEcho.push(data);
 
-          // Set timeout to clear if server doesn't echo back
-          // (Handles raw mode terminals)
-          clearTimeout(serverEchoTimeout);
-          serverEchoTimeout = setTimeout(() => {
-            if (pendingEcho.length > 0) {
-              // Server didn't echo - probably in raw mode
-              // Clear pending echo to avoid confusion
-              pendingEcho = [];
-            }
-          }, SERVER_ECHO_TIMEOUT);
-        }
-      }
 
       // Send immediately - no batching delay
       if (terminalSocket?.readyState === WebSocket.OPEN) {

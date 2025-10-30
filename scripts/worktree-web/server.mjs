@@ -2114,8 +2114,8 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   // Smart output buffering: batch small outputs, send large ones immediately
   let outputBuffer = '';
   let outputTimer = null;
-  const OUTPUT_BATCH_MS = 8; // Half a frame at 60fps
-  const LARGE_OUTPUT_THRESHOLD = 1024; // 1KB - send immediately if larger
+  const OUTPUT_BATCH_MS = 4; // Quarter frame at 60fps for lower latency
+  const LARGE_OUTPUT_THRESHOLD = 512; // 512 bytes - send immediately if larger
 
   const flushOutput = () => {
     if (outputBuffer && ws.readyState === 1) {
@@ -2233,61 +2233,39 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   // Store listener reference for cleanup
   session.activeListener = onData;
 
-  // Performance tracking for PTY writes (only if profiling enabled)
-  let ptyWriteLatencies = ENABLE_PROFILING ? [] : null;
-  let lastPtyLatencyReport = Date.now();
 
-  // Handle WebSocket messages (both terminal input and control messages)
+
+  // OPTIMIZED: Minimal overhead message handler
   ws.on('message', (data) => {
-    const writeStart = ENABLE_PROFILING ? process.hrtime.bigint() : null;
+    // Fast type check - handle Buffer efficiently
+    if (Buffer.isBuffer(data)) {
+      if (!isPaused) {
+        terminal.write(data);
+      }
+      return;
+    }
 
     const dataStr = data.toString();
 
-    // Fast path: Only parse if it's a control message (starts with '{"type":')
-    // 99% of messages are terminal input, avoid expensive JSON.parse()
-    if (dataStr.startsWith('{"type":')) {
+    // OPTIMIZED: More efficient JSON detection
+    if (dataStr.length > 8 && dataStr[0] === '{' && dataStr.slice(0, 8) === '{"type":') {
       try {
-        const msg = JSON.parse(dataStr);
-        // Handle resize control message
-        if (msg.type === 'resize' && msg.cols && msg.rows) {
-          terminal.resize(msg.cols, msg.rows);
-          console.log(`Resized PTY for ${worktreeName} to ${msg.cols}x${msg.rows}`);
-          return; // Don't measure resize latency
+        // Only parse for resize (most common control message)
+        if (dataStr.includes('"resize"')) {
+          const msg = JSON.parse(dataStr);
+          if (msg.type === 'resize' && msg.cols && msg.rows) {
+            terminal.resize(msg.cols, msg.rows);
+            return;
+          }
         }
-        // Other control messages can be added here
       } catch (e) {
-        // JSON-like but invalid, treat as terminal input
+        // Not valid JSON, treat as input
       }
     }
 
-    // Default: Treat as terminal input - but ignore during backpressure pause
-    if (isPaused) {
-      console.log(`[TERMINAL] Ignoring input during backpressure pause for session ${sessionId}`);
-      return;
-    }
-    terminal.write(dataStr);
-
-    // Measure PTY write latency (only if profiling enabled)
-    if (ENABLE_PROFILING && writeStart) {
-      const writeEnd = process.hrtime.bigint();
-      const latencyNs = Number(writeEnd - writeStart);
-      const latencyMs = latencyNs / 1_000_000;
-      ptyWriteLatencies.push(latencyMs);
-
-      // Report stats every 10 seconds
-      if (Date.now() - lastPtyLatencyReport > 10000 && ptyWriteLatencies.length > 0) {
-        const sorted = [...ptyWriteLatencies].sort((a, b) => a - b);
-        const avg = sorted.reduce((a, b) => a + b) / sorted.length;
-        const p50 = sorted[Math.floor(sorted.length * 0.5)];
-        const p95 = sorted[Math.floor(sorted.length * 0.95)];
-        const p99 = sorted[Math.floor(sorted.length * 0.99)];
-        const max = sorted[sorted.length - 1];
-
-        console.log(`[PTY Latency] ${worktreeName}:${command} n=${sorted.length} avg=${avg.toFixed(2)}ms p50=${p50.toFixed(2)}ms p95=${p95.toFixed(2)}ms p99=${p99.toFixed(2)}ms max=${max.toFixed(2)}ms`);
-
-        ptyWriteLatencies = [];
-        lastPtyLatencyReport = Date.now();
-      }
+    // Default: terminal input
+    if (!isPaused) {
+      terminal.write(dataStr);
     }
   });
 
