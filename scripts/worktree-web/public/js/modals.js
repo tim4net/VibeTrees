@@ -269,13 +269,24 @@ async function syncWorktree(name) {
       body: JSON.stringify({ strategy: 'merge' })
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Sync failed');
+    const result = await response.json();
+
+    if (response.status === 409) {
+      // Conflict that couldn't be auto-resolved
+      throw new Error(result.error || 'Sync encountered conflicts that require manual resolution');
     }
 
-    const result = await response.json();
-    showToast(`${name} synced successfully`, 2000);
+    if (!response.ok) {
+      throw new Error(result.error || 'Sync failed');
+    }
+
+    // Check if AI resolved conflicts
+    if (result.resolution) {
+      showToast(`${name} synced (conflicts auto-resolved)`, 3000);
+    } else {
+      showToast(`${name} synced successfully`, 2000);
+    }
+
     return result;
 
   } catch (error) {

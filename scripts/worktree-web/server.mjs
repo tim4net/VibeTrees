@@ -2705,6 +2705,40 @@ function createApp() {
       res.json(result);
     } catch (error) {
       console.error('Error syncing worktree:', error);
+
+      // Check if it's a merge conflict
+      if (error.message.includes('CONFLICT') || error.message.includes('conflict')) {
+        try {
+          console.log('Attempting AI conflict resolution...');
+          const AIConflictResolver = (await import('../ai-conflict-resolver.mjs')).default;
+          const resolver = new AIConflictResolver(worktree.path);
+          const resolution = await resolver.resolve();
+
+          if (resolution.success) {
+            return res.json({
+              success: true,
+              message: 'Conflicts resolved automatically',
+              resolution
+            });
+          } else {
+            return res.status(409).json({
+              success: false,
+              error: 'Could not auto-resolve conflicts',
+              conflicts: resolution.conflicts,
+              needsManualResolution: true
+            });
+          }
+        } catch (resolveError) {
+          console.error('AI conflict resolution failed:', resolveError);
+          return res.status(409).json({
+            success: false,
+            error: 'Conflict resolution failed: ' + resolveError.message,
+            needsManualResolution: true
+          });
+        }
+      }
+
+      // Other errors
       res.status(500).json({
         success: false,
         error: error.message
