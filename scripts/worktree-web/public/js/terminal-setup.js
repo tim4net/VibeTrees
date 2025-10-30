@@ -222,10 +222,10 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     fontSize: 12,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: {
-      background: '#0d1117',
+      background: '#0a0e13',
       foreground: '#c9d1d9',
       cursor: '#c9d1d9',
-      cursorAccent: '#0d1117'
+      cursorAccent: '#0a0e13'
     },
     allowProposedApi: true,
     scrollback: 50000, // Increase for logs
@@ -499,10 +499,10 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     fontSize: 13,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: {
-      background: '#1e1e1e',
+      background: '#0a0e13',
       foreground: '#d4d4d4',
       cursor: '#d4d4d4',
-      cursorAccent: '#1e1e1e',
+      cursorAccent: '#0a0e13',
       selection: 'rgba(255, 255, 255, 0.3)'
     },
     allowProposedApi: true,
