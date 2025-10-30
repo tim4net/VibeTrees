@@ -3682,7 +3682,18 @@ async function initializeInBackground(manager) {
       5000 // Estimated 5 seconds
     ),
 
-    // Task 2: Auto-start containers
+    // Task 2: Auto-start containers - DISABLED FOR SAFETY
+    // REASON: Automatically restarting stopped containers interferes with user intent.
+    // Users may have intentionally stopped containers for debugging, resource management,
+    // or to avoid conflicts. Auto-restarting them on server startup is destructive behavior.
+    //
+    // If auto-start is needed in the future, it should be:
+    // 1. Opt-in via config flag (e.g., AUTO_START_CONTAINERS=true)
+    // 2. Only start containers that have never been started (not ones user stopped)
+    // 3. Show clear notification when it happens
+    //
+    // For now, containers remain in whatever state the user left them.
+    /*
     initManager.executeTask(
       'container-startup',
       'Starting Docker containers',
@@ -3729,6 +3740,7 @@ async function initializeInBackground(manager) {
       },
       10000 // Estimated 10 seconds
     ),
+    */
 
     // Task 3: Warm up caches
     initManager.executeTask(

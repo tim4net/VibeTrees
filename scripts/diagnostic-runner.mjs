@@ -770,10 +770,20 @@ export class DiagnosticRunner {
 
   /**
    * Regenerate .env file for a worktree
+   * Only creates if missing - preserves existing files
    * @private
    */
   async _regenerateEnvFile(worktreeName) {
     const worktreePath = join(this.worktreeBase, worktreeName);
+    const envFile = join(worktreePath, '.env');
+    const fs = require('fs');
+
+    // SAFETY: Only create .env if it doesn't exist (preserve user customizations)
+    if (fs.existsSync(envFile)) {
+      console.log(`[Diagnostic] Skipping .env regeneration - file exists for ${worktreeName}`);
+      return;
+    }
+
     const ports = this.portRegistry.getWorktreePorts(worktreeName);
 
     const envLines = [];
@@ -782,7 +792,7 @@ export class DiagnosticRunner {
       envLines.push(`${varName}=${port}`);
     }
 
-    const envFile = join(worktreePath, '.env');
-    require('fs').writeFileSync(envFile, envLines.join('\n') + '\n');
+    fs.writeFileSync(envFile, envLines.join('\n') + '\n');
+    console.log(`[Diagnostic] Created .env file for ${worktreeName}`);
   }
 }

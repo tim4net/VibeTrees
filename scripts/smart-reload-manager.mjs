@@ -56,13 +56,24 @@ export class SmartReloadManager {
       }
 
       // Step 3: Restart services if needed
-      if (analysis.needsServiceRestart && !options.skipRestart) {
+      // SAFETY: Disabled by default to prevent unwanted service interruptions.
+      // Auto-restarting services can interfere with debugging, testing, or user workflows.
+      // To enable auto-restart, explicitly pass `autoRestart: true` in options.
+      if (analysis.needsServiceRestart && !options.skipRestart && options.autoRestart === true) {
         const restartResult = await this.restartServices(analysis);
         results.actions.push(restartResult);
         if (!restartResult.success) {
           results.errors.push('Service restart failed');
           results.success = false;
         }
+      } else if (analysis.needsServiceRestart && !options.autoRestart) {
+        // Log that restart was skipped (user should manually restart if needed)
+        results.actions.push({
+          action: 'restart_services',
+          success: true,
+          skipped: true,
+          message: 'Service restart recommended but skipped (auto-restart disabled)'
+        });
       }
 
       return results;
