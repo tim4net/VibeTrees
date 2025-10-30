@@ -45,3 +45,8 @@ coverage/
 
 # OS files
 Thumbs.db
+
+
+# Worktree-specific files (managed by VibeTrees)
+docker-compose.yml
+.env

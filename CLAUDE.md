@@ -6,7 +6,7 @@ AI guidance for working with **VibeTrees** - a web-based orchestration tool for 
 
 ```bash
 npm run web              # Start web UI (localhost:3335)
-npm test                 # Run test suite (468 tests)
+npm test                 # Run test suite (621 tests)
 npm run test:watch       # Watch mode
 ```
 
@@ -15,7 +15,7 @@ npm run test:watch       # Watch mode
 - **TDD**: Write tests first, implement minimal code to pass
 - **DRY**: Extract shared logic into reusable modules
 - **SOLID**: Single responsibility, proper separation of concerns
-- **468 tests**: Comprehensive coverage maintained
+- **621 tests**: Comprehensive coverage maintained
 
 ## Architecture
 
