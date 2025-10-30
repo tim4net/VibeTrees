@@ -341,3 +341,44 @@
 .vertical-tab .status-indicator {
   writing-mode: horizontal-tb;
 }
+
+/* Worktree Actions for Containerless Apps */
+.worktree-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.worktree-action-btn {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.worktree-action-btn:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.worktree-action-btn.danger {
+  background: transparent;
+  border-color: #30363d;
+  color: #8b949e;
+}
+
+.worktree-action-btn.danger:hover {
+  border-color: #f85149;
+  color: #f85149;
+}
