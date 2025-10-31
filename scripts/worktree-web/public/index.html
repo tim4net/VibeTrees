@@ -720,18 +720,15 @@
 
     <div class="status-spacer"></div>
 
-    <!-- WebSocket Connection Status -->
-    <div class="status-segment ws-connection" id="ws-connection" title="WebSocket: Connecting...">
-      <span class="ws-indicator" data-state="connecting"></span>
-      <span class="ws-text">WS</span>
-    </div>
-
-    <div class="status-divider">│</div>
-
     <!-- Version -->
     <div class="status-segment version" title="VibeTrees version">
       <span class="version-text">v1.0.0</span>
     </div>
+  </div>
+
+  <!-- WebSocket Connection Status - Bottom Right Corner -->
+  <div class="ws-status-indicator" id="ws-connection" title="WebSocket: Connecting...">
+    <span class="ws-indicator" data-state="connecting"></span>
   </div>
 
   <!-- Theme and Selection Management (Load before main.js) -->
