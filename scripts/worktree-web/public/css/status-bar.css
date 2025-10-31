@@ -258,3 +258,61 @@
   background: transparent;
   color: #8b949e;
 }
+
+/* WebSocket Connection Status */
+.status-segment.ws-connection {
+  opacity: 0.7;
+  font-size: 11px;
+  cursor: default;
+  padding: 4px 6px;
+}
+
+.status-segment.ws-connection:hover {
+  opacity: 1;
+  background: transparent;
+}
+
+.ws-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+/* Connected state - green */
+.ws-indicator[data-state="connected"] {
+  background-color: #2ea043;
+  box-shadow: 0 0 4px rgba(46, 160, 67, 0.6);
+}
+
+/* Connecting/Reconnecting state - yellow */
+.ws-indicator[data-state="connecting"],
+.ws-indicator[data-state="reconnecting"] {
+  background-color: #e5a935;
+  box-shadow: 0 0 4px rgba(229, 169, 53, 0.6);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Disconnected/Error state - red */
+.ws-indicator[data-state="disconnected"],
+.ws-indicator[data-state="error"] {
+  background-color: #da3633;
+  box-shadow: 0 0 4px rgba(218, 54, 51, 0.6);
+}
+
+.ws-text {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

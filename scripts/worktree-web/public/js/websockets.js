@@ -20,11 +20,15 @@ export function connectWebSocket() {
     return;
   }
 
+  // Update status to connecting
+  updateConnectionStatus('connecting');
+
   ws = new WebSocket(`ws://${window.location.host}`);
 
   ws.onopen = () => {
     console.log('WebSocket connected');
     reconnectAttempts = 0; // Reset counter on successful connection
+    updateConnectionStatus('connected');
   };
 
   ws.onmessage = (event) => {
@@ -58,13 +62,46 @@ export function connectWebSocket() {
     reconnectAttempts++;
     console.log(`WebSocket closed, reconnecting in ${delay}ms (attempt ${reconnectAttempts})...`);
 
+    // Update status to reconnecting
+    updateConnectionStatus('reconnecting');
+
     setTimeout(connectWebSocket, delay);
   };
 
   ws.onerror = (error) => {
     console.error('WebSocket error:', error);
+    updateConnectionStatus('error');
     // onclose will handle reconnection
   };
+}
+
+/**
+ * Update WebSocket connection status indicator
+ */
+function updateConnectionStatus(state) {
+  const wsConnection = document.getElementById('ws-connection');
+  const wsIndicator = wsConnection?.querySelector('.ws-indicator');
+
+  if (!wsConnection || !wsIndicator) {
+    console.warn('[websockets] Connection status element not found');
+    return;
+  }
+
+  // Update indicator state
+  wsIndicator.setAttribute('data-state', state);
+
+  // Update tooltip
+  const statusMessages = {
+    connecting: 'WebSocket: Connecting...',
+    connected: 'WebSocket: Connected',
+    reconnecting: `WebSocket: Reconnecting... (attempt ${reconnectAttempts})`,
+    disconnected: 'WebSocket: Disconnected',
+    error: 'WebSocket: Connection error'
+  };
+
+  wsConnection.title = statusMessages[state] || 'WebSocket: Unknown state';
+
+  console.log(`[websockets] Connection status updated: ${state}`);
 }
 
 /**
