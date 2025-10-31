@@ -643,13 +643,28 @@ class WorktreeManager {
         };
       }).filter(c => !c.name.includes('init')); // Filter out init containers
 
-      // Deduplicate by service name - keep most recently created for each service
+      // Deduplicate by service name - prioritize running containers
       // This handles cases where COMPOSE_PROJECT_NAME changed but working_dir stayed the same
       const serviceMap = new Map();
       for (const container of mapped) {
         const existing = serviceMap.get(container.name);
-        if (!existing || container.createdAt > existing.createdAt) {
+
+        if (!existing) {
+          // No existing container for this service, add it
           serviceMap.set(container.name, container);
+        } else {
+          // Priority: running > created/exited, then most recent createdAt
+          const existingRunning = existing.state === 'running';
+          const currentRunning = container.state === 'running';
+
+          if (currentRunning && !existingRunning) {
+            // Current is running, existing is not - prefer current
+            serviceMap.set(container.name, container);
+          } else if (currentRunning === existingRunning && container.createdAt > existing.createdAt) {
+            // Same state, prefer more recent
+            serviceMap.set(container.name, container);
+          }
+          // Otherwise keep existing
         }
       }
 
