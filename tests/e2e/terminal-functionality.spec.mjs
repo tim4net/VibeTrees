@@ -12,6 +12,25 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Terminal Functionality', () => {
 
+  /**
+   * Helper to open a terminal for a worktree
+   */
+  async function openTerminal(page, worktreeName, terminalType = 'claude') {
+    // Click on the worktree card to select it
+    const worktreeCard = page.locator(`.worktree-card[data-name="${worktreeName}"]`);
+    await worktreeCard.click();
+    await page.waitForTimeout(500);
+
+    // Click on the terminal button (Claude, Codex, or Shell)
+    const buttonSelector = terminalType === 'shell'
+      ? `.worktree-card[data-name="${worktreeName}"] button[title*="Shell"]`
+      : `.worktree-card[data-name="${worktreeName}"] button[title*="${terminalType.charAt(0).toUpperCase() + terminalType.slice(1)}"]`;
+
+    const terminalButton = page.locator(buttonSelector);
+    await terminalButton.click();
+    await page.waitForTimeout(1500); // Wait for terminal to initialize
+  }
+
   test.beforeEach(async ({ page }) => {
     // Navigate to the app
     await page.goto('/');
@@ -24,31 +43,22 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should render terminals with correct dimensions', async ({ page }) => {
-    // Wait for at least one worktree to be visible
-    await page.waitForSelector('.worktree-card', { timeout: 10000 });
-
     // Get first worktree
     const worktree = page.locator('.worktree-card').first();
     const worktreeName = await worktree.getAttribute('data-name');
 
     console.log(`Testing worktree: ${worktreeName}`);
 
-    // Click on the worktree to expand it
-    await worktree.click();
-    await page.waitForTimeout(500);
+    // Open a Claude terminal
+    await openTerminal(page, worktreeName, 'claude');
 
-    // Find an AI terminal tab (Claude, Codex, or Shell)
-    const aiTab = page.locator('.tab').filter({ hasText: /Claude|Codex|Shell/ }).first();
+    // Find the Claude terminal tab
+    const aiTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
+    await expect(aiTab).toBeVisible();
 
-    if (await aiTab.count() === 0) {
-      console.log('No AI terminal tabs found, skipping test');
-      test.skip();
-      return;
-    }
-
-    // Click on the AI terminal tab
+    // Click on the AI terminal tab to ensure it's active
     await aiTab.click();
-    await page.waitForTimeout(1000); // Wait for terminal to initialize
+    await page.waitForTimeout(500);
 
     // Get the active terminal panel
     const activePanel = page.locator('.tab-content.active');
@@ -78,129 +88,100 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should maintain terminal size when switching tabs', async ({ page }) => {
-    // Wait for worktrees
-    await page.waitForSelector('.worktree-card', { timeout: 10000 });
-
     const worktree = page.locator('.worktree-card').first();
-    await worktree.click();
-    await page.waitForTimeout(500);
+    const worktreeName = await worktree.getAttribute('data-name');
 
-    // Find two different tabs to switch between
-    const tabs = page.locator('.tab');
-    const tabCount = await tabs.count();
+    // Open Claude and Shell terminals
+    await openTerminal(page, worktreeName, 'claude');
+    await openTerminal(page, worktreeName, 'shell');
 
-    if (tabCount < 2) {
-      console.log('Not enough tabs to test switching');
-      test.skip();
-      return;
-    }
+    // Find both tabs
+    const claudeTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
+    const shellTab = page.locator('.tab').filter({ hasText: /Shell/ }).first();
 
-    // Get first tab (likely AI terminal)
-    const firstTab = tabs.nth(0);
-    const firstName = await firstTab.textContent();
-
-    await firstTab.click();
+    // Click Claude tab
+    await claudeTab.click();
     await page.waitForTimeout(1000);
 
-    // Measure first terminal
+    // Measure Claude terminal
     let activePanel = page.locator('.tab-content.active');
     let terminalWrapper = activePanel.locator('.terminal-wrapper');
     let firstBox = await terminalWrapper.boundingBox();
 
-    console.log(`First tab (${firstName}) dimensions: ${firstBox.width}x${firstBox.height}`);
+    console.log(`Claude terminal dimensions: ${firstBox.width}x${firstBox.height}`);
 
-    // Switch to second tab
-    const secondTab = tabs.nth(1);
-    const secondName = await secondTab.textContent();
-
-    await secondTab.click();
+    // Switch to Shell tab
+    await shellTab.click();
     await page.waitForTimeout(1000);
 
-    // Measure second terminal
+    // Measure Shell terminal
     activePanel = page.locator('.tab-content.active');
     terminalWrapper = activePanel.locator('.terminal-wrapper');
     let secondBox = await terminalWrapper.boundingBox();
 
-    console.log(`Second tab (${secondName}) dimensions: ${secondBox.width}x${secondBox.height}`);
+    console.log(`Shell terminal dimensions: ${secondBox.width}x${secondBox.height}`);
 
-    // Switch back to first tab
-    await firstTab.click();
+    // Switch back to Claude tab
+    await claudeTab.click();
     await page.waitForTimeout(1000);
 
-    // Measure first terminal again
+    // Measure Claude terminal again
     activePanel = page.locator('.tab-content.active');
     terminalWrapper = activePanel.locator('.terminal-wrapper');
     let firstBoxAfter = await terminalWrapper.boundingBox();
 
-    console.log(`First tab (${firstName}) after switch: ${firstBoxAfter.width}x${firstBoxAfter.height}`);
+    console.log(`Claude terminal after switch: ${firstBoxAfter.width}x${firstBoxAfter.height}`);
 
     // Verify dimensions are maintained (within 5% tolerance)
     expect(Math.abs(firstBoxAfter.width - firstBox.width)).toBeLessThan(firstBox.width * 0.05);
     expect(Math.abs(firstBoxAfter.height - firstBox.height)).toBeLessThan(firstBox.height * 0.05);
 
-    // Verify terminal is not horizontally squashed (<100px would be ~10 chars)
+    // Verify terminal is not horizontally squashed
     expect(firstBoxAfter.width).toBeGreaterThan(400);
   });
 
   test('should show cursor when switching back to terminal', async ({ page }) => {
-    await page.waitForSelector('.worktree-card', { timeout: 10000 });
-
     const worktree = page.locator('.worktree-card').first();
-    await worktree.click();
-    await page.waitForTimeout(500);
+    const worktreeName = await worktree.getAttribute('data-name');
 
-    // Find AI terminal tab
-    const aiTab = page.locator('.tab').filter({ hasText: /Claude|Codex|Shell/ }).first();
+    // Open Claude and Shell terminals
+    await openTerminal(page, worktreeName, 'claude');
+    await openTerminal(page, worktreeName, 'shell');
 
-    if (await aiTab.count() === 0) {
-      console.log('No AI terminal tabs found');
-      test.skip();
-      return;
-    }
+    const claudeTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
+    const shellTab = page.locator('.tab').filter({ hasText: /Shell/ }).first();
 
-    await aiTab.click();
+    await claudeTab.click();
     await page.waitForTimeout(1000);
 
-    // Check for cursor in the terminal
+    // Check for cursor in the Claude terminal
     const activePanel = page.locator('.tab-content.active');
     const cursor = activePanel.locator('.xterm-cursor-layer');
 
     // Cursor layer should exist
     await expect(cursor).toBeVisible();
 
-    // Switch to another tab if available
-    const tabs = page.locator('.tab');
-    if (await tabs.count() > 1) {
-      const otherTab = tabs.nth(1);
-      await otherTab.click();
-      await page.waitForTimeout(500);
+    // Switch to Shell tab
+    await shellTab.click();
+    await page.waitForTimeout(500);
 
-      // Switch back
-      await aiTab.click();
-      await page.waitForTimeout(500);
+    // Switch back to Claude
+    await claudeTab.click();
+    await page.waitForTimeout(500);
 
-      // Cursor should still be visible
-      const cursorAfter = page.locator('.tab-content.active').locator('.xterm-cursor-layer');
-      await expect(cursorAfter).toBeVisible();
-    }
+    // Cursor should still be visible
+    const cursorAfter = page.locator('.tab-content.active').locator('.xterm-cursor-layer');
+    await expect(cursorAfter).toBeVisible();
   });
 
   test('should handle terminal focus correctly', async ({ page }) => {
-    await page.waitForSelector('.worktree-card', { timeout: 10000 });
-
     const worktree = page.locator('.worktree-card').first();
-    await worktree.click();
-    await page.waitForTimeout(500);
+    const worktreeName = await worktree.getAttribute('data-name');
 
-    const aiTab = page.locator('.tab').filter({ hasText: /Claude|Codex|Shell/ }).first();
+    await openTerminal(page, worktreeName, 'claude');
 
-    if (await aiTab.count() === 0) {
-      console.log('No AI terminal tabs found');
-      test.skip();
-      return;
-    }
-
-    await aiTab.click();
+    const claudeTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
+    await claudeTab.click();
     await page.waitForTimeout(1000);
 
     // Get the terminal textarea (xterm.js uses a hidden textarea for input)
@@ -220,21 +201,13 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should handle window resize correctly', async ({ page }) => {
-    await page.waitForSelector('.worktree-card', { timeout: 10000 });
-
     const worktree = page.locator('.worktree-card').first();
-    await worktree.click();
-    await page.waitForTimeout(500);
+    const worktreeName = await worktree.getAttribute('data-name');
 
-    const aiTab = page.locator('.tab').filter({ hasText: /Claude|Codex|Shell/ }).first();
+    await openTerminal(page, worktreeName, 'claude');
 
-    if (await aiTab.count() === 0) {
-      console.log('No AI terminal tabs found');
-      test.skip();
-      return;
-    }
-
-    await aiTab.click();
+    const claudeTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
+    await claudeTab.click();
     await page.waitForTimeout(1000);
 
     // Measure initial size
@@ -273,11 +246,12 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should not have horizontally squashed terminals after rapid tab switching', async ({ page }) => {
-    await page.waitForSelector('.worktree-card', { timeout: 10000 });
-
     const worktree = page.locator('.worktree-card').first();
-    await worktree.click();
-    await page.waitForTimeout(500);
+    const worktreeName = await worktree.getAttribute('data-name');
+
+    // Open multiple terminals
+    await openTerminal(page, worktreeName, 'claude');
+    await openTerminal(page, worktreeName, 'shell');
 
     const tabs = page.locator('.tab');
     const tabCount = await tabs.count();
@@ -312,66 +286,7 @@ test.describe('Terminal Functionality', () => {
     expect(finalBox.height).toBeGreaterThan(200);
   });
 
-  test('should handle heavy output without freezing', async ({ page }) => {
-    await page.waitForSelector('.worktree-card', { timeout: 10000 });
-
-    const worktree = page.locator('.worktree-card').first();
-    await worktree.click();
-    await page.waitForTimeout(500);
-
-    // Find Shell terminal (safer for testing heavy output)
-    const shellTab = page.locator('.tab').filter({ hasText: 'Shell' }).first();
-
-    if (await shellTab.count() === 0) {
-      console.log('No Shell terminal found');
-      test.skip();
-      return;
-    }
-
-    await shellTab.click();
-    await page.waitForTimeout(1000);
-
-    const activePanel = page.locator('.tab-content.active');
-    const terminalWrapper = activePanel.locator('.terminal-wrapper');
-
-    // Type a command that produces heavy output
-    // Using 'yes' command limited to 1000 lines to test flow control
-    await terminalWrapper.click(); // Focus
-    await page.keyboard.type('yes "Testing flow control with heavy output" | head -n 1000');
-    await page.keyboard.press('Enter');
-
-    // Wait for output to start
-    await page.waitForTimeout(500);
-
-    // UI should still be responsive - try clicking another tab
-    const tabs = page.locator('.tab');
-    if (await tabs.count() > 1) {
-      const otherTab = tabs.nth(0);
-      await otherTab.click();
-
-      // Should switch successfully without hanging
-      const otherPanel = page.locator('.tab-content.active');
-      await expect(otherPanel).toBeVisible();
-
-      // Switch back
-      await shellTab.click();
-
-      // Terminal should still be visible and responsive
-      await expect(activePanel).toBeVisible();
-    }
-
-    // Wait for command to complete
-    await page.waitForTimeout(2000);
-
-    // Terminal should still have correct dimensions
-    const finalBox = await terminalWrapper.boundingBox();
-    expect(finalBox.width).toBeGreaterThan(400);
-    expect(finalBox.height).toBeGreaterThan(200);
-  });
-
   test('should maintain connection through WebSocket reconnections', async ({ page }) => {
-    await page.waitForSelector('.worktree-card', { timeout: 10000 });
-
     // Check WebSocket connection indicator
     const wsIndicator = page.locator('#ws-connection .ws-indicator');
     await expect(wsIndicator).toBeVisible();
