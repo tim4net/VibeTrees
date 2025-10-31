@@ -44,11 +44,17 @@ export function initTerminals() {
     if (activeTabId) {
       const terminalInfo = terminals.get(activeTabId);
       if (terminalInfo && terminalInfo.fitAddon) {
-        // Use requestAnimationFrame to ensure layout is complete
+        // Use requestAnimationFrame + multiple fits with increasing delays
         requestAnimationFrame(() => {
           setTimeout(() => {
             if (terminalInfo.fitAddon) {
               terminalInfo.fitAddon.fit();
+              // Second fit after a longer delay to catch late renders
+              setTimeout(() => {
+                if (terminalInfo.fitAddon) {
+                  terminalInfo.fitAddon.fit();
+                }
+              }, 100);
             }
           }, 50);
         });
@@ -487,11 +493,18 @@ export function switchToTab(tabId) {
     // This prevents the "compressed width" bug when switching tabs
     const panel = document.getElementById(`${tabId}-panel`);
     if (panel) {
-      // Use requestAnimationFrame to ensure layout is complete
+      // Use requestAnimationFrame + multiple fits with increasing delays
+      // This ensures the terminal fits properly even on slow renders
       requestAnimationFrame(() => {
         setTimeout(() => {
           if (terminalInfo.fitAddon) {
             terminalInfo.fitAddon.fit();
+            // Second fit after a longer delay to catch late renders
+            setTimeout(() => {
+              if (terminalInfo.fitAddon) {
+                terminalInfo.fitAddon.fit();
+              }
+            }, 100);
           }
         }, 50);
       });
