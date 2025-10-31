@@ -558,18 +558,23 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   let pendingCallbacks = 0;
 
   // ResizeObserver for efficient resize handling (replaces window resize event)
+  // Observe the panel instead of wrapper to catch visibility changes
   let resizeFitToken = null;
-  const resizeObserver = new ResizeObserver(() => {
-    if (activeTabId === tabId && !resizeFitToken) {
-      resizeFitToken = requestAnimationFrame(() => {
-        resizeFitToken = null;
-        if (fitAddon) {
-          fitAddon.fit();
-        }
-      });
+  const resizeObserver = new ResizeObserver((entries) => {
+    // Only fit if the element actually has size (is visible)
+    for (const entry of entries) {
+      if (entry.contentRect.width > 0 && entry.contentRect.height > 0 && !resizeFitToken) {
+        resizeFitToken = requestAnimationFrame(() => {
+          resizeFitToken = null;
+          if (fitAddon) {
+            fitAddon.fit();
+          }
+        });
+        break;
+      }
     }
   });
-  resizeObserver.observe(terminalWrapper);
+  resizeObserver.observe(panel); // Observe panel to catch visibility changes
 
   const resizeCleanup = () => {
     if (resizeObserver) {

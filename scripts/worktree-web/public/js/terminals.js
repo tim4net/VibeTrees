@@ -41,22 +41,14 @@ export function initTerminals() {
   // Listen to tab visibility changes
   appState.on('worktree:selected', () => {
     // Fit active terminal when filter changes
+    // ResizeObserver will handle most cases, but do one fit for immediate feedback
     if (activeTabId) {
       const terminalInfo = terminals.get(activeTabId);
       if (terminalInfo && terminalInfo.fitAddon) {
-        // Use requestAnimationFrame + multiple fits with increasing delays
         requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (terminalInfo.fitAddon) {
-              terminalInfo.fitAddon.fit();
-              // Second fit after a longer delay to catch late renders
-              setTimeout(() => {
-                if (terminalInfo.fitAddon) {
-                  terminalInfo.fitAddon.fit();
-                }
-              }, 100);
-            }
-          }, 50);
+          if (terminalInfo.fitAddon) {
+            terminalInfo.fitAddon.fit();
+          }
         });
       }
     }
@@ -489,26 +481,13 @@ export function switchToTab(tabId) {
   // Fit the terminal
   const terminalInfo = terminals.get(tabId);
   if (terminalInfo && terminalInfo.fitAddon) {
-    // Wait for the panel to become visible before fitting
-    // This prevents the "compressed width" bug when switching tabs
-    const panel = document.getElementById(`${tabId}-panel`);
-    if (panel) {
-      // Use requestAnimationFrame + multiple fits with increasing delays
-      // This ensures the terminal fits properly even on slow renders
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          if (terminalInfo.fitAddon) {
-            terminalInfo.fitAddon.fit();
-            // Second fit after a longer delay to catch late renders
-            setTimeout(() => {
-              if (terminalInfo.fitAddon) {
-                terminalInfo.fitAddon.fit();
-              }
-            }, 100);
-          }
-        }, 50);
-      });
-    }
+    // ResizeObserver will handle the fit automatically when panel becomes visible
+    // But do one immediate fit to ensure sizing happens quickly
+    requestAnimationFrame(() => {
+      if (terminalInfo.fitAddon) {
+        terminalInfo.fitAddon.fit();
+      }
+    });
   }
 }
 
