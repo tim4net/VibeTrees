@@ -95,35 +95,37 @@ function getDockerStatus(path, name) {
     const containers = output.trim().split('\n')
       .filter(line => line.trim())
       .map(line => JSON.parse(line))
-      .filter(c => c.Names && !c.Names.endsWith('-init')); // Filter out init containers
+      .filter(c => c.Names); // Basic filter - check Names exists
 
-    return containers.map(c => {
-      // Extract service name from Labels string (Docker returns labels as comma-separated string)
-      let serviceName = null;
+    return containers
+      .map(c => {
+        // Extract service name from Labels string (Docker returns labels as comma-separated string)
+        let serviceName = null;
 
-      if (c.Labels && typeof c.Labels === 'string') {
-        const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
-        serviceName = serviceMatch ? serviceMatch[1] : null;
-      }
+        if (c.Labels && typeof c.Labels === 'string') {
+          const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
+          serviceName = serviceMatch ? serviceMatch[1] : null;
+        }
 
-      // Fallback: parse from container name if label extraction failed
-      if (!serviceName && c.Names) {
-        const parts = c.Names.split('-');
-        serviceName = parts.length > 1 ? parts.slice(0, -1).join('-') : parts[0];
-      }
+        // Fallback: parse from container name if label extraction failed
+        if (!serviceName && c.Names) {
+          const parts = c.Names.split('-');
+          serviceName = parts.length > 1 ? parts.slice(0, -1).join('-') : parts[0];
+        }
 
-      // Last resort: use container ID
-      if (!serviceName) {
-        serviceName = c.ID ? c.ID.substring(0, 12) : 'unknown';
-      }
+        // Last resort: use container ID
+        if (!serviceName) {
+          serviceName = c.ID ? c.ID.substring(0, 12) : 'unknown';
+        }
 
-      return {
-        name: serviceName,
-        state: c.State || 'unknown',
-        status: c.Status || '',
-        ports: c.Ports ? parseDockerPorts(c.Ports) : []
-      };
-    });
+        return {
+          name: serviceName,
+          state: c.State || 'unknown',
+          status: c.Status || '',
+          ports: c.Ports ? parseDockerPorts(c.Ports) : []
+        };
+      })
+      .filter(c => !c.name.includes('init')); // Filter out init containers after service name extraction
   } catch (error) {
     return [];
   }
@@ -133,16 +135,26 @@ function parseDockerPorts(portsString) {
   if (!portsString) return [];
 
   // Parse Docker ports format: "0.0.0.0:5432->5432/tcp, :::5432->5432/tcp"
+  // Note: Docker returns both IPv4 and IPv6 bindings which we need to deduplicate
   const publishers = [];
+  const seen = new Set(); // Track unique port mappings
   const portMappings = portsString.split(',').map(p => p.trim());
 
   for (const mapping of portMappings) {
     const match = mapping.match(/(?:[\d.]+|:::)?:?(\d+)->(\d+)/);
     if (match) {
-      publishers.push({
-        PublishedPort: parseInt(match[1], 10),
-        TargetPort: parseInt(match[2], 10)
-      });
+      const publishedPort = parseInt(match[1], 10);
+      const targetPort = parseInt(match[2], 10);
+      const key = `${publishedPort}->${targetPort}`;
+
+      // Only add if we haven't seen this port mapping before
+      if (!seen.has(key)) {
+        seen.add(key);
+        publishers.push({
+          PublishedPort: publishedPort,
+          TargetPort: targetPort
+        });
+      }
     }
   }
 

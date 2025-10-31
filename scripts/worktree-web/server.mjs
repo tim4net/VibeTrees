@@ -611,9 +611,9 @@ class WorktreeManager {
       const containers = output.trim().split('\n')
         .filter(line => line.trim())
         .map(line => JSON.parse(line))
-        .filter(c => c.Names && !c.Names.endsWith('-init')); // Filter out init containers
+        .filter(c => c.Names); // Basic filter - check Names exists
 
-      statuses.push(...containers.map(c => {
+      const mappedContainers = containers.map(c => {
         // Extract service name from Labels string (Docker returns labels as comma-separated string)
         let serviceName = null;
 
@@ -639,7 +639,9 @@ class WorktreeManager {
           status: c.Status || '',
           ports: c.Ports ? c.Ports.split(',').map(p => p.trim()) : []
         };
-      }));
+      }).filter(c => !c.name.includes('init')); // Filter out init containers after service name extraction
+
+      statuses.push(...mappedContainers);
     } catch {
       // Docker services might not be running or docker not available
     }
