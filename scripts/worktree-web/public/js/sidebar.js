@@ -113,6 +113,55 @@ export function renderWorktrees() {
  */
 function renderWorktreeCards(worktrees, container) {
   container.innerHTML = worktrees.map(wt => {
+    // Handle creating worktrees
+    if (wt.status === 'creating') {
+      const isActive = appState.selectedWorktreeId === wt.name;
+      const progressHtml = wt.progressLog && wt.progressLog.length > 0
+        ? `
+          <div class="progress-log">
+            ${wt.progressLog.slice(-10).map(msg => `<div class="progress-line">${msg}</div>`).join('')}
+          </div>
+        `
+        : '<div class="progress-log"><div class="progress-line">Starting creation...</div></div>';
+
+      return `
+        <div class="worktree-card creating ${isActive ? 'active selected' : ''}" data-name="${wt.name}" onclick="selectWorktree('${wt.name}')">
+          <div class="worktree-header">
+            <div>
+              <div class="worktree-title">
+                <i data-lucide="loader" class="spin" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px; color: #58a6ff;"></i>
+                <span>${wt.name}</span>
+              </div>
+              <div class="worktree-branch" style="font-size: 11px; color: #8b949e; margin-left: 24px; margin-top: 2px;">
+                <i data-lucide="git-branch" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${wt.branch}
+              </div>
+            </div>
+            <span class="status-badge status-creating">Creating...</span>
+          </div>
+          ${progressHtml}
+        </div>
+      `;
+    }
+
+    // Handle error worktrees
+    if (wt.status === 'error') {
+      const isActive = appState.selectedWorktreeId === wt.name;
+      return `
+        <div class="worktree-card error ${isActive ? 'active selected' : ''}" data-name="${wt.name}">
+          <div class="worktree-header">
+            <div>
+              <div class="worktree-title">
+                <i data-lucide="x-circle" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px; color: #f85149;"></i>
+                <span>${wt.name}</span>
+              </div>
+            </div>
+            <span class="status-badge status-error">Failed</span>
+          </div>
+          <div class="error-message">${wt.error || 'Unknown error'}</div>
+        </div>
+      `;
+    }
+
     const isMain = !wt.path.includes('.worktrees');
     const isActive = appState.selectedWorktreeId === wt.name;
     const servicesRunning = wt.dockerStatus.filter(s => s.state === 'running').length;

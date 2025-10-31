@@ -37,11 +37,17 @@ export function connectWebSocket() {
 
     // Route events
     switch (eventType) {
+      case 'worktree:creating':
+        handleWorktreeCreating(data);
+        break;
       case 'worktree:progress':
         handleProgressUpdate(data);
         break;
       case 'worktree:created':
         handleWorktreeCreated(data);
+        break;
+      case 'worktree:error':
+        handleWorktreeError(data);
         break;
       case 'worktree:deleted':
       case 'services:started':
@@ -108,6 +114,11 @@ function updateConnectionStatus(state) {
  * Handle progress update event
  */
 function handleProgressUpdate(data) {
+  // Store progress in worktree progressLog
+  if (data.name && data.message && window.appState && window.appState.appendWorktreeProgress) {
+    window.appState.appendWorktreeProgress(data.name, data.message);
+  }
+
   const progressContainer = document.getElementById('create-progress');
   const progressOutput = document.getElementById('progress-output');
   const progressHeaderText = document.getElementById('progress-header-text');
@@ -189,18 +200,57 @@ function handleProgressUpdate(data) {
 }
 
 /**
+ * Handle worktree creating event (202 response)
+ */
+function handleWorktreeCreating(data) {
+  console.log('[handleWorktreeCreating] Called with data:', data);
+
+  // Add worktree to app state in "creating" status
+  if (window.appState && window.appState.addCreatingWorktree) {
+    window.appState.addCreatingWorktree({
+      name: data.name,
+      branch: data.branch,
+      agent: data.agent || 'claude',
+      status: 'creating',
+      progressLog: []
+    });
+  }
+
+  // Trigger UI update
+  window.refreshWorktrees?.();
+}
+
+/**
  * Handle worktree created event
  */
 function handleWorktreeCreated(data) {
   console.log('[handleWorktreeCreated] Called with data:', data);
 
-  // Give user time to see completion message before closing modal
-  setTimeout(() => {
-    window.hideCreateModal?.();
-    console.log('[handleWorktreeCreated] Modal hidden, calling refreshWorktrees');
-    window.refreshWorktrees?.();
-    console.log('[handleWorktreeCreated] refreshWorktrees called');
-  }, 1500);
+  // Update worktree status to 'ready'
+  if (window.appState && window.appState.updateWorktreeStatus) {
+    window.appState.updateWorktreeStatus(data.name, 'ready');
+  }
+
+  // Refresh to show final state
+  window.refreshWorktrees?.();
+}
+
+/**
+ * Handle worktree error event
+ */
+function handleWorktreeError(data) {
+  console.error('[handleWorktreeError] Error creating worktree:', data);
+
+  // Update worktree status to 'error'
+  if (window.appState && window.appState.updateWorktreeStatus) {
+    window.appState.updateWorktreeStatus(data.name, 'error', data.error);
+  }
+
+  // Refresh to show error state
+  window.refreshWorktrees?.();
+
+  // Show error notification
+  alert(`Failed to create worktree ${data.name}: ${data.error}`);
 }
 
 /**

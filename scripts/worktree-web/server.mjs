@@ -785,7 +785,7 @@ function createApp() {
   });
 
   app.post('/api/worktrees', async (req, res) => {
-    const { branchName, fromBranch } = req.body;
+    const { branchName, fromBranch, agent } = req.body;
     const force = req.query.force === 'true';
     const baseBranch = fromBranch || 'main';
 
@@ -812,9 +812,47 @@ function createApp() {
       }
     }
 
-    // Proceed with normal worktree creation
-    const result = await manager.createWorktree(branchName, baseBranch);
-    res.json(result);
+    // Calculate worktree name using same logic as manager
+    const slugifiedBranch = branchName
+      .toLowerCase()
+      .replace(/[^a-z0-9\/._-]/g, '-')
+      .replace(/--+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/\//g, '-');
+    const worktreeName = slugifiedBranch;
+
+    // Return immediately with 202 Accepted
+    res.status(202).json({
+      success: true,
+      name: worktreeName,
+      branch: branchName,
+      status: 'creating',
+      message: 'Worktree creation started'
+    });
+
+    // Broadcast initial creating state
+    manager.broadcast('worktree:creating', {
+      name: worktreeName,
+      branch: branchName,
+      agent: agent || 'claude'
+    });
+
+    // Create worktree in background (don't await)
+    manager.createWorktree(branchName, baseBranch)
+      .then(result => {
+        // Broadcast completion
+        manager.broadcast('worktree:created', {
+          name: worktreeName,
+          ...result
+        });
+      })
+      .catch(error => {
+        // Broadcast error
+        manager.broadcast('worktree:error', {
+          name: worktreeName,
+          error: error.message
+        });
+      });
   });
 
   app.delete('/api/worktrees/:name', async (req, res) => {

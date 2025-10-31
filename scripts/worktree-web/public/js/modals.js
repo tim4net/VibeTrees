@@ -215,6 +215,17 @@ export async function createWorktree(event, force = false) {
 
     const result = await response.json();
 
+    // Handle 202 Accepted (background creation)
+    if (response.status === 202) {
+      showToast(`Creating worktree ${result.name}...`);
+
+      // Close modal immediately - creation happens in background
+      window.hideCreateModal?.();
+
+      // Worktree card will be added by WebSocket 'worktree:creating' event
+      return;
+    }
+
     if (!result.success) {
       alert('Failed to create worktree: ' + result.error);
       document.getElementById('create-button').disabled = false;

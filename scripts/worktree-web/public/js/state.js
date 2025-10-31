@@ -84,6 +84,60 @@ class AppState {
   }
 
   /**
+   * Add a creating worktree
+   * @param {Object} worktree - Worktree object with status: 'creating'
+   */
+  addCreatingWorktree(worktree) {
+    // Check if already exists
+    const existing = this.worktrees.find(w => w.name === worktree.name);
+    if (!existing) {
+      this.worktrees.push(worktree);
+      this.emit('worktrees:updated', this.worktrees);
+    }
+  }
+
+  /**
+   * Update worktree status
+   * @param {string} name - Worktree name
+   * @param {string} status - New status ('creating', 'ready', 'error')
+   * @param {string} error - Optional error message
+   */
+  updateWorktreeStatus(name, status, error = null) {
+    const worktree = this.worktrees.find(w => w.name === name);
+    if (worktree) {
+      worktree.status = status;
+      if (error) {
+        worktree.error = error;
+      }
+      this.emit('worktrees:updated', this.worktrees);
+    }
+  }
+
+  /**
+   * Append progress to worktree progress log
+   * @param {string} name - Worktree name
+   * @param {string} message - Progress message
+   */
+  appendWorktreeProgress(name, message) {
+    const worktree = this.worktrees.find(w => w.name === name);
+    if (worktree) {
+      if (!worktree.progressLog) {
+        worktree.progressLog = [];
+      }
+      worktree.progressLog.push(message);
+      this.emit('worktree:progress-updated', { name, message });
+    }
+  }
+
+  /**
+   * Get worktrees list
+   * @returns {Array} Worktrees array
+   */
+  getWorktrees() {
+    return this.worktrees;
+  }
+
+  /**
    * Add a tab
    * @param {string} tabId - Tab ID
    * @param {Object} tabInfo - Tab information

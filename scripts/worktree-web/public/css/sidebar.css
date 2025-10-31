@@ -382,3 +382,84 @@
   border-color: #f85149;
   color: #f85149;
 }
+
+/* Creating and Error States */
+.worktree-card.creating {
+  border-left-color: #58a6ff;
+  background: linear-gradient(135deg, #1a1f26 0%, #1c2128 100%);
+  opacity: 0.95;
+}
+
+.worktree-card.error {
+  border-left-color: #f85149;
+  background: linear-gradient(135deg, #1a1517 0%, #1c1719 100%);
+}
+
+.status-badge.status-creating {
+  background: linear-gradient(135deg, #0969da 0%, #1f6feb 100%);
+  color: white;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-badge.status-error {
+  background: linear-gradient(135deg, #d1242f 0%, #f85149 100%);
+  color: white;
+}
+
+/* Progress Log */
+.progress-log {
+  background: #000000;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.progress-line {
+  color: #8b949e;
+  padding: 2px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.progress-line:last-child {
+  color: #58a6ff;
+}
+
+.error-message {
+  background: #1a0d0e;
+  border: 1px solid #f85149;
+  border-radius: 4px;
+  padding: 8px;
+  color: #f85149;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Spinner Animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
