@@ -515,8 +515,8 @@ export function closeTerminalTab(tabId, event) {
 
       // Clear session ID from sessionStorage for PTY terminals (not logs)
       // This ensures explicitly closed terminals don't reconnect on page refresh
-      if (!terminalInfo.isLogs && terminalInfo.command && terminalInfo.worktree) {
-        clearTerminalSession(terminalInfo.worktree, terminalInfo.command);
+      if (!terminalInfo.isLogs && terminalInfo.command) {
+        clearTerminalSession(tabId);
       }
     }
 

@@ -17,40 +17,37 @@ if (typeof WebglAddon === 'undefined') {
 
 /**
  * Save terminal session ID to sessionStorage
- * @param {string} worktreeName - Name of the worktree
- * @param {string} command - Command type (claude, codex, shell)
+ * @param {string} tabId - Unique tab ID
  * @param {string} sessionId - Session ID from server
  */
-export function saveTerminalSession(worktreeName, command, sessionId) {
-  const key = `terminal-session-${worktreeName}-${command}`;
+export function saveTerminalSession(tabId, sessionId) {
+  const key = `terminal-session-${tabId}`;
   sessionStorage.setItem(key, sessionId);
-  console.log(`Saved session ID for ${worktreeName}:${command} -> ${sessionId}`);
+  console.log(`Saved session ID for ${tabId} -> ${sessionId}`);
 }
 
 /**
  * Get terminal session ID from sessionStorage
- * @param {string} worktreeName - Name of the worktree
- * @param {string} command - Command type (claude, codex, shell)
+ * @param {string} tabId - Unique tab ID
  * @returns {string|null} Session ID or null if not found
  */
-export function getTerminalSession(worktreeName, command) {
-  const key = `terminal-session-${worktreeName}-${command}`;
+export function getTerminalSession(tabId) {
+  const key = `terminal-session-${tabId}`;
   const sessionId = sessionStorage.getItem(key);
   if (sessionId) {
-    console.log(`Retrieved session ID for ${worktreeName}:${command} -> ${sessionId}`);
+    console.log(`Retrieved session ID for ${tabId} -> ${sessionId}`);
   }
   return sessionId;
 }
 
 /**
  * Clear terminal session ID from sessionStorage
- * @param {string} worktreeName - Name of the worktree
- * @param {string} command - Command type (claude, codex, shell)
+ * @param {string} tabId - Unique tab ID
  */
-export function clearTerminalSession(worktreeName, command) {
-  const key = `terminal-session-${worktreeName}-${command}`;
+export function clearTerminalSession(tabId) {
+  const key = `terminal-session-${tabId}`;
   sessionStorage.removeItem(key);
-  console.log(`Cleared session ID for ${worktreeName}:${command}`);
+  console.log(`Cleared session ID for ${tabId}`);
 }
 
 // Reconnection constants
@@ -556,8 +553,8 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   window.addEventListener('resize', resizeHandler);
 
   // Reconnection state
-  // Try to retrieve existing session ID from sessionStorage
-  const savedSessionId = getTerminalSession(worktreeName, command);
+  // Try to retrieve existing session ID from sessionStorage (for reconnection after page refresh)
+  const savedSessionId = getTerminalSession(tabId);
   const reconnectState = {
     attempt: 0,
     delay: RECONNECT_INITIAL_DELAY,
@@ -623,7 +620,7 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
           if (msg.type === 'session' && msg.sessionId) {
             reconnectState.sessionId = msg.sessionId;
             // Save session ID to sessionStorage for persistence across page refreshes
-            saveTerminalSession(worktreeName, command, msg.sessionId);
+            saveTerminalSession(tabId, msg.sessionId);
             console.log(`PTY session ID: ${msg.sessionId}`);
 
             // Enable profiling if server has it enabled
