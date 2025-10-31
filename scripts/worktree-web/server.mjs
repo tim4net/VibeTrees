@@ -530,10 +530,13 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
           console.warn(`[BACKPRESSURE] Timeout after ${BACKPRESSURE_TIMEOUT}ms - force resuming PTY for session ${sessionId}`);
           draining = false;
           isPaused = false;
-          terminal.resume();
-          try {
-            ws.send(JSON.stringify({ type: 'status', message: '', paused: false }));
-          } catch (e) {}
+          // Only resume if client hasn't paused it
+          if (!clientPaused) {
+            terminal.resume();
+            try {
+              ws.send(JSON.stringify({ type: 'status', message: '', paused: false }));
+            } catch (e) {}
+          }
         }, BACKPRESSURE_TIMEOUT);
 
         // Use 'drain' event instead of polling
@@ -543,10 +546,13 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
             ws.off('drain', drainHandler);
             draining = false;
             isPaused = false;
-            terminal.resume();
-            try {
-              ws.send(JSON.stringify({ type: 'status', message: '', paused: false }));
-            } catch (e) {}
+            // Only resume if client hasn't paused it
+            if (!clientPaused) {
+              terminal.resume();
+              try {
+                ws.send(JSON.stringify({ type: 'status', message: '', paused: false }));
+              } catch (e) {}
+            }
           }
         };
         ws.on('drain', drainHandler);

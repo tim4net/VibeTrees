@@ -526,9 +526,10 @@ export function closeTerminalTab(tabId, event) {
         terminalInfo.terminal.dispose();
       }
 
-      // Remove resize handler
+      // Cleanup ResizeObserver
       if (terminalInfo.resizeHandler) {
-        window.removeEventListener('resize', terminalInfo.resizeHandler);
+        // resizeHandler is now the cleanup function, not an event listener
+        terminalInfo.resizeHandler();
       }
 
       // Clear session ID from sessionStorage for PTY terminals (not logs)

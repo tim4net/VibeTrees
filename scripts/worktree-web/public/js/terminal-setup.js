@@ -760,7 +760,8 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
       } else {
         // Fast path for small chunks - no callback overhead
         terminal.write(data);
-        watermark = Math.max(watermark - data.length, 0);
+        // Don't subtract here - watermark tracks unrendered data
+        // Subtraction happens in callback when data is actually rendered
       }
 
       // Pause when watermark exceeds HIGH threshold
