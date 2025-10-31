@@ -496,10 +496,10 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     fontSize: 13,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: {
-      background: '#0a0e13',
+      background: '#000000',
       foreground: '#d4d4d4',
       cursor: '#d4d4d4',
-      cursorAccent: '#0a0e13',
+      cursorAccent: '#000000',
       selection: 'rgba(255, 255, 255, 0.3)'
     },
     allowProposedApi: true,
