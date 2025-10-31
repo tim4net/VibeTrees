@@ -560,8 +560,13 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   setTimeout(() => {
     // Check if panel actually has size before fitting
     const rect = panel.getBoundingClientRect();
+    console.log(`[Terminal] Initial fit check for ${worktreeName}:`, { width: rect.width, height: rect.height });
     if (rect.width > 0 && rect.height > 0) {
+      console.log(`[Terminal] Running initial fit for ${worktreeName}`);
       fitAddon.fit();
+      console.log(`[Terminal] After fit - cols: ${terminal.cols}, rows: ${terminal.rows}`);
+    } else {
+      console.log(`[Terminal] Panel hidden, waiting for ResizeObserver for ${worktreeName}`);
     }
     // If panel is hidden, ResizeObserver will handle the fit when it becomes visible
   }, 100);
@@ -595,11 +600,14 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   const resizeObserver = new ResizeObserver((entries) => {
     // Only fit if the element actually has size (is visible)
     for (const entry of entries) {
+      console.log(`[ResizeObserver] ${worktreeName} - width: ${entry.contentRect.width}, height: ${entry.contentRect.height}`);
       if (entry.contentRect.width > 0 && entry.contentRect.height > 0 && !resizeFitToken) {
+        console.log(`[ResizeObserver] Fitting ${worktreeName}`);
         resizeFitToken = requestAnimationFrame(() => {
           resizeFitToken = null;
           if (fitAddon) {
             fitAddon.fit();
+            console.log(`[ResizeObserver] After fit - cols: ${terminal.cols}, rows: ${terminal.rows}`);
           }
         });
         break;
