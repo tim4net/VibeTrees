@@ -347,13 +347,32 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
   // Fit terminal after delay to ensure toolbar is rendered
   setTimeout(() => fitAddon.fit(), isCombinedLogs ? 100 : 150);
 
-  // Handle window resize
-  const resizeHandler = () => {
-    if (activeTabId === tabId) {
-      fitAddon.fit();
+  // ResizeObserver for efficient resize handling (same as PTY terminals)
+  let resizeFitToken = null;
+  const resizeObserver = new ResizeObserver((entries) => {
+    // Only fit if the element actually has size (is visible)
+    for (const entry of entries) {
+      if (entry.contentRect.width > 0 && entry.contentRect.height > 0 && !resizeFitToken) {
+        resizeFitToken = requestAnimationFrame(() => {
+          resizeFitToken = null;
+          if (fitAddon) {
+            fitAddon.fit();
+          }
+        });
+        break;
+      }
+    }
+  });
+  resizeObserver.observe(panel); // Observe panel to catch visibility changes
+
+  const resizeCleanup = () => {
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+    }
+    if (resizeFitToken) {
+      cancelAnimationFrame(resizeFitToken);
     }
   };
-  window.addEventListener('resize', resizeHandler);
 
   // Reconnection state
   const reconnectState = {
@@ -480,7 +499,7 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     worktree: worktreeName,
     service: serviceName || null,
     fitAddon,
-    resizeHandler,
+    resizeHandler: resizeCleanup, // Updated to use ResizeObserver cleanup
     reconnectState
   });
 
