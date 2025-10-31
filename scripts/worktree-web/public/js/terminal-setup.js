@@ -503,8 +503,9 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
       selection: 'rgba(255, 255, 255, 0.3)'
     },
     allowProposedApi: true,
-    scrollback: 10000, // Reasonable for PTY
+    scrollback: 2000, // Reduced for better performance with heavy output
     fastScrollModifier: 'shift',
+    allowTransparency: false, // Improves WebGL performance
     windowOptions: {
       setWinSizePixels: false
     },
@@ -518,6 +519,9 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   // Enable WebGL rendering with fallback
   try {
     const webglAddon = new WebglAddon.WebglAddon();
+    webglAddon.onContextLoss(() => {
+      console.warn(`[Terminal] WebGL context lost for ${worktreeName}, falling back to canvas`);
+    });
     terminal.loadAddon(webglAddon);
     console.log(`[Terminal] WebGL renderer enabled for ${worktreeName}`);
   } catch (e) {
@@ -544,13 +548,37 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     }
   });
 
-  // Handle window resize
-  const resizeHandler = () => {
-    if (activeTabId === tabId) {
-      fitAddon.fit();
+  // Flow control constants (VSCode watermark pattern)
+  const HIGH_WATERMARK = 100000;  // Pause when buffered data exceeds this
+  const LOW_WATERMARK = 10000;    // Resume when buffered data drops below this
+  const CALLBACK_BYTE_LIMIT = 100000;  // Add callback every N bytes
+
+  let watermark = 0;
+  let written = 0;
+  let pendingCallbacks = 0;
+
+  // ResizeObserver for efficient resize handling (replaces window resize event)
+  let resizeFitToken = null;
+  const resizeObserver = new ResizeObserver(() => {
+    if (activeTabId === tabId && !resizeFitToken) {
+      resizeFitToken = requestAnimationFrame(() => {
+        resizeFitToken = null;
+        if (fitAddon) {
+          fitAddon.fit();
+        }
+      });
+    }
+  });
+  resizeObserver.observe(terminalWrapper);
+
+  const resizeCleanup = () => {
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+    }
+    if (resizeFitToken) {
+      cancelAnimationFrame(resizeFitToken);
     }
   };
-  window.addEventListener('resize', resizeHandler);
 
   // Reconnection state
   // Try to retrieve existing session ID from sessionStorage (for reconnection after page refresh)
@@ -670,8 +698,38 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
 
 
-      // Default: Write to terminal
-      terminal.write(data);
+      // Flow control with watermarks (VSCode pattern)
+      watermark += data.length;
+      written += data.length;
+
+      if (written > CALLBACK_BYTE_LIMIT) {
+        const dataLength = data.length; // Capture for callback closure
+        terminal.write(data, () => {
+          watermark = Math.max(watermark - dataLength, 0);
+          pendingCallbacks--;
+
+          // Resume when watermark drops below LOW threshold
+          if (watermark < LOW_WATERMARK && terminalSocket.readyState === WebSocket.OPEN) {
+            terminalSocket.send(JSON.stringify({ type: 'resume' }));
+          }
+        });
+        pendingCallbacks++;
+        written = 0;
+
+        // Pause if too many pending callbacks
+        if (pendingCallbacks > 5) {
+          terminalSocket.send(JSON.stringify({ type: 'pause' }));
+        }
+      } else {
+        // Fast path for small chunks - no callback overhead
+        terminal.write(data);
+        watermark = Math.max(watermark - data.length, 0);
+      }
+
+      // Pause when watermark exceeds HIGH threshold
+      if (watermark > HIGH_WATERMARK) {
+        terminalSocket.send(JSON.stringify({ type: 'pause' }));
+      }
     };
 
     terminalSocket.onerror = (error) => {
@@ -777,7 +835,7 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     worktree: worktreeName,
     command,
     fitAddon,
-    resizeHandler,
+    resizeHandler: resizeCleanup, // Updated to use ResizeObserver cleanup
     reconnectState,
     localEchoControls
   });

@@ -598,6 +598,26 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
           return;
         }
 
+        // Handle client-side flow control: pause
+        if (msg.type === 'pause') {
+          if (!isPaused && terminal && typeof terminal.pause === 'function') {
+            isPaused = true;
+            terminal.pause();
+            console.log(`[PTY Flow Control] Client requested pause for ${worktreeName}`);
+          }
+          return;
+        }
+
+        // Handle client-side flow control: resume
+        if (msg.type === 'resume') {
+          if (isPaused && terminal && typeof terminal.resume === 'function') {
+            isPaused = false;
+            terminal.resume();
+            console.log(`[PTY Flow Control] Client requested resume for ${worktreeName}`);
+          }
+          return;
+        }
+
         // Unknown/unsupported control message - ignore it
         return;
       } catch (e) {
