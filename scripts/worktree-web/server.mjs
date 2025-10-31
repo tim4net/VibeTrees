@@ -971,10 +971,8 @@ class WorktreeManager {
     const worktreeName = slugifiedBranch;
     const worktreePath = join(WORKTREE_BASE, worktreeName);
 
-    console.log(`[CREATE] Starting createWorktree(${branchName} -> ${slugifiedBranch}, ${fromBranch})`);
 
     if (!existsSync(WORKTREE_BASE)) {
-      console.log(`[CREATE] Creating base directory: ${WORKTREE_BASE}`);
       mkdirSync(WORKTREE_BASE, { recursive: true });
     }
 
@@ -983,20 +981,16 @@ class WorktreeManager {
       const branchExists = execSync(`git branch --list "${slugifiedBranch}"`, {
         encoding: 'utf-8'
       }).trim().length > 0;
-      console.log(`[CREATE] Branch ${slugifiedBranch} exists: ${branchExists}`);
 
       // IDEMPOTENCY CHECK 2: Does the worktree directory already exist?
       const dirExists = existsSync(worktreePath);
-      console.log(`[CREATE] Directory ${worktreePath} exists: ${dirExists}`);
 
       // IDEMPOTENCY CHECK 3: Is there a worktree registration?
       const worktrees = this.listWorktrees();
       const worktreeRegistered = worktrees.some(wt => wt.name === worktreeName);
-      console.log(`[CREATE] Worktree ${worktreeName} registered: ${worktreeRegistered}`);
 
       // IDEMPOTENT LOGIC: If everything exists, return success
       if (branchExists && dirExists && worktreeRegistered) {
-        console.log(`[CREATE] Worktree ${worktreeName} already exists, skipping creation`);
         this.profiler.end(totalId);
         return {
           success: true,
@@ -1010,19 +1004,16 @@ class WorktreeManager {
 
       // Handle orphaned worktree registration (directory deleted but registration remains)
       if (worktreeRegistered && !dirExists) {
-        console.log(`[CREATE] Found orphaned registration for ${worktreeName}, pruning...`);
         execSync('git worktree prune', { stdio: 'pipe' });
       }
 
       // Handle orphaned directory (directory exists but not registered)
       if (dirExists && !worktreeRegistered) {
-        console.log(`[CREATE] Found orphaned directory ${worktreePath}, removing...`);
         execSync(`rm -rf "${worktreePath}"`, { stdio: 'pipe' });
       }
 
       // Progress: Creating git worktree
       const gitId = this.profiler.start('git-worktree-add', totalId);
-      console.log(`[CREATE] Broadcasting git progress...`);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'git',
@@ -1034,10 +1025,8 @@ class WorktreeManager {
         ? `git worktree add "${worktreePath}" "${slugifiedBranch}"`  // Branch exists, just check it out
         : `git worktree add -b "${slugifiedBranch}" "${worktreePath}" "${fromBranch}"`; // Create new branch
 
-      console.log(`[CREATE] Running: ${createCmd}`);
       execSync(createCmd, { stdio: 'pipe' });
 
-      console.log(`[CREATE] Git worktree created successfully`);
 
       // Add worktree-specific files to .gitignore to prevent git conflicts
       const gitignorePath = join(worktreePath, '.gitignore');
@@ -1055,11 +1044,9 @@ class WorktreeManager {
           // Only add if not already present
           if (!existingContent.includes('# Worktree-specific files')) {
             writeFileSync(gitignorePath, existingContent + '\n' + worktreeIgnoreEntries);
-            console.log(`[CREATE] Updated .gitignore with worktree-specific entries`);
           }
         } else {
           writeFileSync(gitignorePath, worktreeIgnoreEntries);
-          console.log(`[CREATE] Created .gitignore with worktree-specific entries`);
         }
       } catch (gitignoreError) {
         console.warn(`[CREATE] Failed to update .gitignore (non-critical):`, gitignoreError.message);
@@ -1069,7 +1056,6 @@ class WorktreeManager {
 
       // Push the new branch to GitHub to create it remotely
       const pushId = this.profiler.start('git-push-branch', totalId);
-      console.log(`[CREATE] Pushing branch to GitHub...`);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'git',
@@ -1081,7 +1067,6 @@ class WorktreeManager {
           cwd: worktreePath,
           stdio: 'pipe'
         });
-        console.log(`[CREATE] Branch pushed to GitHub successfully`);
       } catch (pushError) {
         console.warn(`[CREATE] Failed to push branch to GitHub: ${pushError.message}`);
         // Don't fail the whole operation if push fails
@@ -1096,7 +1081,6 @@ class WorktreeManager {
 
       // Progress: Allocating ports (quick, do before slow operations)
       const portsId = this.profiler.start('allocate-ports', totalId);
-      console.log(`[CREATE] Allocating ports...`);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'ports',
@@ -1134,9 +1118,7 @@ class WorktreeManager {
         }
 
         writeFileSync(envFilePath, envContent);
-        console.log(`✓ Created .env file for ${worktreeName}`);
       } else {
-        console.log(`✓ Using existing .env file for ${worktreeName}`);
       }
 
       // Generate MCP server configuration for this worktree
@@ -1157,14 +1139,12 @@ class WorktreeManager {
         }
 
         const mcpResult = mcpManager.generateClaudeSettings(worktreePath, null, { serverEnv });
-        console.log(`[CREATE] MCP configuration generated: ${mcpResult.count} servers configured`);
       } catch (error) {
         console.warn(`[CREATE] MCP configuration failed (non-critical):`, error.message);
       }
       this.profiler.end(mcpId);
 
       // Run bootstrap (containers must start before database copy)
-      console.log(`[CREATE] Starting bootstrap...`);
 
       const bootstrapId = this.profiler.start('npm-bootstrap', totalId);
       const bootstrapPromise = new Promise((resolve, reject) => {
@@ -1177,14 +1157,12 @@ class WorktreeManager {
             const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
             if (packageJson.scripts && packageJson.scripts.bootstrap) {
               installCommand = 'npm run bootstrap';
-              console.log(`[CREATE] Running bootstrap script to build packages...`);
               this.broadcast('worktree:progress', {
                 name: worktreeName,
                 step: 'bootstrap',
                 message: 'Building packages (bootstrap)...'
               });
             } else {
-              console.log(`[CREATE] No bootstrap script found, running npm install...`);
               this.broadcast('worktree:progress', {
                 name: worktreeName,
                 step: 'install',
@@ -1199,7 +1177,6 @@ class WorktreeManager {
             encoding: 'utf-8'
           });
 
-          console.log(`[CREATE] Dependencies installed successfully`);
           this.broadcast('worktree:progress', {
             name: worktreeName,
             step: installCommand.includes('bootstrap') ? 'bootstrap' : 'install',
@@ -1216,7 +1193,6 @@ class WorktreeManager {
 
       // Wait for bootstrap to complete
       await bootstrapPromise;
-      console.log(`[CREATE] Bootstrap completed`);
 
       this.broadcast('worktree:progress', {
         name: worktreeName,
@@ -1226,16 +1202,13 @@ class WorktreeManager {
 
       // Start containers
       const dockerId = this.profiler.start('docker-compose-up', totalId);
-      console.log(`[CREATE] Starting containers...`);
       await this.startContainersForWorktree(worktreeName, worktreePath);
-      console.log(`[CREATE] Containers started`);
       this.profiler.end(dockerId);
 
       // Copy database after containers are running
       const dbCopyId = this.profiler.start('database-copy', totalId);
       try {
         await this.copyDatabase(worktreeName, worktreePath);
-        console.log(`[CREATE] Database copy completed`);
       } catch (err) {
         console.error(`[CREATE] Database copy failed (non-critical):`, err.message);
         // Don't fail worktree creation if database copy fails
@@ -1260,7 +1233,6 @@ class WorktreeManager {
 
       // Log performance report
       const report = this.profiler.generateReport();
-      console.log('[PERFORMANCE] Worktree creation report:', JSON.stringify(report, null, 2));
 
       this.broadcast('worktree:created', worktree);
       return { success: true, worktree };
@@ -1296,7 +1268,6 @@ class WorktreeManager {
       this.profiler.end(totalId);
 
       const report = this.profiler.generateReport();
-      console.log('[PERFORMANCE] Optimized worktree creation report:', JSON.stringify(report, null, 2));
 
       return result;
     } catch (error) {
@@ -1312,7 +1283,6 @@ class WorktreeManager {
         step: 'database',
         message: 'Copying database...'
       });
-      console.log(`Copying database for ${targetWorktreeName}...`);
 
       // Use pg_dump/pg_restore instead of file copy to avoid checkpoint corruption
       // This is safer because it works with a running database and creates a consistent snapshot
@@ -1324,7 +1294,6 @@ class WorktreeManager {
       const mainDbPort = mainWorktree ? this._findDatabasePort(mainWorktree.ports || {}) : null;
 
       if (!mainDbPort) {
-        console.log(`No main worktree database found to copy`);
         this.broadcast('worktree:progress', {
           name: targetWorktreeName,
           step: 'database',
@@ -1334,7 +1303,6 @@ class WorktreeManager {
       }
 
       const sourcePort = mainDbPort;
-      console.log(`Found main worktree database on port ${sourcePort}`);
 
       // Check if source database is accessible
       try {
@@ -1342,7 +1310,6 @@ class WorktreeManager {
           stdio: 'pipe'
         });
       } catch (e) {
-        console.log(`Source database not running, skipping copy`);
         this.broadcast('worktree:progress', {
           name: targetWorktreeName,
           step: 'database',
@@ -1355,7 +1322,6 @@ class WorktreeManager {
       const targetDbPort = this._findDatabasePort(this.portRegistry.getWorktreePorts(targetWorktreeName));
 
       if (!targetDbPort) {
-        console.log(`Target database port not found for ${targetWorktreeName}`);
         this.broadcast('worktree:progress', {
           name: targetWorktreeName,
           step: 'database',
@@ -1365,7 +1331,6 @@ class WorktreeManager {
       }
 
       // Wait for target database to be ready (max 30 seconds)
-      console.log(`Waiting for target database on port ${targetDbPort} to be ready...`);
       let attempts = 0;
       const maxAttempts = 30;
       while (attempts < maxAttempts) {
@@ -1373,12 +1338,10 @@ class WorktreeManager {
           execSync(`PGPASSWORD=app pg_isready -h localhost -p ${targetDbPort} -U app -d app`, {
             stdio: 'pipe'
           });
-          console.log(`✓ Target database is ready`);
           break;
         } catch (e) {
           attempts++;
           if (attempts >= maxAttempts) {
-            console.log(`Target database not ready after ${maxAttempts}s, skipping copy`);
             this.broadcast('worktree:progress', {
               name: targetWorktreeName,
               step: 'database',
@@ -1390,7 +1353,6 @@ class WorktreeManager {
         }
       }
 
-      console.log(`Copying database from port ${sourcePort} to ${targetDbPort}...`);
 
       // Use pg_dump to export from source and pipe directly to target
       // This avoids writing large files to disk and is more efficient
@@ -1490,7 +1452,6 @@ class WorktreeManager {
             message: line.trim()
           });
         });
-        console.log(output);
       });
 
       child.stderr.on('data', (data) => {
@@ -1707,9 +1668,7 @@ class WorktreeManager {
         }
 
         writeFileSync(envFilePath, envContent);
-        console.log(`✓ Created .env file for ${worktreeName}`);
       } else {
-        console.log(`✓ Using existing .env file for ${worktreeName}`);
       }
 
       // Start Docker services
@@ -1719,7 +1678,6 @@ class WorktreeManager {
         stdio: 'pipe'
       });
 
-      console.log(`✓ Started Docker services for ${worktreeName}`);
 
       this.broadcast('services:started', { worktree: worktreeName, ports });
       return { success: true, ports };
@@ -1778,7 +1736,6 @@ class WorktreeManager {
         }
       }
 
-      console.log(`[INSTALL] Running ${installCommand} for ${worktreeName}...`);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'install',
@@ -1791,7 +1748,6 @@ class WorktreeManager {
         encoding: 'utf-8'
       });
 
-      console.log(`[INSTALL] Dependencies installed successfully for ${worktreeName}`);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'install',
@@ -2055,7 +2011,6 @@ function formatLogLine(line, serviceName) {
  * Handle logs WebSocket connection
  */
 function handleLogsConnection(ws, worktreeName, serviceName, manager) {
-  console.log(`\x1b[36mLogs connection opened for ${worktreeName}/${serviceName}\x1b[0m`);
 
   // Find worktree
   const worktrees = manager.listWorktrees();
@@ -2110,7 +2065,6 @@ function handleLogsConnection(ws, worktreeName, serviceName, manager) {
 
   // Cleanup on close
   ws.on('close', () => {
-    console.log(`\x1b[90mLogs connection closed for ${worktreeName}/${serviceName}\x1b[0m`);
     logsProcess.kill();
   });
 
@@ -2122,7 +2076,6 @@ function handleLogsConnection(ws, worktreeName, serviceName, manager) {
  * Handle combined logs WebSocket connection (all services)
  */
 function handleCombinedLogsConnection(ws, worktreeName, manager) {
-  console.log(`\x1b[36mCombined logs connection opened for ${worktreeName}\x1b[0m`);
 
   // Find worktree
   const worktrees = manager.listWorktrees();
@@ -2178,7 +2131,6 @@ function handleCombinedLogsConnection(ws, worktreeName, manager) {
 
   // Cleanup on close
   ws.on('close', () => {
-    console.log(`\x1b[90mCombined logs connection closed for ${worktreeName}\x1b[0m`);
     logsProcess.kill();
   });
 
@@ -2190,7 +2142,6 @@ function handleCombinedLogsConnection(ws, worktreeName, manager) {
  * Handle terminal WebSocket connection
  */
 function handleTerminalConnection(ws, worktreeName, command, manager) {
-  console.log(`Terminal connection opened for worktree: ${worktreeName} (${command})`);
 
   // Find worktree
   const worktrees = manager.listWorktrees();
@@ -2236,7 +2187,6 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
         type: 'takeover',
         message: 'Session taken over by another client'
       }));
-      console.log(`[TAKEOVER] Notified previous client for ${worktreeName}:${command}`);
     } catch (e) {
       console.error(`[TAKEOVER] Failed to notify previous client: ${e.message}`);
     }
@@ -2248,15 +2198,12 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
     // Determine command and args based on agent type
     let commandStr, args;
     if (command === 'shell') {
-      console.log(`Spawning shell for ${worktreeName}...`);
       commandStr = process.env.SHELL || '/bin/bash';
       args = [];
     } else if (command === 'codex') {
-      console.log(`Spawning codex for ${worktreeName}...`);
       commandStr = 'npx';
       args = ['-y', '@openai/codex@latest', '--dangerously-bypass-approvals-and-sandbox'];
     } else {
-      console.log(`Spawning Claude Code for ${worktreeName}...`);
       // npx handles caching intelligently - no need to clear cache
       commandStr = 'npx';
       args = ['-y', '@anthropic-ai/claude-code@latest', '--dangerously-skip-permissions'];
@@ -2269,10 +2216,8 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       rows: 30
     });
 
-    console.log(`✓ PTY spawned for ${worktreeName} (session: ${sessionId})`);
   } else {
     terminal = session.pty;
-    console.log(`✓ Reusing existing PTY for ${worktreeName} (session: ${sessionId})`);
 
     // Clean up any existing listeners for this session to prevent memory leaks
     if (session.activeListener) {
@@ -2350,7 +2295,6 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
         // Use 'drain' event instead of polling
         const drainHandler = () => {
           if (ws.bufferedAmount < BACKPRESSURE_THRESHOLD / 2) {
-            console.log(`[BACKPRESSURE] Drained - resuming PTY for session ${sessionId} (took ${Date.now() - pauseStart}ms)`);
             clearTimeout(drainTimeout);
             ws.off('drain', drainHandler);
             draining = false;
@@ -2451,7 +2395,6 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
 
   // Cleanup on close
   ws.on('close', () => {
-    console.log(`[TERMINAL] Connection closed for worktree: ${worktreeName} (session: ${sessionId})`);
 
     // Clean up drain interval if exists
     if (session && session.drainInterval) {
@@ -3389,7 +3332,6 @@ function createApp() {
     }
 
     try {
-      console.log(`Restarting service ${service} in worktree ${name}...`);
 
       // All services managed by docker compose
       runtime.execCompose(`restart ${service}`, {
@@ -3416,7 +3358,6 @@ function createApp() {
     }
 
     try {
-      console.log(`Rebuilding service ${service} in worktree ${name}...`);
 
       // All services managed by docker compose
       // Stop the service
@@ -3466,7 +3407,6 @@ function createApp() {
 
       // Destroy the session
       await manager.ptyManager.destroySession(sessionId);
-      console.log(`Successfully killed terminal session: ${sessionId} (${worktreeName}:${command})`);
       res.json({ success: true });
     } catch (error) {
       console.error('Error killing terminal:', error.message);
@@ -3543,7 +3483,6 @@ function createApp() {
           session.pty.kill();
         }
         ptyManager.sessions.delete(sessionId);
-        console.log(`[agent-switch] Killed PTY session: ${sessionId}`);
       }
 
       // Store agent preference in worktree config
@@ -3924,7 +3863,6 @@ async function autoStartContainers(manager) {
       } else {
         // Check if this is just a "no compose file" situation (not an error)
         if (result.error.includes('no configuration file provided')) {
-          console.log(`ℹ ${worktree.name}: No Docker services configured (no compose file)`);
           continue;
         }
 
