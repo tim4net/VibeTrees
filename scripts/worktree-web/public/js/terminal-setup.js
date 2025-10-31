@@ -219,10 +219,10 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     fontSize: 12,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: {
-      background: '#0a0e13',
+      background: '#000000',
       foreground: '#c9d1d9',
       cursor: '#c9d1d9',
-      cursorAccent: '#0a0e13'
+      cursorAccent: '#000000'
     },
     allowProposedApi: true,
     scrollback: 50000, // Increase for logs
