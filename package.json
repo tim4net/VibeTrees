@@ -19,6 +19,10 @@
     "test:coverage": "vitest run --coverage",
     "test:security": "vitest run scripts/security/*.test.mjs",
     "test:security:watch": "vitest scripts/security/*.test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
     "lint": "eslint scripts/**/*.mjs",
     "lint:fix": "eslint scripts/**/*.mjs --fix",
     "lint:security": "eslint scripts/**/*.mjs --rule 'no-eval: error' --rule 'no-implied-eval: error'",
@@ -37,8 +41,10 @@
     "development"
   ],
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@vitest/coverage-v8": "^4.0.4",
     "eslint": "^8.56.0",
+    "playwright": "^1.56.1",
     "prettier": "^3.2.0",
     "vitest": "^4.0.4"
   },
