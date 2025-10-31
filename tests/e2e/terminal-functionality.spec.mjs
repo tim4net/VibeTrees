@@ -18,15 +18,18 @@ test.describe('Terminal Functionality', () => {
 
     // Wait for the app to load
     await page.waitForSelector('.sidebar', { timeout: 10000 });
+
+    // Wait for worktrees to load
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
   });
 
   test('should render terminals with correct dimensions', async ({ page }) => {
     // Wait for at least one worktree to be visible
-    await page.waitForSelector('.worktree-item', { timeout: 10000 });
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
 
     // Get first worktree
-    const worktree = page.locator('.worktree-item').first();
-    const worktreeName = await worktree.getAttribute('data-worktree');
+    const worktree = page.locator('.worktree-card').first();
+    const worktreeName = await worktree.getAttribute('data-name');
 
     console.log(`Testing worktree: ${worktreeName}`);
 
@@ -76,9 +79,9 @@ test.describe('Terminal Functionality', () => {
 
   test('should maintain terminal size when switching tabs', async ({ page }) => {
     // Wait for worktrees
-    await page.waitForSelector('.worktree-item', { timeout: 10000 });
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
 
-    const worktree = page.locator('.worktree-item').first();
+    const worktree = page.locator('.worktree-card').first();
     await worktree.click();
     await page.waitForTimeout(500);
 
@@ -140,9 +143,9 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should show cursor when switching back to terminal', async ({ page }) => {
-    await page.waitForSelector('.worktree-item', { timeout: 10000 });
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
 
-    const worktree = page.locator('.worktree-item').first();
+    const worktree = page.locator('.worktree-card').first();
     await worktree.click();
     await page.waitForTimeout(500);
 
@@ -183,9 +186,9 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should handle terminal focus correctly', async ({ page }) => {
-    await page.waitForSelector('.worktree-item', { timeout: 10000 });
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
 
-    const worktree = page.locator('.worktree-item').first();
+    const worktree = page.locator('.worktree-card').first();
     await worktree.click();
     await page.waitForTimeout(500);
 
@@ -217,9 +220,9 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should handle window resize correctly', async ({ page }) => {
-    await page.waitForSelector('.worktree-item', { timeout: 10000 });
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
 
-    const worktree = page.locator('.worktree-item').first();
+    const worktree = page.locator('.worktree-card').first();
     await worktree.click();
     await page.waitForTimeout(500);
 
@@ -270,9 +273,9 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should not have horizontally squashed terminals after rapid tab switching', async ({ page }) => {
-    await page.waitForSelector('.worktree-item', { timeout: 10000 });
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
 
-    const worktree = page.locator('.worktree-item').first();
+    const worktree = page.locator('.worktree-card').first();
     await worktree.click();
     await page.waitForTimeout(500);
 
@@ -310,9 +313,9 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should handle heavy output without freezing', async ({ page }) => {
-    await page.waitForSelector('.worktree-item', { timeout: 10000 });
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
 
-    const worktree = page.locator('.worktree-item').first();
+    const worktree = page.locator('.worktree-card').first();
     await worktree.click();
     await page.waitForTimeout(500);
 
@@ -367,7 +370,7 @@ test.describe('Terminal Functionality', () => {
   });
 
   test('should maintain connection through WebSocket reconnections', async ({ page }) => {
-    await page.waitForSelector('.worktree-item', { timeout: 10000 });
+    await page.waitForSelector('.worktree-card', { timeout: 10000 });
 
     // Check WebSocket connection indicator
     const wsIndicator = page.locator('#ws-connection .ws-indicator');
