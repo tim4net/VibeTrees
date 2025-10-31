@@ -263,6 +263,7 @@ export function createTerminalTab(worktreeName, command, isWebUI = false, uiPort
   const tab = document.createElement('button');
   tab.className = 'terminal-tab';
   tab.id = tabId;
+  tab.draggable = true;
   tab.innerHTML = `
     <span>${commandLabel} - ${worktreeName}</span>
     <span class="terminal-tab-close" onclick="closeTerminalTab('${tabId}', event)">×</span>
@@ -284,6 +285,67 @@ export function createTerminalTab(worktreeName, command, isWebUI = false, uiPort
       command,
       serviceName
     });
+  };
+
+  // Add drag-and-drop reordering
+  tab.ondragstart = (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tabId);
+    tab.classList.add('dragging');
+  };
+
+  tab.ondragend = (e) => {
+    tab.classList.remove('dragging');
+    // Remove all drag-over classes
+    document.querySelectorAll('.terminal-tab').forEach(t => t.classList.remove('drag-over'));
+  };
+
+  tab.ondragover = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const draggingTab = document.querySelector('.terminal-tab.dragging');
+    if (draggingTab && draggingTab !== tab) {
+      tab.classList.add('drag-over');
+    }
+  };
+
+  tab.ondragleave = (e) => {
+    tab.classList.remove('drag-over');
+  };
+
+  tab.ondrop = (e) => {
+    e.preventDefault();
+    tab.classList.remove('drag-over');
+
+    const draggedTabId = e.dataTransfer.getData('text/plain');
+    const draggedTab = document.getElementById(draggedTabId);
+
+    if (draggedTab && draggedTab !== tab) {
+      const tabsContainer = document.getElementById('terminal-tabs');
+      const allTabs = Array.from(tabsContainer.children);
+      const draggedIndex = allTabs.indexOf(draggedTab);
+      const targetIndex = allTabs.indexOf(tab);
+
+      // Reorder DOM
+      if (draggedIndex < targetIndex) {
+        tabsContainer.insertBefore(draggedTab, tab.nextSibling);
+      } else {
+        tabsContainer.insertBefore(draggedTab, tab);
+      }
+
+      // Also reorder panels to match
+      const panelsContainer = document.getElementById('terminal-panels');
+      const draggedPanel = document.getElementById(`${draggedTabId}-panel`);
+      const targetPanel = document.getElementById(`${tabId}-panel`);
+
+      if (draggedPanel && targetPanel) {
+        if (draggedIndex < targetIndex) {
+          panelsContainer.insertBefore(draggedPanel, targetPanel.nextSibling);
+        } else {
+          panelsContainer.insertBefore(draggedPanel, targetPanel);
+        }
+      }
+    }
   };
 
   // Create panel
@@ -336,6 +398,33 @@ export function createTerminalTab(worktreeName, command, isWebUI = false, uiPort
   // Web UI tabs don't need terminal initialization
   if (isWebUI) {
     terminals.set(tabId, { isWebUI: true, worktree: worktreeName, uiPort });
+
+    // Update tab title when iframe loads
+    const iframe = document.getElementById(`${tabId}-iframe`);
+    if (iframe) {
+      iframe.addEventListener('load', () => {
+        try {
+          const iframeTitle = iframe.contentDocument?.title || iframe.contentWindow?.document?.title;
+          if (iframeTitle && iframeTitle.trim()) {
+            const tabElement = document.getElementById(tabId);
+            if (tabElement) {
+              const tabLabel = tabElement.querySelector('span:first-child');
+              if (tabLabel) {
+                tabLabel.innerHTML = `<i data-lucide="globe" class="lucide-sm"></i> ${iframeTitle}`;
+                // Reinitialize Lucide icons
+                if (window.lucide) {
+                  window.lucide.createIcons();
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // CORS prevents access to iframe title - keep default label
+          console.log(`[WebUI] Could not access iframe title (CORS): ${e.message}`);
+        }
+      });
+    }
+
     switchToTab(tabId);
     saveTerminalSession(tabId, worktreeName, command, isWebUI, isLogs, isCombinedLogs, serviceName, uiPort);
     return;
@@ -377,6 +466,12 @@ export function switchToTab(tabId) {
 
   // Save active tab to sessionStorage
   saveActiveTab(tabId);
+
+  // Remember last active tab for this worktree
+  const tabInfo = appState.tabs.get(tabId);
+  if (tabInfo && tabInfo.worktree) {
+    appState.setLastActiveTab(tabInfo.worktree, tabId);
+  }
 
   // Fit the terminal
   const terminalInfo = terminals.get(tabId);

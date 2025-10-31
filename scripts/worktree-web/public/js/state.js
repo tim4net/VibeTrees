@@ -10,6 +10,7 @@ class AppState {
     this.sidebarCollapsed = this.loadSidebarState();
     this.worktrees = [];
     this.tabs = new Map(); // tabId -> { worktree, command, isWebUI, isLogs, etc. }
+    this.lastActiveTabPerWorktree = new Map(); // worktreeName -> tabId
 
     // Event listeners
     this.listeners = new Map(); // eventType -> Set of callbacks
@@ -132,6 +133,25 @@ class AppState {
   }
 
   /**
+   * Set the last active tab for a worktree
+   * @param {string} worktreeName - Worktree name
+   * @param {string} tabId - Tab ID
+   */
+  setLastActiveTab(worktreeName, tabId) {
+    this.lastActiveTabPerWorktree.set(worktreeName, tabId);
+    this.persistLastActiveTabs();
+  }
+
+  /**
+   * Get the last active tab for a worktree
+   * @param {string} worktreeName - Worktree name
+   * @returns {string|null} Tab ID or null
+   */
+  getLastActiveTab(worktreeName) {
+    return this.lastActiveTabPerWorktree.get(worktreeName) || null;
+  }
+
+  /**
    * Load persisted state from localStorage
    */
   loadPersistedState() {
@@ -140,6 +160,13 @@ class AppState {
       if (saved) {
         const state = JSON.parse(saved);
         this.selectedWorktreeId = state.selectedWorktreeId || null;
+      }
+
+      // Load last active tabs
+      const savedTabs = localStorage.getItem('last-active-tabs');
+      if (savedTabs) {
+        const tabsObj = JSON.parse(savedTabs);
+        this.lastActiveTabPerWorktree = new Map(Object.entries(tabsObj));
       }
     } catch (e) {
       console.warn('Failed to load persisted state:', e);
@@ -157,6 +184,18 @@ class AppState {
       localStorage.setItem('worktree-manager-state', JSON.stringify(state));
     } catch (e) {
       console.warn('Failed to persist state:', e);
+    }
+  }
+
+  /**
+   * Persist last active tabs to localStorage
+   */
+  persistLastActiveTabs() {
+    try {
+      const tabsObj = Object.fromEntries(this.lastActiveTabPerWorktree);
+      localStorage.setItem('last-active-tabs', JSON.stringify(tabsObj));
+    } catch (e) {
+      console.warn('Failed to persist last active tabs:', e);
     }
   }
 

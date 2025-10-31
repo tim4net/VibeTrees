@@ -80,11 +80,20 @@ function updateTabVisibility() {
   }
 
   // If we filtered and there are visible tabs, ensure one is active
-  if (visibleCount > 0 && firstVisibleTab) {
+  if (visibleCount > 0) {
     const hasActiveVisibleTab = Array.from(document.querySelectorAll('.terminal-tab:not(.hidden).active')).length > 0;
     if (!hasActiveVisibleTab) {
-      // Activate the first visible tab
-      window.switchToTab(firstVisibleTab);
+      // Try to restore the last active tab for this worktree
+      const lastActiveTabId = appState.getLastActiveTab(selectedWorktreeId);
+      const lastTabExists = lastActiveTabId && document.getElementById(lastActiveTabId) && !document.getElementById(lastActiveTabId).classList.contains('hidden');
+
+      if (lastTabExists) {
+        // Restore last active tab
+        window.switchToTab(lastActiveTabId);
+      } else if (firstVisibleTab) {
+        // Fall back to first visible tab
+        window.switchToTab(firstVisibleTab);
+      }
     }
   }
 

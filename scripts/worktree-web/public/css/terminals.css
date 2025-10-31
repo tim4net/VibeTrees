@@ -73,6 +73,17 @@
   display: none;
 }
 
+.terminal-tab.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.terminal-tab.drag-over {
+  background: #21262d;
+  border-left: 2px solid #58a6ff;
+  border-right: 2px solid #58a6ff;
+}
+
 .terminal-tab-close {
   display: flex;
   align-items: center;
