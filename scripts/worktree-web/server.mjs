@@ -482,7 +482,8 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   const BACKPRESSURE_TIMEOUT = 30000; // 30 seconds max pause
   const BACKPRESSURE_CHECK_INTERVAL = 100; // Check every 100ms
   let draining = false;
-  let isPaused = false;
+  let isPaused = false; // Server-side backpressure pause state
+  let clientPaused = false; // Client-side flow control pause state
 
   // Smart output buffering: batch small outputs, send large ones immediately
   let outputBuffer = '';
@@ -600,20 +601,27 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
 
         // Handle client-side flow control: pause
         if (msg.type === 'pause') {
-          if (!isPaused && terminal && typeof terminal.pause === 'function') {
-            isPaused = true;
-            terminal.pause();
-            console.log(`[PTY Flow Control] Client requested pause for ${worktreeName}`);
+          if (!clientPaused && terminal && typeof terminal.pause === 'function') {
+            const wasFullyResumed = !isPaused && !clientPaused;
+            clientPaused = true;
+            // Only pause PTY if neither system has it paused
+            if (wasFullyResumed) {
+              terminal.pause();
+              console.log(`[PTY Flow Control] Client requested pause for ${worktreeName}`);
+            }
           }
           return;
         }
 
         // Handle client-side flow control: resume
         if (msg.type === 'resume') {
-          if (isPaused && terminal && typeof terminal.resume === 'function') {
-            isPaused = false;
-            terminal.resume();
-            console.log(`[PTY Flow Control] Client requested resume for ${worktreeName}`);
+          if (clientPaused && terminal && typeof terminal.resume === 'function') {
+            clientPaused = false;
+            // Only resume PTY if server backpressure is also not active
+            if (!isPaused) {
+              terminal.resume();
+              console.log(`[PTY Flow Control] Client requested resume for ${worktreeName}`);
+            }
           }
           return;
         }
@@ -626,8 +634,8 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       }
     }
 
-    // Default: terminal input
-    if (!isPaused) {
+    // Default: terminal input - check both pause states
+    if (!isPaused && !clientPaused) {
       terminal.write(dataStr);
     }
   };
