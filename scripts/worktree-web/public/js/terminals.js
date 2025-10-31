@@ -44,10 +44,14 @@ export function initTerminals() {
     // ResizeObserver will handle most cases, but do one fit for immediate feedback
     if (activeTabId) {
       const terminalInfo = terminals.get(activeTabId);
-      if (terminalInfo && terminalInfo.fitAddon) {
+      if (terminalInfo) {
         requestAnimationFrame(() => {
           if (terminalInfo.fitAddon) {
             terminalInfo.fitAddon.fit();
+          }
+          // Refocus terminal after filter change
+          if (terminalInfo.terminal && !terminalInfo.isWebUI) {
+            terminalInfo.terminal.focus();
           }
         });
       }
@@ -478,14 +482,18 @@ export function switchToTab(tabId) {
     appState.setLastActiveTab(tabInfo.worktree, tabId);
   }
 
-  // Fit the terminal
+  // Fit the terminal and give it focus
   const terminalInfo = terminals.get(tabId);
-  if (terminalInfo && terminalInfo.fitAddon) {
+  if (terminalInfo) {
     // ResizeObserver will handle the fit automatically when panel becomes visible
     // But do one immediate fit to ensure sizing happens quickly
     requestAnimationFrame(() => {
       if (terminalInfo.fitAddon) {
         terminalInfo.fitAddon.fit();
+      }
+      // Focus terminal so cursor appears and keyboard input works
+      if (terminalInfo.terminal && !terminalInfo.isWebUI) {
+        terminalInfo.terminal.focus();
       }
     });
   }
