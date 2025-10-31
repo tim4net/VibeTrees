@@ -97,7 +97,8 @@ function getDockerStatus(path, name) {
       .map(line => JSON.parse(line))
       .filter(c => c.Names); // Basic filter - check Names exists
 
-    return containers
+    // Map containers to service objects with extracted service names
+    const mapped = containers
       .map(c => {
         // Extract service name from Labels string (Docker returns labels as comma-separated string)
         let serviceName = null;
@@ -122,10 +123,27 @@ function getDockerStatus(path, name) {
           name: serviceName,
           state: c.State || 'unknown',
           status: c.Status || '',
-          ports: c.Ports ? parseDockerPorts(c.Ports) : []
+          ports: c.Ports ? parseDockerPorts(c.Ports) : [],
+          createdAt: c.CreatedAt || '' // Keep creation time for deduplication
         };
       })
-      .filter(c => !c.name.includes('init')); // Filter out init containers after service name extraction
+      .filter(c => !c.name.includes('init')); // Filter out init containers
+
+    // Deduplicate by service name - keep most recently created for each service
+    // This handles cases where COMPOSE_PROJECT_NAME changed but working_dir stayed the same
+    const serviceMap = new Map();
+    for (const container of mapped) {
+      const existing = serviceMap.get(container.name);
+      if (!existing || container.createdAt > existing.createdAt) {
+        serviceMap.set(container.name, container);
+      }
+    }
+
+    // Remove createdAt from final output and return deduplicated containers
+    return Array.from(serviceMap.values()).map(c => {
+      const { createdAt, ...rest } = c;
+      return rest;
+    });
   } catch (error) {
     return [];
   }

@@ -613,7 +613,8 @@ class WorktreeManager {
         .map(line => JSON.parse(line))
         .filter(c => c.Names); // Basic filter - check Names exists
 
-      const mappedContainers = containers.map(c => {
+      // Map containers to service objects with extracted service names
+      const mapped = containers.map(c => {
         // Extract service name from Labels string (Docker returns labels as comma-separated string)
         let serviceName = null;
 
@@ -637,11 +638,28 @@ class WorktreeManager {
           name: serviceName,
           state: c.State || 'unknown',
           status: c.Status || '',
-          ports: c.Ports ? c.Ports.split(',').map(p => p.trim()) : []
+          ports: c.Ports ? c.Ports.split(',').map(p => p.trim()) : [],
+          createdAt: c.CreatedAt || '' // Keep creation time for deduplication
         };
-      }).filter(c => !c.name.includes('init')); // Filter out init containers after service name extraction
+      }).filter(c => !c.name.includes('init')); // Filter out init containers
 
-      statuses.push(...mappedContainers);
+      // Deduplicate by service name - keep most recently created for each service
+      // This handles cases where COMPOSE_PROJECT_NAME changed but working_dir stayed the same
+      const serviceMap = new Map();
+      for (const container of mapped) {
+        const existing = serviceMap.get(container.name);
+        if (!existing || container.createdAt > existing.createdAt) {
+          serviceMap.set(container.name, container);
+        }
+      }
+
+      // Remove createdAt from final output and push deduplicated containers
+      const deduplicated = Array.from(serviceMap.values()).map(c => {
+        const { createdAt, ...rest } = c;
+        return rest;
+      });
+
+      statuses.push(...deduplicated);
     } catch {
       // Docker services might not be running or docker not available
     }
