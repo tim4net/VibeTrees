@@ -611,12 +611,16 @@ class WorktreeManager {
       const containers = output.trim().split('\n')
         .filter(line => line.trim())
         .map(line => JSON.parse(line))
-        .filter(c => !c.Names.endsWith('-init')); // Filter out init containers
+        .filter(c => c.Names && !c.Names.endsWith('-init')); // Filter out init containers
 
       statuses.push(...containers.map(c => {
         // Extract service name from Labels string (Docker returns labels as comma-separated string)
-        const serviceMatch = c.Labels ? c.Labels.match(/com\.docker\.compose\.service=([^,]+)/) : null;
-        let serviceName = serviceMatch ? serviceMatch[1] : null;
+        let serviceName = null;
+
+        if (c.Labels && typeof c.Labels === 'string') {
+          const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
+          serviceName = serviceMatch ? serviceMatch[1] : null;
+        }
 
         // Fallback: parse from container name if label extraction failed
         if (!serviceName && c.Names) {
@@ -631,8 +635,8 @@ class WorktreeManager {
 
         return {
           name: serviceName,
-          state: c.State,
-          status: c.Status,
+          state: c.State || 'unknown',
+          status: c.Status || '',
           ports: c.Ports ? c.Ports.split(',').map(p => p.trim()) : []
         };
       }));
