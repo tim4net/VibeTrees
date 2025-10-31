@@ -53,7 +53,7 @@ test.describe('Terminal Functionality', () => {
     await openTerminal(page, worktreeName, 'claude');
 
     // Find the Claude terminal tab
-    const aiTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
+    const aiTab = page.locator('.terminal-tab').filter({ hasText: /Claude/ }).first();
     await expect(aiTab).toBeVisible();
 
     // Click on the AI terminal tab to ensure it's active
@@ -61,7 +61,7 @@ test.describe('Terminal Functionality', () => {
     await page.waitForTimeout(500);
 
     // Get the active terminal panel
-    const activePanel = page.locator('.tab-content.active');
+    const activePanel = page.locator('.terminal-tab-content.active');
     await expect(activePanel).toBeVisible();
 
     // Get terminal wrapper dimensions
@@ -96,15 +96,15 @@ test.describe('Terminal Functionality', () => {
     await openTerminal(page, worktreeName, 'shell');
 
     // Find both tabs
-    const claudeTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
-    const shellTab = page.locator('.tab').filter({ hasText: /Shell/ }).first();
+    const claudeTab = page.locator('.terminal-tab').filter({ hasText: /Claude/ }).first();
+    const shellTab = page.locator('.terminal-tab').filter({ hasText: /Shell/ }).first();
 
     // Click Claude tab
     await claudeTab.click();
     await page.waitForTimeout(1000);
 
     // Measure Claude terminal
-    let activePanel = page.locator('.tab-content.active');
+    let activePanel = page.locator('.terminal-tab-content.active');
     let terminalWrapper = activePanel.locator('.terminal-wrapper');
     let firstBox = await terminalWrapper.boundingBox();
 
@@ -115,7 +115,7 @@ test.describe('Terminal Functionality', () => {
     await page.waitForTimeout(1000);
 
     // Measure Shell terminal
-    activePanel = page.locator('.tab-content.active');
+    activePanel = page.locator('.terminal-tab-content.active');
     terminalWrapper = activePanel.locator('.terminal-wrapper');
     let secondBox = await terminalWrapper.boundingBox();
 
@@ -126,7 +126,7 @@ test.describe('Terminal Functionality', () => {
     await page.waitForTimeout(1000);
 
     // Measure Claude terminal again
-    activePanel = page.locator('.tab-content.active');
+    activePanel = page.locator('.terminal-tab-content.active');
     terminalWrapper = activePanel.locator('.terminal-wrapper');
     let firstBoxAfter = await terminalWrapper.boundingBox();
 
@@ -148,14 +148,14 @@ test.describe('Terminal Functionality', () => {
     await openTerminal(page, worktreeName, 'claude');
     await openTerminal(page, worktreeName, 'shell');
 
-    const claudeTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
-    const shellTab = page.locator('.tab').filter({ hasText: /Shell/ }).first();
+    const claudeTab = page.locator('.terminal-tab').filter({ hasText: /Claude/ }).first();
+    const shellTab = page.locator('.terminal-tab').filter({ hasText: /Shell/ }).first();
 
     await claudeTab.click();
     await page.waitForTimeout(1000);
 
     // Check for cursor in the Claude terminal
-    const activePanel = page.locator('.tab-content.active');
+    const activePanel = page.locator('.terminal-tab-content.active');
     const cursor = activePanel.locator('.xterm-cursor-layer');
 
     // Cursor layer should exist
@@ -170,7 +170,7 @@ test.describe('Terminal Functionality', () => {
     await page.waitForTimeout(500);
 
     // Cursor should still be visible
-    const cursorAfter = page.locator('.tab-content.active').locator('.xterm-cursor-layer');
+    const cursorAfter = page.locator('.terminal-tab-content.active').locator('.xterm-cursor-layer');
     await expect(cursorAfter).toBeVisible();
   });
 
@@ -180,12 +180,12 @@ test.describe('Terminal Functionality', () => {
 
     await openTerminal(page, worktreeName, 'claude');
 
-    const claudeTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
+    const claudeTab = page.locator('.terminal-tab').filter({ hasText: /Claude/ }).first();
     await claudeTab.click();
     await page.waitForTimeout(1000);
 
     // Get the terminal textarea (xterm.js uses a hidden textarea for input)
-    const activePanel = page.locator('.tab-content.active');
+    const activePanel = page.locator('.terminal-tab-content.active');
     const textarea = activePanel.locator('.xterm-helper-textarea');
 
     // Terminal textarea should exist
@@ -206,12 +206,12 @@ test.describe('Terminal Functionality', () => {
 
     await openTerminal(page, worktreeName, 'claude');
 
-    const claudeTab = page.locator('.tab').filter({ hasText: /Claude/ }).first();
+    const claudeTab = page.locator('.terminal-tab').filter({ hasText: /Claude/ }).first();
     await claudeTab.click();
     await page.waitForTimeout(1000);
 
     // Measure initial size
-    const activePanel = page.locator('.tab-content.active');
+    const activePanel = page.locator('.terminal-tab-content.active');
     const terminalWrapper = activePanel.locator('.terminal-wrapper');
     const initialBox = await terminalWrapper.boundingBox();
 
@@ -253,7 +253,7 @@ test.describe('Terminal Functionality', () => {
     await openTerminal(page, worktreeName, 'claude');
     await openTerminal(page, worktreeName, 'shell');
 
-    const tabs = page.locator('.tab');
+    const tabs = page.locator('.terminal-tab');
     const tabCount = await tabs.count();
 
     if (tabCount < 2) {
@@ -274,7 +274,7 @@ test.describe('Terminal Functionality', () => {
     await tabs.nth(0).click();
     await page.waitForTimeout(1000);
 
-    const activePanel = page.locator('.tab-content.active');
+    const activePanel = page.locator('.terminal-tab-content.active');
     const terminalWrapper = activePanel.locator('.terminal-wrapper');
     const finalBox = await terminalWrapper.boundingBox();
 
