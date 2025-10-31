@@ -246,6 +246,15 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
 
   terminal.open(panel.querySelector('.terminal-wrapper'));
 
+  // Initial fit - but only if panel is visible
+  setTimeout(() => {
+    const rect = panel.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      fitAddon.fit();
+    }
+    // If hidden, ResizeObserver will handle the fit when visible
+  }, isCombinedLogs ? 100 : 150);
+
   // Copy/Paste keyboard shortcuts
   terminal.attachCustomKeyEventHandler((event) => {
     // Copy: Cmd+C (Mac) or Ctrl+Shift+C (Linux/Windows)
@@ -343,9 +352,6 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
       ]);
     }
   });
-
-  // Fit terminal after delay to ensure toolbar is rendered
-  setTimeout(() => fitAddon.fit(), isCombinedLogs ? 100 : 150);
 
   // ResizeObserver for efficient resize handling (same as PTY terminals)
   let resizeFitToken = null;
@@ -550,8 +556,15 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
   const terminalWrapper = panel.querySelector('.terminal-wrapper');
   terminal.open(terminalWrapper);
 
-  // Fit terminal after delay
-  setTimeout(() => fitAddon.fit(), 100);
+  // Fit terminal after delay - but only if panel is visible
+  setTimeout(() => {
+    // Check if panel actually has size before fitting
+    const rect = panel.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      fitAddon.fit();
+    }
+    // If panel is hidden, ResizeObserver will handle the fit when it becomes visible
+  }, 100);
 
   // Pause polling when terminal is focused (prevents interruptions)
   // Use DOM events since xterm doesn't expose onFocus/onBlur
