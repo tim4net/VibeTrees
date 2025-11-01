@@ -77,7 +77,7 @@ pm2 logs
 
 ## Configuration
 
-The PM2 configuration is in `ecosystem.config.js`:
+The PM2 configuration is in `ecosystem.config.cjs`:
 
 - **Auto-restart:** Enabled
 - **Max memory:** 500MB (restarts if exceeded)
@@ -143,7 +143,7 @@ npm run pm2:start
 
 **Development (with file watching):**
 ```bash
-pm2 start ecosystem.config.js --env development
+pm2 start ecosystem.config.cjs --env development
 ```
 
 ## Switching from npm run web
