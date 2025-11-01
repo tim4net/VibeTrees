@@ -122,7 +122,7 @@ function showNewProjectModal() {
   document.getElementById('new-project-name').value = '';
   document.getElementById('new-project-path').value = '';
 
-  modal.classList.add('open');
+  modal.classList.add('active');
 }
 
 /**
@@ -131,7 +131,7 @@ function showNewProjectModal() {
 function closeNewProjectModal() {
   const modal = document.getElementById('new-project-modal');
   if (modal) {
-    modal.classList.remove('open');
+    modal.classList.remove('active');
   }
 }
 
