@@ -20,6 +20,7 @@ import { FirewallHelper } from '../firewall-helper.mjs';
 import { ServiceConfig } from '../service-config.mjs';
 import { InitializationManager } from '../initialization-manager.mjs';
 import { ProjectManager } from '../project-manager.mjs';
+import { UpdateChecker } from '../update-checker.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = join(__dirname, '..', '..');
@@ -247,6 +248,11 @@ const worktreeManager = new WorktreeManager({
     AIConflictResolver
   }
 });
+
+// Initialize update checker
+const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf-8'));
+worktreeManager.updateChecker = new UpdateChecker(packageJson.version);
+worktreeManager.updateChecker.start();
 
 /**
  * Format log line by adding color and structure
@@ -819,6 +825,21 @@ function createApp() {
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to read version' });
+    }
+  });
+
+  // Update Status API
+  app.get('/api/updates', (req, res) => {
+    try {
+      const status = manager.updateChecker?.getStatus() || {
+        currentVersion: null,
+        latestVersion: null,
+        isUpdateAvailable: false,
+        lastCheck: null
+      };
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to check for updates' });
     }
   });
 
