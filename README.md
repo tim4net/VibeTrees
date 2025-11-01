@@ -9,8 +9,13 @@ No more port conflicts. No more stashing work. No more losing context when you s
 ### 1. Install
 
 ```bash
-# Install VibeTrees globally
-npm install -g git+https://github.com/tim4net/VibeTrees.git
+# Clone the repository
+git clone https://github.com/tim4net/VibeTrees.git
+cd VibeTrees
+
+# Install dependencies and link globally
+npm install
+npm install -g .
 
 # Install PM2 (process manager)
 npm install -g pm2
