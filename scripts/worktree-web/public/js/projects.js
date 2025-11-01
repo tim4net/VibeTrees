@@ -3,6 +3,8 @@
  * Handles project selection, switching, and creation
  */
 
+import { escapeHtml } from './utils.js';
+
 let currentProject = null;
 let allProjects = [];
 
@@ -22,6 +24,22 @@ async function initializeProjects() {
       const projectId = e.target.value;
       if (projectId && projectId !== currentProject?.id) {
         await switchProject(projectId);
+      }
+    });
+  }
+
+  // Set up path input listener for auto-populating project name (once)
+  const pathInput = document.getElementById('new-project-path');
+  const nameInput = document.getElementById('new-project-name');
+  if (pathInput && nameInput) {
+    pathInput.addEventListener('input', () => {
+      const path = pathInput.value.trim();
+      if (path) {
+        // Extract folder name from path
+        const folderName = path.split('/').filter(p => p).pop();
+        if (folderName && !nameInput.value) {
+          nameInput.value = folderName;
+        }
       }
     });
   }
@@ -122,21 +140,6 @@ async function showNewProjectModal() {
   // Clear form
   document.getElementById('new-project-name').value = '';
   document.getElementById('new-project-path').value = '';
-
-  // Set up path input listener to auto-populate name
-  const pathInput = document.getElementById('new-project-path');
-  const nameInput = document.getElementById('new-project-name');
-
-  pathInput.addEventListener('input', () => {
-    const path = pathInput.value.trim();
-    if (path) {
-      // Extract folder name from path
-      const folderName = path.split('/').filter(p => p).pop();
-      if (folderName && !nameInput.value) {
-        nameInput.value = folderName;
-      }
-    }
-  });
 
   // Show modal first
   modal.classList.add('active');
@@ -393,17 +396,6 @@ function selectSuggestedProject(path, name) {
     pathInput.value = path;
     nameInput.value = name;
   }
-}
-
-/**
- * Escape HTML to prevent XSS
- * @param {string} str - String to escape
- * @returns {string} Escaped string
- */
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }
 
 /**

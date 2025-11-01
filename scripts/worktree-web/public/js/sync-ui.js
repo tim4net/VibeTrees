@@ -3,6 +3,8 @@
  * Handles update checking, sync dialog, progress tracking, and results display
  */
 
+import { escapeHtml } from './utils.js';
+
 // State management
 const syncState = {
   updateChecks: {}, // worktreeName -> { hasUpdates, commitCount, commits, lastCheck }
@@ -693,14 +695,6 @@ function formatRelativeTime(timestamp) {
   }
 }
 
-/**
- * Escape HTML
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
 
 // Export to global scope
 window.syncUI = {

@@ -3,6 +3,8 @@
  * Handles conflict detection and resolution interface
  */
 
+import { escapeHtml } from './utils.js';
+
 /**
  * Show conflict resolution dialog
  */
@@ -278,14 +280,6 @@ function createConflictModal() {
   return modal;
 }
 
-/**
- * Escape HTML
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
 
 // Export to global scope
 window.conflictUI = {

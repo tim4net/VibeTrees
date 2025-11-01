@@ -3,6 +3,8 @@
  * Toast notifications for worktree updates
  */
 
+import { escapeHtml } from './utils.js';
+
 // State management
 const notificationState = {
   shownNotifications: new Set(), // Set of "worktreeName:commitCount" to track shown notifications
@@ -150,14 +152,6 @@ export function clearNotificationHistory() {
   console.log('[update-notifications] Notification history cleared');
 }
 
-/**
- * Escape HTML
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
 
 // Export to global scope
 window.updateNotifications = {

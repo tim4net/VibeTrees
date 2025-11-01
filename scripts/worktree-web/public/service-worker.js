@@ -1,4 +1,4 @@
-const CACHE_NAME = 'worktree-manager-v10';
+const CACHE_NAME = 'worktree-manager-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -15,6 +15,7 @@ const STATIC_ASSETS = [
   '/js/tabs.js',
   '/js/modals.js',
   '/js/projects.js',
+  '/js/utils.js',
   '/js/service-actions.js',
   '/js/context-menus.js',
   '/js/context-menu-actions.js',
