@@ -910,6 +910,11 @@ function createApp() {
     }
   });
 
+  // System API - Get user's home directory
+  app.get('/api/system/home', (req, res) => {
+    res.json({ home: homedir() });
+  });
+
   app.get('/api/worktrees', async (req, res) => {
     // Use async worker thread version to avoid blocking event loop
     const worktrees = await manager.listWorktreesAsync();

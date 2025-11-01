@@ -183,7 +183,45 @@ if (document.readyState === 'loading') {
   initializeProjects();
 }
 
+/**
+ * Browse for a project directory - shows helpful suggestions
+ */
+async function browseForProjectPath() {
+  try {
+    // Get user's home directory from server
+    const response = await fetch('/api/system/home');
+    const { home } = await response.json();
+
+    // Common project directory suggestions
+    const suggestions = [
+      `${home}/code`,
+      `${home}/projects`,
+      `${home}/workspace`,
+      `${home}/dev`,
+      `${home}/Documents/projects`,
+      `${home}/Desktop`,
+      home
+    ];
+
+    const message = `Common project directories:\n\n${suggestions.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nPaste one of these paths, or enter your own absolute path.`;
+
+    // Show suggestions
+    alert(message);
+
+    // Auto-fill with ~/code if it exists, otherwise home
+    document.getElementById('new-project-path').value = `${home}/code`;
+    document.getElementById('new-project-path').select();
+
+  } catch (error) {
+    console.error('[Projects] Error getting suggestions:', error);
+    // Fallback: just focus the input
+    document.getElementById('new-project-path').focus();
+    document.getElementById('new-project-path').select();
+  }
+}
+
 // Expose functions to global scope for onclick handlers
 window.showNewProjectModal = showNewProjectModal;
 window.closeNewProjectModal = closeNewProjectModal;
 window.createProject = createProject;
+window.browseForProjectPath = browseForProjectPath;

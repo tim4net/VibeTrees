@@ -245,12 +245,18 @@
 
       <div class="form-group">
         <label for="new-project-path">Project Path</label>
-        <input
-          type="text"
-          id="new-project-path"
-          placeholder="/path/to/project"
-          required
-        />
+        <div style="display: flex; gap: 8px;">
+          <input
+            type="text"
+            id="new-project-path"
+            placeholder="/path/to/project"
+            required
+            style="flex: 1;"
+          />
+          <button type="button" class="secondary" onclick="browseForProjectPath()" title="Browse for folder">
+            <i data-lucide="folder-open" class="lucide-sm"></i> Browse
+          </button>
+        </div>
         <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
           Must be an absolute path to an existing directory
         </small>
