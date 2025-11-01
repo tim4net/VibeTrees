@@ -471,11 +471,10 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       commandStr = 'npx';
       args = ['-y', '@openai/codex@latest', '--dangerously-bypass-approvals-and-sandbox'];
     } else {
-      // Use native claude binary (not npx to avoid nested instance)
-      // Prefer ~/.local/bin/claude, fallback to PATH
-      const nativePath = join(homedir(), '.local', 'bin', 'claude');
-      commandStr = existsSync(nativePath) ? nativePath : 'claude';
-      args = [];
+      // Use npx with claude-code package
+      // The --dangerously-skip-permissions flag prevents the interactive approval prompts
+      commandStr = 'npx';
+      args = ['-y', '@anthropic-ai/claude-code@latest', '--dangerously-skip-permissions'];
     }
 
     terminal = manager.ptyManager.spawnPTY(sessionId, {
