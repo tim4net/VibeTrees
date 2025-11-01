@@ -101,27 +101,75 @@ const PM2_NAME = 'vibe-worktrees';
 
 // Update command
 if (args.includes('--update')) {
-  console.log('🔄 Updating Vibe Worktrees...');
+  console.log('🔄 Checking for updates...');
   console.log('');
 
-  // Check if server is running
-  let wasRunning = false;
   try {
-    execSync(`pm2 describe ${PM2_NAME}`, { stdio: 'ignore' });
-    wasRunning = true;
-  } catch {
-    wasRunning = false;
-  }
+    // Check if updates are available first (don't stop server yet!)
+    const https = await import('https');
+    const updateCheckPromise = new Promise((resolve, reject) => {
+      https.get('https://api.github.com/repos/tim4net/VibeTrees/releases/latest', {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'VibeTrees-Update-Checker'
+        }
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const release = JSON.parse(data);
+            resolve(release.tag_name.replace(/^v/, ''));
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }).on('error', reject);
+    });
 
-  try {
-    // Stop server if running
+    const latestVersion = await updateCheckPromise;
+    const packageJson = await import('../package.json', { with: { type: 'json' } });
+    const currentVersion = packageJson.default.version;
+
+    // Compare versions
+    const compareVersions = (v1, v2) => {
+      const parts1 = v1.split('.').map(Number);
+      const parts2 = v2.split('.').map(Number);
+      for (let i = 0; i < 3; i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 < p2) return -1;
+        if (p1 > p2) return 1;
+      }
+      return 0;
+    };
+
+    if (compareVersions(currentVersion, latestVersion) >= 0) {
+      console.log(`✅ Already up to date (v${currentVersion})`);
+      console.log('');
+      process.exit(0);
+    }
+
+    console.log(`📦 Update available: v${currentVersion} → v${latestVersion}`);
+    console.log('');
+
+    // Check if server is running
+    let wasRunning = false;
+    try {
+      execSync(`pm2 describe ${PM2_NAME}`, { stdio: 'ignore' });
+      wasRunning = true;
+    } catch {
+      wasRunning = false;
+    }
+
+    // Now stop server and update
     if (wasRunning) {
+      console.log('⏸️  Stopping server...');
       execSync(`pm2 stop ${PM2_NAME}`, { stdio: 'ignore' });
-      console.log('⏸️  Server stopped');
     }
 
     // Update via npm
-    console.log('📦 Downloading and installing latest version...');
+    console.log('📦 Downloading and installing...');
     execSync('npm install -g git+https://github.com/tim4net/VibeTrees.git', { stdio: 'inherit' });
 
     console.log('');
@@ -141,7 +189,8 @@ if (args.includes('--update')) {
     console.log('');
   } catch (error) {
     console.error('');
-    console.error('❌ Update failed');
+    console.error('❌ Update check/install failed');
+    console.error('Error:', error.message);
     console.error('');
     console.error('Try manually:');
     console.error('  npm install -g git+https://github.com/tim4net/VibeTrees.git');
