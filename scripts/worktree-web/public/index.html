@@ -44,7 +44,15 @@
     <div class="sidebar" id="sidebar">
       <div class="resize-handle" id="resize-handle"></div>
       <div class="sidebar-header">
-        <div class="sidebar-title"><i data-lucide="trees" class="lucide"></i> Worktrees</div>
+        <div class="sidebar-title">
+          <i data-lucide="trees" class="lucide"></i> Worktrees
+          <div class="project-selector-container" style="display: inline-flex; align-items: center; margin-left: 8px; gap: 4px;">
+            <select id="project-selector" style="font-size: 12px; padding: 2px 6px; background: var(--modal-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; cursor: pointer;">
+              <option value="">Loading...</option>
+            </select>
+            <button class="small primary" onclick="showNewProjectModal()" title="Add new project" style="padding: 2px 6px; font-size: 11px;">+New</button>
+          </div>
+        </div>
         <div class="sidebar-actions">
           <button id="collapse-sidebar-btn" title="Collapse sidebar"><i id="collapse-icon" data-lucide="panel-left-close" class="lucide-sm"></i></button>
           <button onclick="refreshWorktrees()" title="Refresh"><i data-lucide="rotate-cw" class="lucide-sm"></i></button>
@@ -217,6 +225,41 @@
           <button type="submit" class="primary" id="create-button">Create</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- New Project Modal -->
+  <div id="new-project-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">Add New Project</h2>
+
+      <div class="form-group">
+        <label for="new-project-name">Project Name</label>
+        <input
+          type="text"
+          id="new-project-name"
+          placeholder="My Project"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="new-project-path">Project Path</label>
+        <input
+          type="text"
+          id="new-project-path"
+          placeholder="/path/to/project"
+          required
+        />
+        <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
+          Must be an absolute path to an existing directory
+        </small>
+      </div>
+
+      <div class="modal-buttons">
+        <button type="button" class="secondary" onclick="closeNewProjectModal()">Cancel</button>
+        <button type="button" class="primary" onclick="createProject()">Add Project</button>
+      </div>
     </div>
   </div>
 
@@ -756,6 +799,9 @@
 
   <!-- Initialization Progress -->
   <script type="module" src="/js/initialization.js"></script>
+
+  <!-- Project Management -->
+  <script type="module" src="/js/projects.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
   <script type="module" src="/js/main.js?v=2"></script>
