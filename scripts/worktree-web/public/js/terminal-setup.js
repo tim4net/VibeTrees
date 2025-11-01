@@ -797,6 +797,10 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
       if (watermark > HIGH_WATERMARK) {
         terminalSocket.send(JSON.stringify({ type: 'pause' }));
       }
+      // Resume when watermark drops below LOW threshold
+      else if (watermark < LOW_WATERMARK) {
+        terminalSocket.send(JSON.stringify({ type: 'resume' }));
+      }
     };
 
     terminalSocket.onerror = (error) => {
