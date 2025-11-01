@@ -1,4 +1,4 @@
-const CACHE_NAME = 'worktree-manager-v12';
+const CACHE_NAME = 'worktree-manager-v13';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -90,8 +90,8 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // Network failed, try cache
-        return caches.match(request).then((cachedResponse) => {
+        // Network failed, try cache (ignoring query strings for versioned assets)
+        return caches.match(request, { ignoreSearch: true }).then((cachedResponse) => {
           if (cachedResponse) {
             console.log('Service Worker: Serving from cache', request.url);
             return cachedResponse;

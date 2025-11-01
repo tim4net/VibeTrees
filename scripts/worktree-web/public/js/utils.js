@@ -8,7 +8,8 @@
  * @returns {string} HTML-safe string
  */
 export function escapeHtml(str) {
+  if (str == null || str === undefined) return '';
   const div = document.createElement('div');
-  div.textContent = str;
+  div.textContent = String(str);
   return div.innerHTML;
 }

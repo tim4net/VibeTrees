@@ -87,7 +87,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   display: inline-block;
-  max-width: 100%;
 }
 
 .terminal-tab:hover {

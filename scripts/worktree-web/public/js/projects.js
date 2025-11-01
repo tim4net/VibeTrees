@@ -7,11 +7,16 @@ import { escapeHtml } from './utils.js';
 
 let currentProject = null;
 let allProjects = [];
+let initialized = false;
 
 /**
  * Initialize project management
  */
 async function initializeProjects() {
+  // Idempotency guard - prevent duplicate event listeners
+  if (initialized) return;
+  initialized = true;
+
   console.log('[Projects] Initializing project management');
 
   // Load projects and populate dropdown
@@ -361,9 +366,11 @@ async function loadSuggestedProjects() {
       return;
     }
 
-    // Render suggestions
+    // Render suggestions with data attributes (safe from quote injection)
     list.innerHTML = suggestions.map(project => `
-      <div class="suggested-project-item" onclick="selectSuggestedProject('${escapeHtml(project.path)}', '${escapeHtml(project.name)}')">
+      <div class="suggested-project-item"
+           data-path="${escapeHtml(project.path)}"
+           data-name="${escapeHtml(project.name)}">
         <i data-lucide="folder-git-2" class="lucide-sm folder-icon"></i>
         <div class="suggested-project-info">
           <div class="suggested-project-name">${escapeHtml(project.name)}</div>
@@ -371,6 +378,13 @@ async function loadSuggestedProjects() {
         </div>
       </div>
     `).join('');
+
+    // Attach click handlers via event delegation (XSS-safe)
+    list.querySelectorAll('.suggested-project-item').forEach(item => {
+      item.addEventListener('click', () => {
+        selectSuggestedProject(item.dataset.path, item.dataset.name);
+      });
+    });
 
     // Reinitialize Lucide icons for the new elements
     if (window.lucide) {

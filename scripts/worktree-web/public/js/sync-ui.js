@@ -103,19 +103,23 @@ async function checkWorktreeForUpdates(worktreeName) {
     const response = await fetch(`/api/worktrees/${worktreeName}/check-updates`);
     const data = await response.json();
 
-    // Store update info
+    // Capture previous state before overwriting
+    const previous = syncState.updateChecks[worktreeName];
+    const isFirstCheck = !previous?.notifiedCommitCount;
+
+    // Store update info, preserving notifiedCommitCount
     syncState.updateChecks[worktreeName] = {
       ...data,
-      lastCheck: Date.now()
+      lastCheck: Date.now(),
+      notifiedCommitCount: previous?.notifiedCommitCount
     };
 
     // Update UI badge
     updateWorktreeUpdateBadge(worktreeName, data);
 
     // Show toast notification if updates found (only if not first check)
-    const isFirstCheck = !syncState.updateChecks[worktreeName]?.notifiedCommitCount;
     if (data.hasUpdates && data.commitCount > 0 && !isFirstCheck) {
-      const previousCount = syncState.updateChecks[worktreeName]?.notifiedCommitCount || 0;
+      const previousCount = previous?.notifiedCommitCount || 0;
       if (data.commitCount > previousCount) {
         window.updateNotifications?.showUpdateNotification(worktreeName, data.commitCount);
         syncState.updateChecks[worktreeName].notifiedCommitCount = data.commitCount;
