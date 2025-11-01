@@ -1525,3 +1525,120 @@ input:focus {
   color: var(--text-tertiary);
   font-size: 13px;
 }
+
+/* ===================================
+   Update Modal Styles
+   =================================== */
+
+.version-compare {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
+.version-box {
+  flex: 1;
+  text-align: center;
+}
+
+.version-label {
+  font-size: 11px;
+  color: #8b949e;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.version-number {
+  font-size: 20px;
+  font-weight: 600;
+  color: #c9d1d9;
+}
+
+.version-number.version-new {
+  color: #2ea043;
+}
+
+.version-arrow {
+  color: #8b949e;
+  flex-shrink: 0;
+}
+
+.alert {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.alert-warning {
+  background: #1c2128;
+  border-left: 3px solid #f85149;
+}
+
+.alert i {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #f85149;
+}
+
+.alert strong {
+  display: block;
+  color: #f85149;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.alert p {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.alert ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.alert ul li {
+  margin: 4px 0;
+}
+
+.instructions-list {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: #8b949e;
+  line-height: 1.8;
+}
+
+.instructions-list li {
+  margin: 6px 0;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.input-group input {
+  flex: 1;
+}
+
+.code-input {
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 13px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 8px 12px;
+  border-radius: 6px;
+}

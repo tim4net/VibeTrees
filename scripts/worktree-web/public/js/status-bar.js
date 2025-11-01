@@ -794,7 +794,7 @@ function hideUpdateNotification() {
 }
 
 /**
- * Handle update notification click - show update dialog
+ * Handle update notification click - show update modal
  */
 window.handleUpdateClick = function() {
   const notification = document.getElementById('update-notification');
@@ -811,20 +811,53 @@ window.handleUpdateClick = function() {
   const currentVersion = match[1];
   const latestVersion = match[2];
 
-  // Show confirmation dialog
-  const message = `A new version of VibeTrees is available!\n\nCurrent: v${currentVersion}\nLatest: v${latestVersion}\n\nTo update, run:\nvibe --update\n\nThe update will:\n1. Stop the server\n2. Install the latest version\n3. Prompt you to restart\n\nWould you like to see the instructions?`;
+  // Show update modal
+  showUpdateModal(currentVersion, latestVersion);
+};
 
-  if (confirm(message)) {
-    // Copy update command to clipboard
-    navigator.clipboard.writeText('vibe --update')
-      .then(() => {
-        showToast('Update command copied to clipboard: vibe --update', 'success');
-      })
-      .catch(err => {
-        console.error('[status-bar] Failed to copy:', err);
-        showToast('Update command: vibe --update', 'info');
-      });
+/**
+ * Show update modal with version information
+ */
+window.showUpdateModal = function(currentVersion, latestVersion) {
+  const modal = document.getElementById('update-modal');
+  if (!modal) return;
+
+  // Update version numbers
+  document.getElementById('update-current-version').textContent = `v${currentVersion}`;
+  document.getElementById('update-latest-version').textContent = `v${latestVersion}`;
+
+  // Show modal
+  modal.classList.add('active');
+
+  // Re-render icons
+  if (window.lucide) window.lucide.createIcons();
+};
+
+/**
+ * Hide update modal
+ */
+window.hideUpdateModal = function() {
+  const modal = document.getElementById('update-modal');
+  if (modal) {
+    modal.classList.remove('active');
   }
+};
+
+/**
+ * Copy update command to clipboard
+ */
+window.copyUpdateCommand = function() {
+  const input = document.getElementById('update-command-input');
+  if (!input) return;
+
+  navigator.clipboard.writeText(input.value)
+    .then(() => {
+      showToast('Update command copied to clipboard', 'success');
+    })
+    .catch(err => {
+      console.error('[status-bar] Failed to copy:', err);
+      showToast('Failed to copy command', 'error');
+    });
 };
 
 // Attach click handler to update notification

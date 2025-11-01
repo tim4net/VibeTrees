@@ -31,7 +31,7 @@
   <link rel="stylesheet" href="/css/base.css?v=2">
   <link rel="stylesheet" href="/css/sidebar.css?v=2">
   <link rel="stylesheet" href="/css/terminals.css?v=2">
-  <link rel="stylesheet" href="/css/components.css?v=4">
+  <link rel="stylesheet" href="/css/components.css?v=5">
   <link rel="stylesheet" href="/css/branch-selector.css?v=2">
   <link rel="stylesheet" href="/css/agents.css?v=2">
   <link rel="stylesheet" href="/css/sync.css?v=2">
@@ -704,6 +704,72 @@
         <button id="syncYesBtn" class="primary">Sync & Create</button>
         <button id="syncNoBtn">Create Anyway</button>
         <button id="syncCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Update Available Modal -->
+  <div id="update-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title"><i data-lucide="download" class="lucide"></i> Update Available</h2>
+
+      <div class="form-group">
+        <div class="version-compare">
+          <div class="version-box">
+            <div class="version-label">Current Version</div>
+            <div class="version-number" id="update-current-version">v1.0.0</div>
+          </div>
+          <div class="version-arrow">
+            <i data-lucide="arrow-right" class="lucide"></i>
+          </div>
+          <div class="version-box">
+            <div class="version-label">Latest Version</div>
+            <div class="version-number version-new" id="update-latest-version">v1.0.1</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-warning">
+        <i data-lucide="alert-triangle" class="lucide-sm"></i>
+        <div>
+          <strong>Important: Update When Safe</strong>
+          <p>Only update when no active development is in progress. The update will:</p>
+          <ul>
+            <li>Stop all running servers</li>
+            <li>Close all terminal sessions</li>
+            <li>Restart the application</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Update Instructions:</label>
+        <ol class="instructions-list">
+          <li>Save all your work and commit any changes</li>
+          <li>Close any active terminals or sessions</li>
+          <li>Run the update command below</li>
+          <li>The server will restart automatically</li>
+        </ol>
+      </div>
+
+      <div class="form-group">
+        <label for="update-command-input">Update Command:</label>
+        <div class="input-group">
+          <input
+            type="text"
+            id="update-command-input"
+            value="vibe --update"
+            readonly
+            class="code-input"
+          />
+          <button onclick="copyUpdateCommand()" class="secondary">
+            <i data-lucide="copy" class="lucide-sm"></i> Copy
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button onclick="hideUpdateModal()" class="secondary">Close</button>
       </div>
     </div>
   </div>
