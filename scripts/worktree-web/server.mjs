@@ -215,13 +215,22 @@ const mcpManager = new McpManager(process.cwd(), runtime);
 console.log(`🐳 Container runtime: ${runtime.getRuntime()} (${runtime.getComposeCommand()})`);
 console.log(`🔌 MCP servers discovered: ${mcpManager.discoverServers().length}`);
 console.log(`🤖 AI agents available: ${agentRegistry.list().join(', ')}`);
+
+// Initialize ProjectManager (singleton) - must be before WorktreeManager
+const projectManager = new ProjectManager();
+
+// Get initial rootDir from current project or fall back to cwd
+const currentProject = projectManager.getCurrentProject();
+const initialRootDir = currentProject ? currentProject.path : rootDir;
+
 // Initialize WorktreeManager with all dependencies
 const worktreeManager = new WorktreeManager({
-  rootDir,
+  rootDir: initialRootDir,
   config,
   runtime,
   mcpManager,
   worktreeBase: WORKTREE_BASE,
+  projectManager,
   modules: {
     PortRegistry,
     PTYSessionManager,
@@ -238,9 +247,6 @@ const worktreeManager = new WorktreeManager({
     AIConflictResolver
   }
 });
-
-// Initialize ProjectManager (singleton)
-const projectManager = new ProjectManager();
 
 /**
  * Format log line by adding color and structure
@@ -889,6 +895,12 @@ function createApp() {
     try {
       projectManager.setCurrentProject(req.params.id);
       const project = projectManager.getProject(req.params.id);
+
+      // Update WorktreeManager to use the new project's root directory
+      if (project && project.path) {
+        manager.setProjectRoot(project.path);
+      }
+
       res.json(project);
     } catch (error) {
       if (error.message.includes('not found')) {

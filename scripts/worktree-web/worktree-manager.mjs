@@ -27,12 +27,13 @@ export class WorktreeManager {
    * @param {string} deps.worktreeBase - Base directory for worktrees
    * @param {Object} deps.modules - Imported module classes
    */
-  constructor({ rootDir, config, runtime, mcpManager, worktreeBase, modules }) {
+  constructor({ rootDir, config, runtime, mcpManager, worktreeBase, modules, projectManager = null }) {
     this.rootDir = rootDir;
     this.config = config;
     this.runtime = runtime;
     this.mcpManager = mcpManager;
     this.worktreeBase = worktreeBase;
+    this.projectManager = projectManager;
 
     // Import required classes from modules
     const {
@@ -73,6 +74,34 @@ export class WorktreeManager {
 
     // Sync port registry with existing worktrees on startup
     this._syncPortRegistry();
+  }
+
+  /**
+   * Get the current project root directory
+   * Returns the current project's path if projectManager is available, otherwise returns configured rootDir
+   * @returns {string} Current project root path
+   */
+  getProjectRoot() {
+    if (this.projectManager) {
+      const currentProject = this.projectManager.getCurrentProject();
+      if (currentProject) {
+        return currentProject.path;
+      }
+    }
+    return this.rootDir;
+  }
+
+  /**
+   * Update the root directory for worktree operations
+   * @param {string} newRootDir - New root directory path
+   */
+  setProjectRoot(newRootDir) {
+    if (newRootDir && existsSync(newRootDir)) {
+      this.rootDir = newRootDir;
+      console.log(`[WorktreeManager] Project root updated to: ${newRootDir}`);
+    } else {
+      console.warn(`[WorktreeManager] Invalid project root: ${newRootDir}`);
+    }
   }
 
   /**
