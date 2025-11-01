@@ -182,3 +182,8 @@ if (document.readyState === 'loading') {
 } else {
   initializeProjects();
 }
+
+// Expose functions to global scope for onclick handlers
+window.showNewProjectModal = showNewProjectModal;
+window.closeNewProjectModal = closeNewProjectModal;
+window.createProject = createProject;
