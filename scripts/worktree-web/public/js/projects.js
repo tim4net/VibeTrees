@@ -198,93 +198,59 @@ if (document.readyState === 'loading') {
 
 /**
  * Browse for a project directory - opens native file picker
+ * Uses simple file input method to avoid browser permission dialogs
  */
 async function browseForProjectPath() {
   try {
-    // Check if File System Access API is available (Chrome 86+)
-    if ('showDirectoryPicker' in window) {
-      // Use modern File System Access API
-      const dirHandle = await window.showDirectoryPicker({
-        mode: 'read',
-        startIn: 'documents'
-      });
+    // Use hidden file input with directory selection
+    // This method doesn't trigger "allow to copy" permission dialogs
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.webkitdirectory = true;
+    input.directory = true;
+    input.multiple = true;
+    input.style.display = 'none';
 
-      // Send directory name to server to find matching path
-      const response = await fetch('/api/system/find-directory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: dirHandle.name })
-      });
+    input.onchange = async (e) => {
+      if (e.target.files.length > 0) {
+        const firstFile = e.target.files[0];
+        const relativePath = firstFile.webkitRelativePath || firstFile.name;
+        const dirName = relativePath.split('/')[0];
 
-      const pathInput = document.getElementById('new-project-path');
-      const nameInput = document.getElementById('new-project-name');
+        console.log('[Projects] Selected directory:', dirName);
 
-      if (response.ok) {
-        const { path } = await response.json();
-        pathInput.value = path;
-        // Auto-populate name from folder
-        nameInput.value = dirHandle.name;
-        pathInput.dispatchEvent(new Event('input'));
-      } else {
-        // Fallback: show directory name
-        pathInput.value = dirHandle.name;
-        nameInput.value = dirHandle.name;
-        pathInput.select();
-      }
-    } else {
-      // Fallback: Use hidden file input with directory selection (works in all modern browsers)
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.webkitdirectory = true;
-      input.directory = true;
-      input.multiple = true;
-      input.style.display = 'none';
+        // Try to find full path on server
+        const response = await fetch('/api/system/find-directory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: dirName })
+        });
 
-      input.onchange = async (e) => {
-        if (e.target.files.length > 0) {
-          const firstFile = e.target.files[0];
-          const relativePath = firstFile.webkitRelativePath || firstFile.name;
-          const dirName = relativePath.split('/')[0];
+        const pathInput = document.getElementById('new-project-path');
+        const nameInput = document.getElementById('new-project-name');
 
-          console.log('[Projects] Selected directory:', dirName);
-
-          // Try to find full path on server
-          const response = await fetch('/api/system/find-directory', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: dirName })
-          });
-
-          const pathInput = document.getElementById('new-project-path');
-          const nameInput = document.getElementById('new-project-name');
-
-          if (response.ok) {
-            const { path } = await response.json();
-            pathInput.value = path;
-            // Auto-populate name from folder
-            const folderName = path.split('/').filter(p => p).pop();
-            nameInput.value = folderName;
-            pathInput.dispatchEvent(new Event('input'));
-          } else {
-            // Fallback: use directory name
-            pathInput.value = dirName;
-            nameInput.value = dirName;
-            pathInput.select();
-          }
+        if (response.ok) {
+          const { path } = await response.json();
+          pathInput.value = path;
+          // Auto-populate name from folder
+          const folderName = path.split('/').filter(p => p).pop();
+          nameInput.value = folderName;
+          pathInput.dispatchEvent(new Event('input'));
+        } else {
+          // Fallback: use directory name
+          pathInput.value = dirName;
+          nameInput.value = dirName;
+          pathInput.select();
         }
-        document.body.removeChild(input);
-      };
+      }
+      document.body.removeChild(input);
+    };
 
-      document.body.appendChild(input);
-      input.click();
-    }
+    document.body.appendChild(input);
+    input.click();
   } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('[Projects] Directory selection cancelled');
-    } else {
-      console.error('[Projects] Error browsing for directory:', error);
-      document.getElementById('new-project-path').focus();
-    }
+    console.error('[Projects] Error browsing for directory:', error);
+    document.getElementById('new-project-path').focus();
   }
 }
 
