@@ -14,12 +14,6 @@ export function initTabFiltering() {
   appState.on('worktree:selected', () => {
     updateTabVisibility();
     updateFilterBadge();
-    updateQuickActions();
-  });
-
-  // Listen to sidebar toggle
-  appState.on('sidebar:toggled', () => {
-    updateQuickActions();
   });
 
   // Listen to tab changes
@@ -35,7 +29,6 @@ export function initTabFiltering() {
   // Initial state
   updateTabVisibility();
   updateFilterBadge();
-  updateQuickActions();
 }
 
 /**
@@ -137,57 +130,17 @@ function updateEmptyState() {
 
 /**
  * Update quick action buttons (for collapsed sidebar)
+ * DISABLED: Quick actions removed to avoid duplicate buttons - using terminal-launch-buttons instead
  */
 function updateQuickActions() {
+  // Quick actions feature disabled - terminal-launch-buttons provide the same functionality
   const tabBar = document.getElementById('terminal-tabs');
   if (!tabBar) return;
 
-  const selectedWorktreeId = appState.selectedWorktreeId;
-  const shouldShowActions = appState.sidebarCollapsed && selectedWorktreeId;
-
-  let quickActions = tabBar.querySelector('.quick-actions');
-
-  if (shouldShowActions) {
-    if (!quickActions) {
-      quickActions = document.createElement('div');
-      quickActions.className = 'quick-actions';
-      tabBar.insertBefore(quickActions, tabBar.firstChild);
-    }
-
-    // Get worktree to check for console port
-    const worktree = appState.worktrees.find(wt => wt.name === selectedWorktreeId);
-    const consolePort = worktree?.ports?.console;
-
-    const browserButton = consolePort
-      ? `<button class="quick-action-btn" title="Browser" onclick="window.openWebUI('${selectedWorktreeId}', ${consolePort})">
-          <i data-lucide="globe" class="lucide-sm"></i>
-        </button>`
-      : '';
-
-    quickActions.innerHTML = `
-      ${browserButton}
-      <button class="quick-action-btn" title="Shell" onclick="window.openShell('${selectedWorktreeId}')">
-        <i data-lucide="terminal" class="lucide-sm"></i>
-      </button>
-      <button class="quick-action-btn" title="Claude" onclick="window.openTerminal('${selectedWorktreeId}', 'claude')">
-        <img src="/icons/anthropic.svg" style="width: 14px; height: 14px; filter: brightness(0) invert(1);" />
-      </button>
-      <button class="quick-action-btn" title="Codex" onclick="window.openTerminal('${selectedWorktreeId}', 'codex')">
-        <img src="/icons/openai.svg" style="width: 14px; height: 14px; filter: brightness(0) invert(1);" />
-      </button>
-    `;
-
-    // Reinitialize Lucide icons
-    if (window.lucide) {
-      window.lucide.createIcons();
-    }
-
-    // Setup instant tooltips
-    setupInstantTooltips();
-  } else {
-    if (quickActions) {
-      quickActions.remove();
-    }
+  // Remove any existing quick actions
+  const quickActions = tabBar.querySelector('.quick-actions');
+  if (quickActions) {
+    quickActions.remove();
   }
 }
 

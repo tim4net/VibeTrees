@@ -21,12 +21,15 @@ test.describe('Terminal Functionality', () => {
     await worktreeCard.click();
     await page.waitForTimeout(500);
 
-    // Click on the terminal button (Claude, Codex, or Shell)
-    const buttonSelector = terminalType === 'shell'
-      ? `.worktree-card[data-name="${worktreeName}"] button[title*="Shell"]`
-      : `.worktree-card[data-name="${worktreeName}"] button[title*="${terminalType.charAt(0).toUpperCase() + terminalType.slice(1)}"]`;
+    // Use the terminal launch buttons in the header (always available)
+    const functionMap = {
+      'shell': 'openShellForSelected',
+      'claude': 'openClaudeForSelected',
+      'codex': 'openCodexForSelected'
+    };
 
-    const terminalButton = page.locator(buttonSelector);
+    const functionName = functionMap[terminalType] || functionMap.claude;
+    const terminalButton = page.locator(`.terminal-launch-buttons button[onclick*="${functionName}"]`);
     await terminalButton.click();
     await page.waitForTimeout(1500); // Wait for terminal to initialize
   }
