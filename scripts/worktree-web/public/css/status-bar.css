@@ -245,6 +245,46 @@
   flex: 1;
 }
 
+/* Update Available Notification */
+.status-segment.update-available {
+  background: linear-gradient(135deg, #2ea043 0%, #1f6f2c 100%);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.status-segment.update-available:hover {
+  background: linear-gradient(135deg, #3fb950 0%, #2ea043 100%);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(46, 160, 67, 0.6);
+  transform: translateY(-1px);
+}
+
+.status-segment.update-available .status-icon {
+  animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(46, 160, 67, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(46, 160, 67, 0.6);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
 /* Version display */
 .status-segment.version {
   opacity: 0.6;

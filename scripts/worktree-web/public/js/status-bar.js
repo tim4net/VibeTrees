@@ -40,6 +40,9 @@ export function initStatusBar() {
 
   // Load and display version
   loadVersion();
+
+  // Start checking for updates
+  startUpdateChecker();
 }
 
 /**
@@ -721,3 +724,113 @@ if (!document.getElementById('status-bar-toast-styles')) {
   `;
   document.head.appendChild(style);
 }
+
+// ============================================================================
+// Update Checker
+// ============================================================================
+
+/**
+ * Start checking for updates periodically
+ */
+function startUpdateChecker() {
+  // Check immediately
+  checkForUpdates();
+
+  // Then check every 5 minutes
+  setInterval(checkForUpdates, 5 * 60 * 1000);
+
+  console.log('[status-bar] Update checker started');
+}
+
+/**
+ * Check for updates and show notification if available
+ */
+async function checkForUpdates() {
+  try {
+    const response = await fetch('/api/updates');
+    const data = await response.json();
+
+    if (data.isUpdateAvailable && data.latestVersion) {
+      showUpdateNotification(data.currentVersion, data.latestVersion);
+    } else {
+      hideUpdateNotification();
+    }
+  } catch (error) {
+    console.error('[status-bar] Failed to check for updates:', error);
+    // Don't show error to user - updates are optional
+  }
+}
+
+/**
+ * Show update notification badge
+ */
+function showUpdateNotification(currentVersion, latestVersion) {
+  const notification = document.getElementById('update-notification');
+  if (!notification) return;
+
+  notification.style.display = 'flex';
+  notification.title = `Update available: v${currentVersion} → v${latestVersion}\nClick to update`;
+
+  // Update text
+  const textEl = notification.querySelector('.update-text');
+  if (textEl) {
+    textEl.textContent = `Update to v${latestVersion}`;
+  }
+
+  // Re-render lucide icons
+  if (window.lucide) window.lucide.createIcons();
+
+  console.log('[status-bar] Update notification shown:', latestVersion);
+}
+
+/**
+ * Hide update notification badge
+ */
+function hideUpdateNotification() {
+  const notification = document.getElementById('update-notification');
+  if (notification) {
+    notification.style.display = 'none';
+  }
+}
+
+/**
+ * Handle update notification click - show update dialog
+ */
+window.handleUpdateClick = function() {
+  const notification = document.getElementById('update-notification');
+  if (!notification) return;
+
+  const title = notification.title;
+  const match = title.match(/v([\d.]+) → v([\d.]+)/);
+
+  if (!match) {
+    showToast('Update information not available', 'error');
+    return;
+  }
+
+  const currentVersion = match[1];
+  const latestVersion = match[2];
+
+  // Show confirmation dialog
+  const message = `A new version of VibeTrees is available!\n\nCurrent: v${currentVersion}\nLatest: v${latestVersion}\n\nTo update, run:\nvibe --update\n\nThe update will:\n1. Stop the server\n2. Install the latest version\n3. Prompt you to restart\n\nWould you like to see the instructions?`;
+
+  if (confirm(message)) {
+    // Copy update command to clipboard
+    navigator.clipboard.writeText('vibe --update')
+      .then(() => {
+        showToast('Update command copied to clipboard: vibe --update', 'success');
+      })
+      .catch(err => {
+        console.error('[status-bar] Failed to copy:', err);
+        showToast('Update command: vibe --update', 'info');
+      });
+  }
+};
+
+// Attach click handler to update notification
+document.addEventListener('DOMContentLoaded', () => {
+  const notification = document.getElementById('update-notification');
+  if (notification) {
+    notification.addEventListener('click', window.handleUpdateClick);
+  }
+});

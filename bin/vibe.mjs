@@ -115,7 +115,7 @@ if (args.includes('--update')) {
 
     // Update via npm
     console.log('📦 Updating package...');
-    execSync('npm install -g github:tim4net/VibeTrees@latest', { stdio: 'inherit' });
+    execSync('npm install -g git+https://github.com/tim4net/VibeTrees.git', { stdio: 'inherit' });
 
     console.log('');
     console.log('✅ Update complete!');
