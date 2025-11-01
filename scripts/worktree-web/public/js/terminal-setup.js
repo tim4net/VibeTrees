@@ -787,10 +787,11 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
           terminalSocket.send(JSON.stringify({ type: 'pause' }));
         }
       } else {
-        // Fast path for small chunks - no callback overhead
-        terminal.write(data);
-        // Don't subtract here - watermark tracks unrendered data
-        // Subtraction happens in callback when data is actually rendered
+        // Fast path for small chunks - use callback to track watermark
+        const dataLength = data.length;
+        terminal.write(data, () => {
+          watermark = Math.max(watermark - dataLength, 0);
+        });
       }
 
       // Pause when watermark exceeds HIGH threshold
