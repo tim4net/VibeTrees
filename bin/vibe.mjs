@@ -37,6 +37,7 @@ Usage:
   vibe --restart     Restart the server
   vibe --status      Show server status
   vibe --logs        Show server logs (follow mode)
+  vibe --update      Update to latest version
   vibe --listen      Start with network access (all interfaces)
   vibe --port 8080   Start on custom port (default: 3335)
   vibe --help        Show this help message
@@ -48,6 +49,9 @@ Examples:
 
   # Check if it's running
   vibe --status
+
+  # Update to latest version
+  vibe --update
 
   # View logs
   vibe --logs
@@ -94,6 +98,41 @@ if (!checkPM2()) {
 
 const ecosystemPath = join(__dirname, '..', 'ecosystem.config.cjs');
 const PM2_NAME = 'vibe-worktrees';
+
+// Update command
+if (args.includes('--update')) {
+  console.log('🔄 Updating Vibe Worktrees...');
+  console.log('');
+
+  try {
+    // Stop server if running
+    try {
+      execSync(`pm2 stop ${PM2_NAME}`, { stdio: 'ignore' });
+      console.log('⏸️  Server stopped');
+    } catch {
+      // Not running, that's fine
+    }
+
+    // Update via npm
+    console.log('📦 Updating package...');
+    execSync('npm install -g github:tim4net/VibeTrees@latest', { stdio: 'inherit' });
+
+    console.log('');
+    console.log('✅ Update complete!');
+    console.log('');
+    console.log('Restart with: vibe');
+    console.log('');
+  } catch (error) {
+    console.error('');
+    console.error('❌ Update failed');
+    console.error('');
+    console.error('Try manually:');
+    console.error('  npm install -g github:tim4net/VibeTrees@latest');
+    console.error('');
+    process.exit(1);
+  }
+  process.exit(0);
+}
 
 // PM2 Management Commands
 if (args.includes('--stop')) {
