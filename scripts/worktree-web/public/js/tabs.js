@@ -129,22 +129,6 @@ function updateEmptyState() {
 }
 
 /**
- * Update quick action buttons (for collapsed sidebar)
- * DISABLED: Quick actions removed to avoid duplicate buttons - using terminal-launch-buttons instead
- */
-function updateQuickActions() {
-  // Quick actions feature disabled - terminal-launch-buttons provide the same functionality
-  const tabBar = document.getElementById('terminal-tabs');
-  if (!tabBar) return;
-
-  // Remove any existing quick actions
-  const quickActions = tabBar.querySelector('.quick-actions');
-  if (quickActions) {
-    quickActions.remove();
-  }
-}
-
-/**
  * Clear tab filter
  */
 window.clearTabFilter = function(event) {
@@ -177,51 +161,17 @@ export function getWorktreeTabCount(worktreeName) {
   return appState.getWorktreeTabs(worktreeName).length;
 }
 
-/**
- * Setup instant tooltips for quick action buttons
- */
-function setupInstantTooltips() {
-  const tooltipDiv = document.getElementById('instant-tooltip') || createTooltipDiv();
-
-  document.querySelectorAll('.quick-action-btn[title]').forEach(btn => {
-    btn.addEventListener('mouseenter', (e) => {
-      const title = e.currentTarget.getAttribute('title');
-      if (!title) return;
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      tooltipDiv.textContent = title;
-      tooltipDiv.style.display = 'block';
-      tooltipDiv.style.left = (rect.left + rect.width / 2) + 'px';
-      tooltipDiv.style.top = (rect.bottom + 8) + 'px';
-    });
-
-    btn.addEventListener('mouseleave', () => {
-      tooltipDiv.style.display = 'none';
-    });
-  });
-}
-
-/**
- * Create tooltip div element
- */
-function createTooltipDiv() {
-  const div = document.createElement('div');
-  div.id = 'instant-tooltip';
-  div.style.cssText = `
-    position: fixed;
-    background: #1c2128;
-    color: #c9d1d9;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    white-space: nowrap;
-    border: 1px solid #30363d;
-    z-index: 99999;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-    pointer-events: none;
-    display: none;
-    transform: translateX(-50%);
-  `;
-  document.body.appendChild(div);
-  return div;
-}
+// ============================================================================
+// QUICK-ACTIONS FEATURE REMOVED
+// ============================================================================
+// The quick-actions feature was removed to prevent duplicate terminal launch buttons.
+// Previously, icon-only buttons were dynamically added to #terminal-tabs when the
+// sidebar was collapsed, but this created UI duplication with .terminal-launch-buttons.
+//
+// Solution: Use only .terminal-launch-buttons in index.html for all terminal launching.
+// If icon-only buttons are needed when sidebar is collapsed, use CSS media queries
+// on .terminal-launch-buttons instead of creating a separate button set.
+//
+// Regression prevention: tests/e2e/terminal-functionality.spec.mjs includes a test
+// that fails if duplicate buttons are detected.
+// ============================================================================

@@ -304,4 +304,31 @@ test.describe('Terminal Functionality', () => {
     const stateAfter = await wsIndicator.getAttribute('data-state');
     expect(stateAfter).toBe('connected');
   });
+
+  test('should not have duplicate terminal launch buttons', async ({ page }) => {
+    // This test prevents regression of the duplicate button bug
+    // There should be exactly ONE set of launch buttons in the terminal header
+
+    // Count Shell buttons (should be exactly 1)
+    const shellButtons = page.locator('button[onclick*="openShellForSelected"]');
+    const shellCount = await shellButtons.count();
+    expect(shellCount).toBe(1);
+
+    // Count Claude buttons (should be exactly 1)
+    const claudeButtons = page.locator('button[onclick*="openClaudeForSelected"]');
+    const claudeCount = await claudeButtons.count();
+    expect(claudeCount).toBe(1);
+
+    // Count Codex buttons (should be exactly 1)
+    const codexButtons = page.locator('button[onclick*="openCodexForSelected"]');
+    const codexCount = await codexButtons.count();
+    expect(codexCount).toBe(1);
+
+    // Verify there are NO quick-actions containers (the source of duplicate buttons)
+    const quickActions = page.locator('.quick-actions');
+    const quickActionsCount = await quickActions.count();
+    expect(quickActionsCount).toBe(0);
+
+    console.log('✓ No duplicate buttons found');
+  });
 });

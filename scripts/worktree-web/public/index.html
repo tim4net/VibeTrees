@@ -65,6 +65,12 @@
     <!-- Terminal Area -->
     <div class="terminal-area">
       <div class="terminal-header">
+        <!--
+          IMPORTANT: This is the ONLY set of terminal launch buttons in the UI.
+          Do NOT create additional button sets dynamically (prevents duplicates).
+          See scripts/worktree-web/public/js/tabs.js for details.
+          Regression test: tests/e2e/terminal-functionality.spec.mjs
+        -->
         <div class="terminal-launch-buttons">
           <button class="small" onclick="openShellForSelected()" title="Open Shell">
             <i data-lucide="terminal" class="lucide-sm"></i> Shell
