@@ -120,6 +120,10 @@ if (args.includes('--check-update')) {
         res.on('end', () => {
           try {
             const release = JSON.parse(data);
+            if (!release || !release.tag_name) {
+              reject(new Error('No release found. Create a GitHub release to enable update checks.'));
+              return;
+            }
             resolve(release.tag_name.replace(/^v/, ''));
           } catch (err) {
             reject(err);
@@ -186,6 +190,10 @@ if (args.includes('--update')) {
         res.on('end', () => {
           try {
             const release = JSON.parse(data);
+            if (!release || !release.tag_name) {
+              reject(new Error('No release found. Create a GitHub release to enable updates.'));
+              return;
+            }
             resolve(release.tag_name.replace(/^v/, ''));
           } catch (err) {
             reject(err);
