@@ -471,9 +471,11 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       commandStr = 'npx';
       args = ['-y', '@openai/codex@latest', '--dangerously-bypass-approvals-and-sandbox'];
     } else {
-      // npx handles caching intelligently - no need to clear cache
-      commandStr = 'npx';
-      args = ['-y', '@anthropic-ai/claude-code@latest', '--dangerously-skip-permissions'];
+      // Use native claude binary (not npx to avoid nested instance)
+      // Prefer ~/.local/bin/claude, fallback to PATH
+      const nativePath = join(homedir(), '.local', 'bin', 'claude');
+      commandStr = existsSync(nativePath) ? nativePath : 'claude';
+      args = [];
     }
 
     terminal = manager.ptyManager.spawnPTY(sessionId, {
