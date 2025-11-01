@@ -104,30 +104,47 @@ if (args.includes('--update')) {
   console.log('🔄 Updating Vibe Worktrees...');
   console.log('');
 
+  // Check if server is running
+  let wasRunning = false;
+  try {
+    execSync(`pm2 describe ${PM2_NAME}`, { stdio: 'ignore' });
+    wasRunning = true;
+  } catch {
+    wasRunning = false;
+  }
+
   try {
     // Stop server if running
-    try {
+    if (wasRunning) {
       execSync(`pm2 stop ${PM2_NAME}`, { stdio: 'ignore' });
       console.log('⏸️  Server stopped');
-    } catch {
-      // Not running, that's fine
     }
 
     // Update via npm
-    console.log('📦 Updating package...');
+    console.log('📦 Downloading and installing latest version...');
     execSync('npm install -g git+https://github.com/tim4net/VibeTrees.git', { stdio: 'inherit' });
 
     console.log('');
     console.log('✅ Update complete!');
-    console.log('');
-    console.log('Restart with: vibe');
+
+    // Automatically restart if it was running
+    if (wasRunning) {
+      console.log('🔄 Restarting server...');
+      execSync(`pm2 restart ${PM2_NAME}`, { stdio: 'inherit' });
+      console.log('');
+      console.log('✅ Server restarted successfully!');
+      console.log('🌐 Access at: http://localhost:3335');
+    } else {
+      console.log('');
+      console.log('Start server with: vibe');
+    }
     console.log('');
   } catch (error) {
     console.error('');
     console.error('❌ Update failed');
     console.error('');
     console.error('Try manually:');
-    console.error('  npm install -g github:tim4net/VibeTrees@latest');
+    console.error('  npm install -g git+https://github.com/tim4net/VibeTrees.git');
     console.error('');
     process.exit(1);
   }
