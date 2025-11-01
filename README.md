@@ -59,6 +59,7 @@ vibe
 
 | Feature | What It Does |
 |---------|--------------|
+| **Multi-Project** | Manage multiple git repositories with one server instance |
 | **Multi-Worktree** | Work on `feature-a`, `bugfix-b`, and `main` simultaneously |
 | **AI Agents** | Claude Code, Codex, or Gemini running in each worktree's terminal |
 | **Port Isolation** | Auto-assigned unique ports per worktree (3000 → 3001 → 3002...) |
@@ -71,6 +72,22 @@ vibe
 ---
 
 ## Features
+
+### Multi-Project Management
+Manage multiple git repositories from a single VibeTrees instance. Switch between projects seamlessly while keeping all worktrees, terminals, and services isolated per project.
+
+**How it works:**
+- One PM2 server manages all projects
+- Project dropdown in the sidebar (next to "Worktrees" title)
+- Click "+New" to add a new project
+- Switch projects instantly—worktrees auto-load
+- Projects persisted to `~/.vibetrees/projects.json`
+
+**Perfect for:**
+- Managing multiple client projects
+- Working on related microservices
+- Switching between work and personal repos
+- Testing across different codebases
 
 ### Terminal Persistence
 Your terminal sessions survive browser crashes. Even system reboots. State is saved every 5 seconds.
@@ -125,6 +142,21 @@ vibe --listen
 # Custom port
 vibe --port 8080
 ```
+
+### Add a New Project
+1. Click "+New" button (next to project dropdown in sidebar)
+2. Enter project name: "My API Server"
+3. Enter project path: `/Users/you/projects/api-server`
+4. Click "Create Project"
+
+VibeTrees automatically switches to your new project and loads its worktrees.
+
+### Switch Between Projects
+1. Click the project dropdown in the sidebar
+2. Select a different project
+3. Worktrees refresh automatically
+
+All terminals, services, and state remain intact when you switch back.
 
 ### Create Worktree
 1. Click "Create Worktree"
