@@ -13,6 +13,7 @@ import { initPerformanceMetrics } from './performance-metrics.js';
 import { pollingManager } from './polling.js';
 import { initStatusBar } from './status-bar.js';
 import './modals.js'; // Import for side effects (global exports)
+import './projects.js'; // Import for side effects (project management)
 import './context-menu-actions.js'; // Import for side effects (global exports)
 import './service-actions.js'; // Import for side effects (global exports)
 import './update-notifications.js'; // Import for side effects (toast notifications)
