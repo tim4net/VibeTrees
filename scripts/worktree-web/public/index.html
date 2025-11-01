@@ -51,6 +51,9 @@
               <option value="">Loading...</option>
             </select>
             <button class="small primary" onclick="showNewProjectModal()" title="Add new project">+New</button>
+            <button class="small secondary" onclick="removeCurrentProject()" title="Remove current project from VibeTrees" style="padding: 4px 8px;">
+              <i data-lucide="trash-2" class="lucide-sm"></i>
+            </button>
           </div>
         </div>
         <div class="sidebar-actions">
@@ -259,6 +262,9 @@
         </div>
         <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
           Must be an absolute path to an existing directory
+        </small>
+        <small style="color: var(--text-secondary); display: block; margin-top: 8px; padding: 8px; background: rgba(88, 166, 255, 0.1); border-radius: 4px;">
+          💡 <strong>Browse button:</strong> If your browser asks to "view and copy files", this just means it will access the folder name. Click "Allow" - VibeTrees only reads the directory path, not file contents.
         </small>
       </div>
 
@@ -807,7 +813,7 @@
   <script type="module" src="/js/initialization.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
-  <script type="module" src="/js/main.js?v=4"></script>
+  <script type="module" src="/js/main.js?v=5"></script>
 
   <!-- Toast notification -->
   <div id="toast" class="toast" style="display: none;"></div>

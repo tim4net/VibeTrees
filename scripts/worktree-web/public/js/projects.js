@@ -268,8 +268,53 @@ async function browseForProjectPath() {
   }
 }
 
+/**
+ * Remove the current project from VibeTrees
+ */
+async function removeCurrentProject() {
+  if (!currentProject) {
+    alert('No project selected');
+    return;
+  }
+
+  const projectName = currentProject.name;
+  const confirmed = confirm(`Remove "${projectName}" from VibeTrees?\n\nThis only removes it from the project list. Your files will not be deleted.`);
+
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(`/api/projects/${currentProject.id}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove project');
+    }
+
+    console.log(`[Projects] Removed project: ${projectName}`);
+
+    // Reload projects list
+    await loadProjects();
+
+    // If there are other projects, switch to the first one
+    if (allProjects.length > 0) {
+      await switchProject(allProjects[0].id);
+    } else {
+      // No projects left, clear worktrees
+      currentProject = null;
+      updateProjectDropdown();
+    }
+
+  } catch (error) {
+    console.error('[Projects] Failed to remove project:', error);
+    alert(`Failed to remove project: ${error.message}`);
+  }
+}
+
 // Expose functions to global scope for onclick handlers
 window.showNewProjectModal = showNewProjectModal;
 window.closeNewProjectModal = closeNewProjectModal;
 window.createProject = createProject;
 window.browseForProjectPath = browseForProjectPath;
+window.removeCurrentProject = removeCurrentProject;
