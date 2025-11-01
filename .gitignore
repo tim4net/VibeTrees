@@ -50,3 +50,6 @@ Thumbs.db
 # Worktree-specific files (managed by VibeTrees)
 docker-compose.yml
 .env
+# Playwright test results
+test-results/
+playwright-report/
