@@ -16,14 +16,24 @@ export class ClaudeAgent extends AgentInterface {
   }
 
   async spawn(worktreePath, options = {}) {
-    const args = this.getDefaultArgs();
+    // Update Claude before launching
+    try {
+      console.log('[Claude Agent] Updating Claude Code...');
+      execSync('claude update', {
+        stdio: 'ignore',
+        timeout: 30000
+      });
+    } catch (error) {
+      console.warn('[Claude Agent] Update failed, continuing with existing version:', error.message);
+    }
+
     const env = {
       ...process.env,
       ...this.getEnvironmentVariables(worktreePath),
       ...options.env
     };
 
-    return pty.spawn('npx', args, {
+    return pty.spawn('claude', [], {
       cwd: worktreePath,
       env,
       cols: options.cols || 80,
@@ -32,7 +42,7 @@ export class ClaudeAgent extends AgentInterface {
   }
 
   getDefaultArgs() {
-    return ['-y', '@anthropic-ai/claude-code@latest'];
+    return [];
   }
 
   getConfigPath(worktreePath) {
@@ -53,20 +63,19 @@ export class ClaudeAgent extends AgentInterface {
 
   async checkVersion() {
     try {
-      const output = execSync('npx -y @anthropic-ai/claude-code@latest --version', {
+      const output = execSync('claude --version', {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'ignore'],
         timeout: 10000
       });
       return output.trim();
     } catch (error) {
-      throw new Error('Claude Code CLI not accessible');
+      throw new Error('Claude Code CLI not installed (run: npm install -g @anthropic-ai/claude-code)');
     }
   }
 
   async isInstalled() {
-    // Claude is installed via npx, so it's always "available"
-    // but we can check if it runs
+    // Check if claude command is available globally
     try {
       await this.checkVersion();
       return true;
@@ -116,18 +125,40 @@ export class ClaudeAgent extends AgentInterface {
   }
 
   async installDependencies() {
-    // Claude is installed via npx, no explicit install needed
-    return {
-      success: true,
-      message: 'Claude Code is installed via npx (no action needed)'
-    };
+    // Claude should be installed globally
+    try {
+      execSync('npm install -g @anthropic-ai/claude-code', {
+        stdio: 'inherit',
+        timeout: 60000
+      });
+      return {
+        success: true,
+        message: 'Claude Code installed globally'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to install Claude Code: ${error.message}`
+      };
+    }
   }
 
   async update() {
-    // npx always fetches latest, so no explicit update needed
-    return {
-      success: true,
-      message: 'Claude Code auto-updates via npx @latest'
-    };
+    // Use claude update command
+    try {
+      execSync('claude update', {
+        stdio: 'inherit',
+        timeout: 30000
+      });
+      return {
+        success: true,
+        message: 'Claude Code updated successfully'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to update Claude Code: ${error.message}`
+      };
+    }
   }
 }

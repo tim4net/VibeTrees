@@ -242,7 +242,7 @@
           <input
             type="text"
             id="new-project-path"
-            placeholder="/path/to/project"
+            placeholder="e.g., /Users/tim/code/my-project"
             required
             style="flex: 1;"
           />
@@ -251,8 +251,16 @@
           </button>
         </div>
         <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
-          Click Browse or type the full path
+          Select a suggestion below, browse, or type the full path
         </small>
+      </div>
+
+      <!-- Suggested Projects -->
+      <div id="suggested-projects" class="suggested-projects" style="display: none;">
+        <label style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">
+          Suggested Projects
+        </label>
+        <div id="suggested-projects-list" class="suggested-projects-list"></div>
       </div>
 
       <div class="form-group">
@@ -271,6 +279,29 @@
       <div class="modal-buttons">
         <button type="button" class="secondary" onclick="closeNewProjectModal()">Cancel</button>
         <button type="button" class="primary" onclick="createProject()">Add Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Folder Browser Modal -->
+  <div id="folder-browser-modal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <h2 class="modal-title">Browse for Project Folder</h2>
+
+      <!-- Current Path -->
+      <div class="folder-browser-path">
+        <i data-lucide="folder" class="lucide-sm"></i>
+        <span id="folder-browser-current-path">/</span>
+      </div>
+
+      <!-- Folder List -->
+      <div id="folder-browser-list" class="folder-browser-list">
+        <!-- Will be populated dynamically -->
+      </div>
+
+      <div class="modal-buttons">
+        <button type="button" class="secondary" onclick="closeFolderBrowser()">Cancel</button>
+        <button type="button" class="primary" onclick="selectCurrentFolder()">Select This Folder</button>
       </div>
     </div>
   </div>
@@ -813,7 +844,7 @@
   <script type="module" src="/js/initialization.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
-  <script type="module" src="/js/main.js?v=7"></script>
+  <script type="module" src="/js/main.js?v=8"></script>
 
   <!-- Toast notification -->
   <div id="toast" class="toast" style="display: none;"></div>

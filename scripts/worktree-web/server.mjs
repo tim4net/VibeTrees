@@ -7,9 +7,9 @@
 
 import { execSync, spawn } from 'child_process';
 import { Worker } from 'worker_threads';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
 import path from 'path';
-import { basename, join, dirname } from 'path';
+import { basename, join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 import { createServer as createNetServer } from 'net';
@@ -952,6 +952,114 @@ function createApp() {
       error: 'Directory not found in common locations',
       searched: searchPaths.filter((p, i) => i < 7) // Return subset to avoid clutter
     });
+  });
+
+  // Discover git repositories in common locations
+  app.get('/api/system/suggested-projects', (req, res) => {
+    const home = homedir();
+    const suggestions = [];
+
+    // Common parent directories to search
+    const parentDirs = [
+      join(home, 'code'),
+      join(home, 'projects'),
+      join(home, 'workspace'),
+      join(home, 'dev'),
+      join(home, 'Documents', 'projects'),
+      join(home, 'Desktop')
+    ];
+
+    // Scan each parent directory for git repos (max depth 1)
+    for (const parentDir of parentDirs) {
+      try {
+        if (!existsSync(parentDir)) continue;
+
+        const entries = readdirSync(parentDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+
+          const fullPath = join(parentDir, entry.name);
+          const gitPath = join(fullPath, '.git');
+
+          // Check if it's a git repository
+          if (existsSync(gitPath)) {
+            suggestions.push({
+              name: entry.name,
+              path: fullPath,
+              parent: basename(parentDir)
+            });
+          }
+
+          // Limit to 20 suggestions to avoid overwhelming the user
+          if (suggestions.length >= 20) break;
+        }
+
+        if (suggestions.length >= 20) break;
+      } catch (err) {
+        // Ignore errors, continue scanning
+      }
+    }
+
+    res.json(suggestions);
+  });
+
+  // Browse directories server-side
+  app.post('/api/system/browse-directory', (req, res) => {
+    try {
+      let { path } = req.body;
+      const home = homedir();
+
+      // If no path provided, start at home directory
+      if (!path || path === '') {
+        path = home;
+      }
+
+      // Security: Ensure path is within current user's home directory only
+      const resolvedPath = resolve(path);
+      if (!resolvedPath.startsWith(home)) {
+        return res.status(403).json({ error: 'Access denied - path must be within your home directory' });
+      }
+
+      // Check if path exists
+      if (!existsSync(resolvedPath)) {
+        return res.status(404).json({ error: 'Directory not found' });
+      }
+
+      // Check if it's a directory
+      const stats = statSync(resolvedPath);
+      if (!stats.isDirectory()) {
+        return res.status(400).json({ error: 'Not a directory' });
+      }
+
+      // Read directory contents
+      const entries = readdirSync(resolvedPath, { withFileTypes: true });
+      const directories = entries
+        .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+        .map(entry => {
+          const fullPath = join(resolvedPath, entry.name);
+          const hasGit = existsSync(join(fullPath, '.git'));
+          return {
+            name: entry.name,
+            path: fullPath,
+            isGitRepo: hasGit
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // Get parent directory
+      const parent = dirname(resolvedPath);
+      const canGoUp = parent !== resolvedPath && parent.startsWith(home);
+
+      res.json({
+        currentPath: resolvedPath,
+        parentPath: canGoUp ? parent : null,
+        directories
+      });
+
+    } catch (err) {
+      console.error('[API] Browse directory error:', err);
+      res.status(500).json({ error: 'Failed to browse directory' });
+    }
   });
 
   app.get('/api/worktrees', async (req, res) => {

@@ -96,8 +96,11 @@ async function switchProject(projectId) {
     currentProject = await response.json();
     console.log(`[Projects] Switched to: ${currentProject.name}`);
 
+    // Update dropdown to show newly selected project
+    updateProjectDropdown();
+
     // Refresh worktrees for new project
-    await refreshWorktrees();
+    await window.refreshWorktrees();
 
   } catch (error) {
     console.error('[Projects] Failed to switch project:', error);
@@ -109,7 +112,7 @@ async function switchProject(projectId) {
 /**
  * Show modal to create a new project
  */
-function showNewProjectModal() {
+async function showNewProjectModal() {
   const modal = document.getElementById('new-project-modal');
   if (!modal) {
     console.error('[Projects] New project modal not found');
@@ -135,7 +138,11 @@ function showNewProjectModal() {
     }
   });
 
+  // Show modal first
   modal.classList.add('active');
+
+  // Load suggested projects
+  await loadSuggestedProjects();
 }
 
 /**
@@ -197,61 +204,206 @@ if (document.readyState === 'loading') {
 }
 
 /**
- * Browse for a project directory - opens native file picker
- * Uses simple file input method to avoid browser permission dialogs
+ * Browse for a project directory using custom folder browser
  */
+let currentBrowserPath = '';
+
 async function browseForProjectPath() {
-  try {
-    // Use hidden file input with directory selection
-    // This method doesn't trigger "allow to copy" permission dialogs
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.webkitdirectory = true;
-    input.directory = true;
-    input.multiple = true;
-    input.style.display = 'none';
-
-    input.onchange = async (e) => {
-      if (e.target.files.length > 0) {
-        const firstFile = e.target.files[0];
-        const relativePath = firstFile.webkitRelativePath || firstFile.name;
-        const dirName = relativePath.split('/')[0];
-
-        console.log('[Projects] Selected directory:', dirName);
-
-        // Try to find full path on server
-        const response = await fetch('/api/system/find-directory', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: dirName })
-        });
-
-        const pathInput = document.getElementById('new-project-path');
-        const nameInput = document.getElementById('new-project-name');
-
-        if (response.ok) {
-          const { path } = await response.json();
-          pathInput.value = path;
-          // Auto-populate name from folder
-          const folderName = path.split('/').filter(p => p).pop();
-          nameInput.value = folderName;
-          pathInput.dispatchEvent(new Event('input'));
-        } else {
-          // Fallback: use directory name
-          pathInput.value = dirName;
-          nameInput.value = dirName;
-          pathInput.select();
-        }
-      }
-      document.body.removeChild(input);
-    };
-
-    document.body.appendChild(input);
-    input.click();
-  } catch (error) {
-    console.error('[Projects] Error browsing for directory:', error);
-    document.getElementById('new-project-path').focus();
+  const modal = document.getElementById('folder-browser-modal');
+  if (!modal) {
+    console.error('[Projects] Folder browser modal not found');
+    return;
   }
+
+  // Open modal and load home directory
+  modal.classList.add('active');
+  await loadFolderBrowserPath('');
+}
+
+/**
+ * Load a directory in the folder browser
+ * @param {string} path - Directory path to load
+ */
+async function loadFolderBrowserPath(path) {
+  const list = document.getElementById('folder-browser-list');
+  const pathDisplay = document.getElementById('folder-browser-current-path');
+
+  if (!list || !pathDisplay) {
+    console.error('[Projects] Folder browser elements not found');
+    return;
+  }
+
+  // Show loading
+  list.innerHTML = '<div class="folder-browser-loading">Loading...</div>';
+
+  try {
+    const response = await fetch('/api/system/browse-directory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    });
+
+    if (!response.ok) throw new Error('Failed to browse directory');
+
+    const data = await response.json();
+    currentBrowserPath = data.currentPath;
+    pathDisplay.textContent = data.currentPath;
+
+    // Build folder list - use data attributes to prevent XSS
+    const folders = [];
+
+    // Add parent directory if available
+    if (data.parentPath) {
+      folders.push(`
+        <div class="folder-browser-item parent" data-path="${escapeHtml(data.parentPath)}">
+          <i data-lucide="arrow-up" class="lucide-sm folder-icon"></i>
+          <span class="folder-name">..</span>
+        </div>
+      `);
+    }
+
+    // Add subdirectories
+    data.directories.forEach(dir => {
+      const gitClass = dir.isGitRepo ? ' git-repo' : '';
+      const gitBadge = dir.isGitRepo ? '<span class="git-badge">GIT</span>' : '';
+      folders.push(`
+        <div class="folder-browser-item${gitClass}" data-path="${escapeHtml(dir.path)}">
+          <i data-lucide="${dir.isGitRepo ? 'folder-git-2' : 'folder'}" class="lucide-sm folder-icon"></i>
+          <span class="folder-name">${escapeHtml(dir.name)}</span>
+          ${gitBadge}
+        </div>
+      `);
+    });
+
+    list.innerHTML = folders.length > 0
+      ? folders.join('')
+      : '<div class="folder-browser-empty">No subdirectories</div>';
+
+    // Attach click handlers safely via event delegation
+    list.querySelectorAll('.folder-browser-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const path = item.dataset.path;
+        if (path) loadFolderBrowserPath(path);
+      });
+    });
+
+    // Reinitialize Lucide icons
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+
+  } catch (error) {
+    console.error('[Projects] Failed to browse directory:', error);
+    list.innerHTML = '<div class="folder-browser-empty">Failed to load directory</div>';
+  }
+}
+
+/**
+ * Select the current folder in the browser
+ */
+function selectCurrentFolder() {
+  if (!currentBrowserPath) {
+    console.error('[Projects] No folder selected');
+    return;
+  }
+
+  // Fill in the project path
+  const pathInput = document.getElementById('new-project-path');
+  const nameInput = document.getElementById('new-project-name');
+
+  if (pathInput && nameInput) {
+    pathInput.value = currentBrowserPath;
+    const folderName = currentBrowserPath.split('/').filter(p => p).pop();
+    nameInput.value = folderName;
+  }
+
+  closeFolderBrowser();
+}
+
+/**
+ * Close the folder browser modal
+ */
+function closeFolderBrowser() {
+  const modal = document.getElementById('folder-browser-modal');
+  if (modal) {
+    modal.classList.remove('active');
+  }
+  currentBrowserPath = '';
+}
+
+/**
+ * Load suggested projects from common locations
+ */
+async function loadSuggestedProjects() {
+  const container = document.getElementById('suggested-projects');
+  const list = document.getElementById('suggested-projects-list');
+
+  if (!container || !list) {
+    console.error('[Projects] Suggested projects elements not found');
+    return;
+  }
+
+  // Show loading state
+  container.style.display = 'block';
+  list.innerHTML = '<div class="suggested-projects-loading">Scanning for projects...</div>';
+
+  try {
+    const response = await fetch('/api/system/suggested-projects');
+    if (!response.ok) throw new Error('Failed to load suggestions');
+
+    const suggestions = await response.json();
+
+    if (suggestions.length === 0) {
+      list.innerHTML = '<div class="suggested-projects-empty">No git repositories found in common locations</div>';
+      return;
+    }
+
+    // Render suggestions
+    list.innerHTML = suggestions.map(project => `
+      <div class="suggested-project-item" onclick="selectSuggestedProject('${escapeHtml(project.path)}', '${escapeHtml(project.name)}')">
+        <i data-lucide="folder-git-2" class="lucide-sm folder-icon"></i>
+        <div class="suggested-project-info">
+          <div class="suggested-project-name">${escapeHtml(project.name)}</div>
+          <div class="suggested-project-path">${escapeHtml(project.path)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    // Reinitialize Lucide icons for the new elements
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+
+  } catch (error) {
+    console.error('[Projects] Failed to load suggested projects:', error);
+    list.innerHTML = '<div class="suggested-projects-empty">Failed to load suggestions</div>';
+  }
+}
+
+/**
+ * Select a suggested project
+ * @param {string} path - Full path to project
+ * @param {string} name - Project name
+ */
+function selectSuggestedProject(path, name) {
+  const pathInput = document.getElementById('new-project-path');
+  const nameInput = document.getElementById('new-project-name');
+
+  if (pathInput && nameInput) {
+    pathInput.value = path;
+    nameInput.value = name;
+  }
+}
+
+/**
+ * Escape HTML to prevent XSS
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 /**
@@ -301,4 +453,8 @@ window.showNewProjectModal = showNewProjectModal;
 window.closeNewProjectModal = closeNewProjectModal;
 window.createProject = createProject;
 window.browseForProjectPath = browseForProjectPath;
+window.loadFolderBrowserPath = loadFolderBrowserPath;
+window.selectCurrentFolder = selectCurrentFolder;
+window.closeFolderBrowser = closeFolderBrowser;
+window.selectSuggestedProject = selectSuggestedProject;
 window.removeCurrentProject = removeCurrentProject;
