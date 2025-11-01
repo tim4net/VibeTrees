@@ -172,28 +172,12 @@ if (portIndex !== -1 && args[portIndex + 1]) {
 // Set working directory
 envVars.push(`VIBE_CWD=${process.cwd()}`);
 
-// Build PM2 command
+// Build PM2 command (use startOrReload to prevent duplicates)
 const envString = envVars.length > 0 ? envVars.join(' ') + ' ' : '';
-const pm2Command = `${envString}pm2 start ${ecosystemPath}`;
+const pm2Command = `${envString}pm2 startOrReload ${ecosystemPath}`;
 
 try {
-  // Check if already running
-  try {
-    execSync(`pm2 describe ${PM2_NAME}`, { stdio: 'ignore' });
-    console.log('⚠️  Vibe is already running!');
-    console.log('');
-    console.log('Use these commands:');
-    console.log('  vibe --status   Check status');
-    console.log('  vibe --logs     View logs');
-    console.log('  vibe --restart  Restart server');
-    console.log('  vibe --stop     Stop server');
-    console.log('');
-    process.exit(0);
-  } catch {
-    // Not running, continue with start
-  }
-
-  // Start with PM2
+  // Start or reload with PM2 (handles both first start and updates)
   execSync(pm2Command, { stdio: 'inherit', shell: true });
 
   console.log('');
