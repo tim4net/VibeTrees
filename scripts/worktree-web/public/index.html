@@ -50,7 +50,7 @@
             <select id="project-selector">
               <option value="">Loading...</option>
             </select>
-            <button class="small primary" onclick="showNewProjectModal()" title="Add new project">+New</button>
+            <button class="small primary" onclick="showNewProjectModal()" title="Add new project">+Add</button>
             <button class="small secondary" onclick="removeCurrentProject()" title="Remove current project from VibeTrees" style="padding: 4px 8px;">
               <i data-lucide="trash-2" class="lucide-sm"></i>
             </button>
@@ -237,17 +237,7 @@
       <h2 class="modal-title">Add New Project</h2>
 
       <div class="form-group">
-        <label for="new-project-name">Project Name</label>
-        <input
-          type="text"
-          id="new-project-name"
-          placeholder="My Project"
-          required
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="new-project-path">Project Path</label>
+        <label for="new-project-path">Project Folder</label>
         <div style="display: flex; gap: 8px;">
           <input
             type="text"
@@ -261,10 +251,20 @@
           </button>
         </div>
         <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
-          Must be an absolute path to an existing directory
+          Click Browse or type the full path
         </small>
-        <small style="color: var(--text-secondary); display: block; margin-top: 8px; padding: 8px; background: rgba(88, 166, 255, 0.1); border-radius: 4px;">
-          💡 <strong>Browse button:</strong> If your browser asks to "view and copy files", this just means it will access the folder name. Click "Allow" - VibeTrees only reads the directory path, not file contents.
+      </div>
+
+      <div class="form-group">
+        <label for="new-project-name">Project Name</label>
+        <input
+          type="text"
+          id="new-project-name"
+          placeholder="my-project"
+          required
+        />
+        <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
+          Auto-filled from folder name
         </small>
       </div>
 
@@ -813,7 +813,7 @@
   <script type="module" src="/js/initialization.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
-  <script type="module" src="/js/main.js?v=5"></script>
+  <script type="module" src="/js/main.js?v=6"></script>
 
   <!-- Toast notification -->
   <div id="toast" class="toast" style="display: none;"></div>

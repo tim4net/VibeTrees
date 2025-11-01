@@ -101,8 +101,6 @@ async function switchProject(projectId) {
 
   } catch (error) {
     console.error('[Projects] Failed to switch project:', error);
-    alert(`Failed to switch project: ${error.message}`);
-
     // Revert dropdown to current project
     updateProjectDropdown();
   }
@@ -121,6 +119,21 @@ function showNewProjectModal() {
   // Clear form
   document.getElementById('new-project-name').value = '';
   document.getElementById('new-project-path').value = '';
+
+  // Set up path input listener to auto-populate name
+  const pathInput = document.getElementById('new-project-path');
+  const nameInput = document.getElementById('new-project-name');
+
+  pathInput.addEventListener('input', () => {
+    const path = pathInput.value.trim();
+    if (path) {
+      // Extract folder name from path
+      const folderName = path.split('/').filter(p => p).pop();
+      if (folderName && !nameInput.value) {
+        nameInput.value = folderName;
+      }
+    }
+  });
 
   modal.classList.add('active');
 }
@@ -143,7 +156,7 @@ async function createProject() {
   const path = document.getElementById('new-project-path').value.trim();
 
   if (!name || !path) {
-    alert('Please provide both name and path');
+    console.log('[Projects] Name and path required');
     return;
   }
 
@@ -172,7 +185,7 @@ async function createProject() {
 
   } catch (error) {
     console.error('[Projects] Failed to create project:', error);
-    alert(`Failed to create project: ${error.message}`);
+    // Error logged to console - no popup
   }
 }
 
@@ -203,16 +216,20 @@ async function browseForProjectPath() {
         body: JSON.stringify({ name: dirHandle.name })
       });
 
+      const pathInput = document.getElementById('new-project-path');
+      const nameInput = document.getElementById('new-project-name');
+
       if (response.ok) {
         const { path } = await response.json();
-        document.getElementById('new-project-path').value = path;
-        document.getElementById('new-project-path').select();
+        pathInput.value = path;
+        // Auto-populate name from folder
+        nameInput.value = dirHandle.name;
+        pathInput.dispatchEvent(new Event('input'));
       } else {
-        // Fallback: show directory name and ask user to complete path
-        const pathInput = document.getElementById('new-project-path');
+        // Fallback: show directory name
         pathInput.value = dirHandle.name;
+        nameInput.value = dirHandle.name;
         pathInput.select();
-        alert(`Selected directory: ${dirHandle.name}\n\nPlease verify or complete the full absolute path.`);
       }
     } else {
       // Fallback: Use hidden file input with directory selection (works in all modern browsers)
@@ -239,16 +256,20 @@ async function browseForProjectPath() {
           });
 
           const pathInput = document.getElementById('new-project-path');
+          const nameInput = document.getElementById('new-project-name');
 
           if (response.ok) {
             const { path } = await response.json();
             pathInput.value = path;
-            pathInput.select();
+            // Auto-populate name from folder
+            const folderName = path.split('/').filter(p => p).pop();
+            nameInput.value = folderName;
+            pathInput.dispatchEvent(new Event('input'));
           } else {
-            // Fallback: just use the name
+            // Fallback: use directory name
             pathInput.value = dirName;
+            nameInput.value = dirName;
             pathInput.select();
-            alert(`Selected: ${dirName}\n\nPlease enter the full absolute path.`);
           }
         }
         document.body.removeChild(input);
@@ -262,7 +283,6 @@ async function browseForProjectPath() {
       console.log('[Projects] Directory selection cancelled');
     } else {
       console.error('[Projects] Error browsing for directory:', error);
-      alert(`Error: ${error.message}\n\nPlease enter the path manually.`);
       document.getElementById('new-project-path').focus();
     }
   }
@@ -270,17 +290,15 @@ async function browseForProjectPath() {
 
 /**
  * Remove the current project from VibeTrees
+ * Note: Only removes from project list, does not delete files
  */
 async function removeCurrentProject() {
   if (!currentProject) {
-    alert('No project selected');
+    console.log('[Projects] No project to remove');
     return;
   }
 
   const projectName = currentProject.name;
-  const confirmed = confirm(`Remove "${projectName}" from VibeTrees?\n\nThis only removes it from the project list. Your files will not be deleted.`);
-
-  if (!confirmed) return;
 
   try {
     const response = await fetch(`/api/projects/${currentProject.id}`, {
@@ -308,7 +326,7 @@ async function removeCurrentProject() {
 
   } catch (error) {
     console.error('[Projects] Failed to remove project:', error);
-    alert(`Failed to remove project: ${error.message}`);
+    // Show error in console - no alert popups
   }
 }
 
