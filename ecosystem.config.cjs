@@ -2,6 +2,7 @@ module.exports = {
   apps: [{
     name: 'vibe-worktrees',
     script: './scripts/worktree-web/server.mjs',
+    cwd: __dirname, // Run from the installation directory
     instances: 1,
     autorestart: true,
     watch: false, // Set to true for development if you want auto-reload on file changes
