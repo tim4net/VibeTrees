@@ -29,12 +29,40 @@
 }
 
 .sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sidebar-title-text {
   font-size: 16px;
   font-weight: 600;
   background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.project-selector-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.project-selector-container select {
+  font-size: 12px;
+  padding: 2px 6px;
+  background: var(--modal-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.project-selector-container button {
+  padding: 2px 6px;
+  font-size: 11px;
 }
 
 .sidebar-actions { display: flex; gap: 6px; }
@@ -47,7 +75,8 @@
 }
 
 .sidebar.collapsed .sidebar-header { flex-direction: column; padding: 8px 4px; gap: 8px; }
-.sidebar.collapsed .sidebar-title { display: none; }
+.sidebar.collapsed .sidebar-title-text,
+.sidebar.collapsed .project-selector-container { display: none; }
 .sidebar.collapsed .sidebar-actions { flex-direction: column; width: 100%; gap: 8px; }
 .sidebar.collapsed .sidebar-actions button { width: 100%; height: 36px; padding: 0; font-size: 0; }
 .sidebar.collapsed .sidebar-actions button i { margin: 0; font-size: 16px; }

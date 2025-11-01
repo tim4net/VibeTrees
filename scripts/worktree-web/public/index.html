@@ -45,12 +45,12 @@
       <div class="resize-handle" id="resize-handle"></div>
       <div class="sidebar-header">
         <div class="sidebar-title">
-          <i data-lucide="trees" class="lucide"></i> Worktrees
-          <div class="project-selector-container" style="display: inline-flex; align-items: center; margin-left: 8px; gap: 4px;">
-            <select id="project-selector" style="font-size: 12px; padding: 2px 6px; background: var(--modal-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; cursor: pointer;">
+          <span class="sidebar-title-text"><i data-lucide="trees" class="lucide"></i> Worktrees</span>
+          <div class="project-selector-container">
+            <select id="project-selector">
               <option value="">Loading...</option>
             </select>
-            <button class="small primary" onclick="showNewProjectModal()" title="Add new project" style="padding: 2px 6px; font-size: 11px;">+New</button>
+            <button class="small primary" onclick="showNewProjectModal()" title="Add new project">+New</button>
           </div>
         </div>
         <div class="sidebar-actions">
