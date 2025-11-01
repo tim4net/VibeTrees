@@ -19,6 +19,7 @@ import { CacheManager } from '../cache-manager.mjs';
 import { FirewallHelper } from '../firewall-helper.mjs';
 import { ServiceConfig } from '../service-config.mjs';
 import { InitializationManager } from '../initialization-manager.mjs';
+import { ProjectManager } from '../project-manager.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = join(__dirname, '..', '..');
@@ -237,6 +238,9 @@ const worktreeManager = new WorktreeManager({
     AIConflictResolver
   }
 });
+
+// Initialize ProjectManager (singleton)
+const projectManager = new ProjectManager();
 
 /**
  * Format log line by adding color and structure
@@ -809,6 +813,88 @@ function createApp() {
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to read version' });
+    }
+  });
+
+  // Project Management API
+  app.get('/api/projects', (req, res) => {
+    try {
+      const projects = projectManager.listProjects();
+      res.json(projects);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/projects/current', (req, res) => {
+    try {
+      const project = projectManager.getCurrentProject();
+      res.json(project);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/projects/:id', (req, res) => {
+    try {
+      const project = projectManager.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      res.json(project);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/projects', (req, res) => {
+    try {
+      const { name, path } = req.body;
+      if (!name || !path) {
+        return res.status(400).json({ error: 'Name and path are required' });
+      }
+      const project = projectManager.addProject({ name, path });
+      res.status(201).json(project);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/projects/:id', (req, res) => {
+    try {
+      const updates = req.body;
+      const project = projectManager.updateProject(req.params.id, updates);
+      res.json(project);
+    } catch (error) {
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/projects/:id', (req, res) => {
+    try {
+      projectManager.deleteProject(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/projects/:id/set-current', (req, res) => {
+    try {
+      projectManager.setCurrentProject(req.params.id);
+      const project = projectManager.getProject(req.params.id);
+      res.json(project);
+    } catch (error) {
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
     }
   });
 
