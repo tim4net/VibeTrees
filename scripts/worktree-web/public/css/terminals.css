@@ -38,7 +38,28 @@
   padding: 0 8px;
   gap: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   flex-shrink: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #30363d #0d1117;
+}
+
+/* Webkit scrollbar styling for better visibility */
+.terminal-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.terminal-tabs::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+.terminal-tabs::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+
+.terminal-tabs::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
 }
 
 .terminal-tab {
@@ -55,6 +76,18 @@
   font-size: 13px;
   white-space: nowrap;
   transition: all 0.2s;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 300px;
+}
+
+/* Tab label with ellipsis for overflow */
+.terminal-tab > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
 }
 
 .terminal-tab:hover {
