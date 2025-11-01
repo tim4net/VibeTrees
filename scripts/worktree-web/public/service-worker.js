@@ -1,4 +1,4 @@
-const CACHE_NAME = 'worktree-manager-v13';
+const CACHE_NAME = 'worktree-manager-v14';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
