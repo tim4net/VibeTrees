@@ -843,6 +843,24 @@ function createApp() {
     }
   });
 
+  // Force update check (manual trigger)
+  app.post('/api/check-updates', async (req, res) => {
+    try {
+      if (!manager.updateChecker) {
+        return res.status(503).json({ error: 'Update checker not available' });
+      }
+
+      // Force an immediate check
+      await manager.updateChecker.checkForUpdates();
+
+      // Return updated status
+      const status = manager.updateChecker.getStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to check for updates' });
+    }
+  });
+
   // Project Management API
   app.get('/api/projects', (req, res) => {
     try {

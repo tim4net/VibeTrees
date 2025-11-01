@@ -32,16 +32,17 @@ if (args.includes('--help') || args.includes('-h')) {
 Vibe Worktrees - Parallel development with AI agents and isolated containers
 
 Usage:
-  vibe               Start with PM2 (background process)
-  vibe --stop        Stop the server
-  vibe --restart     Restart the server
-  vibe --status      Show server status
-  vibe --logs        Show server logs (follow mode)
-  vibe --update      Update to latest version
-  vibe --listen      Start with network access (all interfaces)
-  vibe --port 8080   Start on custom port (default: 3335)
-  vibe --help        Show this help message
-  vibe --version     Show version
+  vibe                 Start with PM2 (background process)
+  vibe --stop          Stop the server
+  vibe --restart       Restart the server
+  vibe --status        Show server status
+  vibe --logs          Show server logs (follow mode)
+  vibe --update        Update to latest version
+  vibe --check-update  Check for updates (manual trigger)
+  vibe --listen        Start with network access (all interfaces)
+  vibe --port 8080     Start on custom port (default: 3335)
+  vibe --help          Show this help message
+  vibe --version       Show version
 
 Examples:
   # Start server in background
@@ -98,6 +99,72 @@ if (!checkPM2()) {
 
 const ecosystemPath = join(__dirname, '..', 'ecosystem.config.cjs');
 const PM2_NAME = 'vibe-worktrees';
+
+// Check for updates command (manual trigger)
+if (args.includes('--check-update')) {
+  console.log('🔄 Checking for updates...');
+  console.log('');
+
+  try {
+    // Check GitHub for latest version
+    const https = await import('https');
+    const updateCheckPromise = new Promise((resolve, reject) => {
+      https.get('https://api.github.com/repos/tim4net/VibeTrees/releases/latest', {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'VibeTrees-Update-Checker'
+        }
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const release = JSON.parse(data);
+            resolve(release.tag_name.replace(/^v/, ''));
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }).on('error', reject);
+    });
+
+    const latestVersion = await updateCheckPromise;
+    const packageJson = await import('../package.json', { with: { type: 'json' } });
+    const currentVersion = packageJson.default.version;
+
+    // Compare versions
+    const compareVersions = (v1, v2) => {
+      const parts1 = v1.split('.').map(Number);
+      const parts2 = v2.split('.').map(Number);
+      for (let i = 0; i < 3; i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 < p2) return -1;
+        if (p1 > p2) return 1;
+      }
+      return 0;
+    };
+
+    console.log(`Current version: v${currentVersion}`);
+    console.log(`Latest version:  v${latestVersion}`);
+    console.log('');
+
+    if (compareVersions(currentVersion, latestVersion) >= 0) {
+      console.log('✅ You are up to date!');
+    } else {
+      console.log(`📦 Update available: v${currentVersion} → v${latestVersion}`);
+      console.log('');
+      console.log('Run: vibe --update');
+    }
+    console.log('');
+  } catch (error) {
+    console.error('❌ Failed to check for updates');
+    console.error('Error:', error.message);
+    console.error('');
+    process.exit(1);
+  }
+  process.exit(0);
+}
 
 // Update command
 if (args.includes('--update')) {
