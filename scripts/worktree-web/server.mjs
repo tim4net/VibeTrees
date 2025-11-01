@@ -291,6 +291,8 @@ function handleLogsConnection(ws, worktreeName, serviceName, manager) {
   const worktree = worktrees.find(w => w.name === worktreeName);
 
   if (!worktree) {
+    console.error(`[WebSocket] Logs connection failed: worktree "${worktreeName}" not found`);
+    console.error(`[WebSocket] Available worktrees:`, worktrees.map(w => w.name));
     ws.send('\x1b[31mError: Worktree not found\x1b[0m\r\n');
     ws.close();
     return;
@@ -351,6 +353,8 @@ function handleCombinedLogsConnection(ws, worktreeName, manager) {
   const worktree = worktrees.find(w => w.name === worktreeName);
 
   if (!worktree) {
+    console.error(`[WebSocket] Combined logs connection failed: worktree "${worktreeName}" not found`);
+    console.error(`[WebSocket] Available worktrees:`, worktrees.map(w => w.name));
     ws.send('\x1b[31mError: Worktree not found\x1b[0m\r\n');
     ws.close();
     return;
@@ -412,6 +416,8 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
   const worktree = worktrees.find(w => w.name === worktreeName);
 
   if (!worktree) {
+    console.error(`[WebSocket] Terminal connection failed: worktree "${worktreeName}" not found`);
+    console.error(`[WebSocket] Available worktrees:`, worktrees.map(w => w.name));
     ws.send('\r\n\x1b[31mError: Worktree not found\x1b[0m\r\n');
     ws.close();
     return;

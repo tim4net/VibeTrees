@@ -284,7 +284,7 @@ export class WorktreeManager {
       // Get all worktree names from synchronous call first
       const syncWorktrees = execSync('git worktree list --porcelain', {
         encoding: 'utf-8',
-        cwd: this.rootDir
+        cwd: this.getProjectRoot()
       });
       const portRegistryData = {};
       const lines = syncWorktrees.split('\n');
@@ -297,7 +297,7 @@ export class WorktreeManager {
 
       worker.postMessage({
         portRegistry: portRegistryData,
-        rootDir: this.rootDir
+        rootDir: this.getProjectRoot()
       });
     });
   }
@@ -308,7 +308,10 @@ export class WorktreeManager {
    */
   listWorktrees() {
     try {
-      const output = execSync('git worktree list --porcelain', { encoding: 'utf-8' });
+      const output = execSync('git worktree list --porcelain', {
+        encoding: 'utf-8',
+        cwd: this.getProjectRoot()  // Run in project directory, not process cwd
+      });
       const worktrees = [];
       const lines = output.split('\n');
       let current = {};

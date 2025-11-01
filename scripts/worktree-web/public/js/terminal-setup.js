@@ -386,7 +386,8 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     delay: RECONNECT_INITIAL_DELAY,
     timeoutId: null,
     isReconnecting: false,
-    overlay: null
+    overlay: null,
+    permanentFailure: false  // Track permanent errors like "Worktree not found"
   };
 
   // Connect to logs WebSocket
@@ -422,6 +423,12 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     logsSocket.onmessage = (event) => {
       const data = event.data;
 
+      // Check for permanent errors that should stop reconnection attempts
+      if (data.includes('Error: Worktree not found')) {
+        reconnectState.permanentFailure = true;
+        console.log('[Terminal] Permanent failure detected - worktree not found, will not attempt reconnection');
+      }
+
       // Fast path: Check for JSON only if starts with '{'
       // Most messages are log data, not JSON control messages
       if (data.length > 0 && data[0] === '{') {
@@ -453,6 +460,13 @@ export function setupLogsTerminal(tabId, panel, worktreeName, serviceName, isCom
     logsSocket.onclose = () => {
       console.log('Logs WebSocket closed');
       const terminalInfo = terminals.get(tabId);
+
+      // Don't reconnect if it's a permanent failure (worktree not found)
+      if (reconnectState.permanentFailure) {
+        console.log('[Terminal] Permanent failure - not attempting reconnection');
+        return;
+      }
+
       // Only attempt reconnection if terminal still exists (not manually closed)
       if (terminalInfo && !reconnectState.isReconnecting) {
         if (!reconnectState.isReconnecting) {
@@ -634,7 +648,8 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
     timeoutId: null,
     isReconnecting: false,
     overlay: null,
-    sessionId: savedSessionId
+    sessionId: savedSessionId,
+    permanentFailure: false  // Track permanent errors like "Worktree not found"
   };
 
   // Connect WebSocket for PTY
@@ -683,6 +698,12 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
 
     terminalSocket.onmessage = (event) => {
       const data = event.data;
+
+      // Check for permanent errors that should stop reconnection attempts
+      if (data.includes('Error: Worktree not found')) {
+        reconnectState.permanentFailure = true;
+        console.log('[Terminal] Permanent failure detected - worktree not found, will not attempt reconnection');
+      }
 
       // OPTIMIZED: Check for JSON more efficiently
       if (data.length > 8 && data[0] === '{' && data.slice(0, 8) === '{"type":') {
@@ -789,6 +810,12 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
       console.log(`Terminal WebSocket closed: ${tabId}`);
 
       const terminalInfo = terminals.get(tabId);
+
+      // Don't reconnect if it's a permanent failure (worktree not found)
+      if (reconnectState.permanentFailure) {
+        console.log('[Terminal] Permanent failure - not attempting reconnection');
+        return;
+      }
 
       // Only attempt reconnection if terminal still exists (not manually closed)
       if (terminalInfo && !reconnectState.isReconnecting) {
