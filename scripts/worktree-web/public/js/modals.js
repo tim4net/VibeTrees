@@ -3,6 +3,8 @@
  * Handles modal dialogs (create worktree)
  */
 
+import { showSpinner, hideSpinner } from './spinner.js';
+
 // Initialize branch selector
 let branchSelector = null;
 
@@ -156,6 +158,9 @@ export async function createWorktree(event, force = false) {
   document.getElementById('create-progress').classList.add('active');
   document.getElementById('progress-header-text').textContent = 'Starting...';
 
+  // Show spinner overlay
+  showSpinner('Creating worktree...');
+
   try {
     const payload = {
       branchName,
@@ -180,6 +185,7 @@ export async function createWorktree(event, force = false) {
       document.getElementById('create-button').disabled = false;
       document.getElementById('cancel-button').disabled = false;
       document.getElementById('create-progress').classList.remove('active');
+      hideSpinner();
 
       // Check if dirty state
       if (data.hasDirtyState) {
@@ -231,6 +237,10 @@ export async function createWorktree(event, force = false) {
       document.getElementById('create-button').disabled = false;
       document.getElementById('cancel-button').disabled = false;
       document.getElementById('create-progress').classList.remove('active');
+      hideSpinner();
+    } else {
+      // Success case - hide spinner when modal closes
+      hideSpinner();
     }
     // Success case is handled by WebSocket progress events
   } catch (error) {
@@ -238,6 +248,7 @@ export async function createWorktree(event, force = false) {
     document.getElementById('create-button').disabled = false;
     document.getElementById('cancel-button').disabled = false;
     document.getElementById('create-progress').classList.remove('active');
+    hideSpinner();
   }
 }
 
