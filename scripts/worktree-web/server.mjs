@@ -666,6 +666,9 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
     // Default: terminal input - check both pause states
     if (!isPaused && !clientPaused) {
       terminal.write(dataStr);
+    } else {
+      // DEBUG: Log when input is being dropped due to pause
+      console.log(`[PTY Input Blocked] ${worktreeName} - isPaused: ${isPaused}, clientPaused: ${clientPaused}, input length: ${dataStr.length}`);
     }
   };
 
