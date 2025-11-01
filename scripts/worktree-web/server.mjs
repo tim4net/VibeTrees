@@ -915,6 +915,45 @@ function createApp() {
     res.json({ home: homedir() });
   });
 
+  // System API - Find directory by name in common locations
+  app.post('/api/system/find-directory', (req, res) => {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Directory name required' });
+    }
+
+    const home = homedir();
+    const searchPaths = [
+      join(home, 'code', name),
+      join(home, 'projects', name),
+      join(home, 'workspace', name),
+      join(home, 'dev', name),
+      join(home, 'Documents', 'projects', name),
+      join(home, 'Desktop', name),
+      join(home, name),
+      // Also check direct paths
+      join('/Users', process.env.USER || '', 'code', name),
+      join('/home', process.env.USER || '', 'code', name)
+    ];
+
+    // Find first existing path
+    for (const searchPath of searchPaths) {
+      try {
+        if (existsSync(searchPath) && statSync(searchPath).isDirectory()) {
+          return res.json({ path: searchPath, found: true });
+        }
+      } catch (err) {
+        // Ignore errors, continue searching
+      }
+    }
+
+    // Not found
+    res.status(404).json({
+      error: 'Directory not found in common locations',
+      searched: searchPaths.filter((p, i) => i < 7) // Return subset to avoid clutter
+    });
+  });
+
   app.get('/api/worktrees', async (req, res) => {
     // Use async worker thread version to avoid blocking event loop
     const worktrees = await manager.listWorktreesAsync();

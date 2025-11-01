@@ -184,39 +184,87 @@ if (document.readyState === 'loading') {
 }
 
 /**
- * Browse for a project directory - shows helpful suggestions
+ * Browse for a project directory - opens native file picker
  */
 async function browseForProjectPath() {
   try {
-    // Get user's home directory from server
-    const response = await fetch('/api/system/home');
-    const { home } = await response.json();
+    // Check if File System Access API is available (Chrome 86+)
+    if ('showDirectoryPicker' in window) {
+      // Use modern File System Access API
+      const dirHandle = await window.showDirectoryPicker({
+        mode: 'read',
+        startIn: 'documents'
+      });
 
-    // Common project directory suggestions
-    const suggestions = [
-      `${home}/code`,
-      `${home}/projects`,
-      `${home}/workspace`,
-      `${home}/dev`,
-      `${home}/Documents/projects`,
-      `${home}/Desktop`,
-      home
-    ];
+      // Send directory name to server to find matching path
+      const response = await fetch('/api/system/find-directory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: dirHandle.name })
+      });
 
-    const message = `Common project directories:\n\n${suggestions.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nPaste one of these paths, or enter your own absolute path.`;
+      if (response.ok) {
+        const { path } = await response.json();
+        document.getElementById('new-project-path').value = path;
+        document.getElementById('new-project-path').select();
+      } else {
+        // Fallback: show directory name and ask user to complete path
+        const pathInput = document.getElementById('new-project-path');
+        pathInput.value = dirHandle.name;
+        pathInput.select();
+        alert(`Selected directory: ${dirHandle.name}\n\nPlease verify or complete the full absolute path.`);
+      }
+    } else {
+      // Fallback: Use hidden file input with directory selection (works in all modern browsers)
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.webkitdirectory = true;
+      input.directory = true;
+      input.multiple = true;
+      input.style.display = 'none';
 
-    // Show suggestions
-    alert(message);
+      input.onchange = async (e) => {
+        if (e.target.files.length > 0) {
+          const firstFile = e.target.files[0];
+          const relativePath = firstFile.webkitRelativePath || firstFile.name;
+          const dirName = relativePath.split('/')[0];
 
-    // Auto-fill with ~/code if it exists, otherwise home
-    document.getElementById('new-project-path').value = `${home}/code`;
-    document.getElementById('new-project-path').select();
+          console.log('[Projects] Selected directory:', dirName);
 
+          // Try to find full path on server
+          const response = await fetch('/api/system/find-directory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: dirName })
+          });
+
+          const pathInput = document.getElementById('new-project-path');
+
+          if (response.ok) {
+            const { path } = await response.json();
+            pathInput.value = path;
+            pathInput.select();
+          } else {
+            // Fallback: just use the name
+            pathInput.value = dirName;
+            pathInput.select();
+            alert(`Selected: ${dirName}\n\nPlease enter the full absolute path.`);
+          }
+        }
+        document.body.removeChild(input);
+      };
+
+      document.body.appendChild(input);
+      input.click();
+    }
   } catch (error) {
-    console.error('[Projects] Error getting suggestions:', error);
-    // Fallback: just focus the input
-    document.getElementById('new-project-path').focus();
-    document.getElementById('new-project-path').select();
+    if (error.name === 'AbortError') {
+      console.log('[Projects] Directory selection cancelled');
+    } else {
+      console.error('[Projects] Error browsing for directory:', error);
+      alert(`Error: ${error.message}\n\nPlease enter the path manually.`);
+      document.getElementById('new-project-path').focus();
+    }
   }
 }
 
