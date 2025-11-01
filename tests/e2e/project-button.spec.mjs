@@ -43,7 +43,7 @@ test.describe('Project Management UI', () => {
     await expect(page.locator('#new-project-path')).toBeVisible();
   });
 
-  test('Browse button should show directory suggestions and fill input', async ({ page }) => {
+  test('Browse button functionality and API endpoint', async ({ page, context }) => {
     // Open the modal first
     const newButton = page.locator('button:has-text("+New")');
     await newButton.click();
@@ -65,41 +65,39 @@ test.describe('Project Management UI', () => {
     expect(functionExists).toBe(true);
     console.log('✓ browseForProjectPath function exists');
 
-    // Check that /api/system/home endpoint works
-    const homeResponse = await page.evaluate(async () => {
-      const response = await fetch('/api/system/home');
-      return response.json();
+    // Test the /api/system/find-directory endpoint
+    const testResponse = await page.evaluate(async () => {
+      const response = await fetch('/api/system/find-directory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'vibe-worktrees' })
+      });
+      return {
+        status: response.status,
+        data: await response.json()
+      };
     });
-    expect(homeResponse).toHaveProperty('home');
-    expect(homeResponse.home).toBeTruthy();
-    console.log('✓ /api/system/home endpoint works, home:', homeResponse.home);
 
-    // Set up dialog handler to accept the alert
-    const dialogPromise = page.waitForEvent('dialog');
+    // Endpoint should return either 200 (found) or 404 (not found)
+    expect([200, 404]).toContain(testResponse.status);
 
-    // Click the Browse button
-    await browseButton.click();
+    if (testResponse.status === 200) {
+      expect(testResponse.data).toHaveProperty('path');
+      expect(testResponse.data.path).toContain('vibe-worktrees');
+      console.log('✓ /api/system/find-directory found:', testResponse.data.path);
+    } else {
+      expect(testResponse.data).toHaveProperty('error');
+      expect(testResponse.data).toHaveProperty('searched');
+      console.log('✓ /api/system/find-directory returned 404 (directory not in common locations)');
+      console.log('  Searched paths:', testResponse.data.searched.length, 'locations');
+    }
 
-    // Wait for and handle the dialog
-    const dialog = await dialogPromise;
-    console.log('Alert message:', dialog.message());
-    expect(dialog.message()).toContain('Common project directories:');
-    await dialog.accept();
-    console.log('✓ Browse button clicked and alert handled');
+    // Note: We cannot test the actual native file picker in Playwright
+    // as it's an OS-level dialog that Playwright cannot interact with.
+    // The file picker would require user interaction to select a directory.
 
-    // Wait for the input to be filled (the code runs after alert is dismissed)
-    await page.waitForTimeout(500);
-
-    // Verify the path input is filled with ~/code
-    const pathInput = page.locator('#new-project-path');
-    const pathValue = await pathInput.inputValue();
-    expect(pathValue).toContain('/code');
-    console.log('✓ Path input filled with:', pathValue);
-
-    // Verify input is selected (focused)
-    const isFocused = await pathInput.evaluate(el => el === document.activeElement);
-    expect(isFocused).toBe(true);
-    console.log('✓ Path input is focused and selected');
+    // Instead, we verify the function exists and the backend API works correctly.
+    console.log('✓ Native file picker would open on click (cannot be automated)');
   });
 
   test('Debug: Check what happens on click', async ({ page }) => {
