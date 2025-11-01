@@ -1,7 +1,8 @@
 /**
- * Claude Agent - Anthropic's Claude Code CLI
+ * Claude Agent - Anthropic's Claude Code CLI (Native Binary)
  *
  * Official CLI for Claude Code with integrated MCP support.
+ * Uses the native binary installation for better performance and auto-updates.
  */
 
 import { AgentInterface } from './agent-interface.mjs';
@@ -9,23 +10,26 @@ import pty from 'node-pty';
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { homedir } from 'os';
 
 export class ClaudeAgent extends AgentInterface {
   constructor(config = {}) {
     super('claude', config);
   }
 
-  async spawn(worktreePath, options = {}) {
-    // Update Claude before launching
-    try {
-      console.log('[Claude Agent] Updating Claude Code...');
-      execSync('claude update', {
-        stdio: 'ignore',
-        timeout: 30000
-      });
-    } catch (error) {
-      console.warn('[Claude Agent] Update failed, continuing with existing version:', error.message);
+  getClaudePath() {
+    // Prefer native binary, fallback to PATH
+    const nativePath = join(homedir(), '.local', 'bin', 'claude');
+    if (existsSync(nativePath)) {
+      return nativePath;
     }
+    return 'claude'; // Fallback to PATH
+  }
+
+  async spawn(worktreePath, options = {}) {
+    // Native binary auto-updates on startup, no manual update needed
+    const claudePath = this.getClaudePath();
+    console.log(`[Claude Agent] Using Claude at: ${claudePath}`);
 
     const env = {
       ...process.env,
@@ -33,7 +37,7 @@ export class ClaudeAgent extends AgentInterface {
       ...options.env
     };
 
-    return pty.spawn('claude', [], {
+    return pty.spawn(claudePath, [], {
       cwd: worktreePath,
       env,
       cols: options.cols || 80,
@@ -63,19 +67,26 @@ export class ClaudeAgent extends AgentInterface {
 
   async checkVersion() {
     try {
-      const output = execSync('claude --version', {
+      const claudePath = this.getClaudePath();
+      const output = execSync(`${claudePath} --version`, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'ignore'],
         timeout: 10000
       });
       return output.trim();
     } catch (error) {
-      throw new Error('Claude Code CLI not installed (run: npm install -g @anthropic-ai/claude-code)');
+      throw new Error('Claude Code native binary not installed (run: curl -fsSL https://claude.ai/install.sh | bash)');
     }
   }
 
   async isInstalled() {
-    // Check if claude command is available globally
+    // Check if native binary exists
+    const nativePath = join(homedir(), '.local', 'bin', 'claude');
+    if (existsSync(nativePath)) {
+      return true;
+    }
+
+    // Fallback: check if claude is in PATH
     try {
       await this.checkVersion();
       return true;
@@ -125,15 +136,16 @@ export class ClaudeAgent extends AgentInterface {
   }
 
   async installDependencies() {
-    // Claude should be installed globally
+    // Install native binary
     try {
-      execSync('npm install -g @anthropic-ai/claude-code', {
+      execSync('curl -fsSL https://claude.ai/install.sh | bash', {
         stdio: 'inherit',
-        timeout: 60000
+        timeout: 60000,
+        shell: '/bin/bash'
       });
       return {
         success: true,
-        message: 'Claude Code installed globally'
+        message: 'Claude Code native binary installed to ~/.local/bin/claude'
       };
     } catch (error) {
       return {
@@ -144,21 +156,10 @@ export class ClaudeAgent extends AgentInterface {
   }
 
   async update() {
-    // Use claude update command
-    try {
-      execSync('claude update', {
-        stdio: 'inherit',
-        timeout: 30000
-      });
-      return {
-        success: true,
-        message: 'Claude Code updated successfully'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Failed to update Claude Code: ${error.message}`
-      };
-    }
+    // Native binary auto-updates on startup
+    return {
+      success: true,
+      message: 'Claude Code native binary auto-updates on startup (no manual update needed)'
+    };
   }
 }
