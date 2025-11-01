@@ -1,6 +1,6 @@
 {
   "name": "vibetrees",
-  "version": "1.0.28",
+  "version": "1.0.29",
   "type": "module",
   "description": "Manage multiple git worktrees with AI agents and isolated containers",
   "bin": {
