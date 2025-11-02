@@ -472,12 +472,19 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       args = ['-y', '@openai/codex@latest', '--dangerously-bypass-approvals-and-sandbox'];
     } else {
       // Claude Code with update and session UUID
-      // Use bash to chain: update → generate UUID → echo UUID → launch
-      const { randomUUID } = await import('crypto');
+      // Prefer native binary, fall back to npx if not found
       const sessionUUID = randomUUID();
+      const nativePath = join(homedir(), '.local', 'bin', 'claude');
+      const hasNative = existsSync(nativePath);
 
       commandStr = '/bin/bash';
-      args = ['-c', `echo "Updating Claude Code..." && npx -y @anthropic-ai/claude-code@latest update 2>/dev/null || echo "Update skipped" && echo "" && echo "🔑 Session ID: ${sessionUUID}" && echo "" && npx -y @anthropic-ai/claude-code@latest --dangerously-skip-permissions`];
+      if (hasNative) {
+        // Use native claude with update command
+        args = ['-c', `echo "Updating Claude Code..." && ${nativePath} update 2>/dev/null || echo "Update skipped" && echo "" && echo "🔑 Session ID: ${sessionUUID}" && echo "" && ${nativePath} --dangerously-skip-permissions`];
+      } else {
+        // Fall back to npx
+        args = ['-c', `echo "Updating Claude Code..." && npx -y @anthropic-ai/claude-code@latest update 2>/dev/null || echo "Update skipped" && echo "" && echo "🔑 Session ID: ${sessionUUID}" && echo "" && npx -y @anthropic-ai/claude-code@latest --dangerously-skip-permissions`];
+      }
     }
 
     terminal = manager.ptyManager.spawnPTY(sessionId, {
