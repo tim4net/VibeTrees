@@ -1,6 +1,8 @@
 /**
  * Modal Management Module
  * Handles modal dialogs (create worktree)
+ *
+ * State Machine: idle → creating → cancelling/success/error → idle
  */
 
 import { showSpinner, hideSpinner } from './spinner.js';
@@ -10,6 +12,60 @@ let branchSelector = null;
 
 // Initialize agent selector
 let agentSelector = null;
+
+// Track current modal state for proper lifecycle management
+let currentModalState = 'idle';
+
+// Request in-flight guard to prevent duplicate submissions
+let createInFlight = false;
+
+/**
+ * Set modal state and update UI accordingly
+ * @param {string} state - One of: idle, creating, cancelling, success, error
+ */
+function setModalState(state) {
+  const modal = document.getElementById('create-modal');
+  const createBtn = document.getElementById('create-button');
+  const cancelBtn = document.getElementById('cancel-button');
+
+  currentModalState = state;
+  modal.setAttribute('data-state', state);
+
+  // Update button labels and states based on current state
+  switch (state) {
+    case 'idle':
+      createBtn.disabled = false;
+      createBtn.textContent = 'Create';
+      cancelBtn.disabled = false;
+      cancelBtn.textContent = 'Cancel';
+      break;
+    case 'creating':
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating...';
+      cancelBtn.disabled = false;
+      cancelBtn.textContent = 'Cancel and clean up'; // Inform user about cleanup
+      break;
+    case 'cancelling':
+      createBtn.disabled = true;
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = 'Cleaning up...';
+      break;
+    case 'success':
+      createBtn.disabled = true;
+      createBtn.textContent = 'Created!';
+      cancelBtn.disabled = true;
+      break;
+    case 'error':
+      createBtn.disabled = false;
+      createBtn.textContent = 'Retry';
+      cancelBtn.disabled = false;
+      cancelBtn.textContent = 'Cancel';
+      break;
+  }
+}
+
+// Toast timeout tracker for cleanup
+let toastTimer = null;
 
 /**
  * Show toast notification
@@ -21,9 +77,49 @@ function showToast(message, duration = 3000) {
   toast.textContent = message;
   toast.style.display = 'block';
 
-  setTimeout(() => {
+  // Clear previous timeout to prevent flicker
+  if (toastTimer) clearTimeout(toastTimer);
+
+  toastTimer = setTimeout(() => {
     toast.style.display = 'none';
+    toastTimer = null;
   }, duration);
+}
+
+/**
+ * Toggle progress logs visibility
+ */
+export function toggleProgressLogs() {
+  const logPanel = document.getElementById('progress-output');
+  const logToggle = document.getElementById('log-toggle');
+
+  if (logPanel.classList.contains('collapsed')) {
+    logPanel.classList.remove('collapsed');
+    logToggle.querySelector('span').textContent = 'Hide details';
+    // Re-initialize Lucide icons for the rotated chevron
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+  } else {
+    logPanel.classList.add('collapsed');
+    logToggle.querySelector('span').textContent = 'Show details';
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+  }
+}
+
+/**
+ * Auto-expand logs on errors
+ */
+function autoExpandLogs() {
+  const logPanel = document.getElementById('progress-output');
+  const logToggle = document.getElementById('log-toggle');
+
+  if (logPanel.classList.contains('collapsed')) {
+    logPanel.classList.remove('collapsed');
+    logToggle.querySelector('span').textContent = 'Hide details';
+  }
 }
 
 /**
@@ -69,7 +165,10 @@ export function showCreateModal() {
  * Hide create worktree modal and reset state
  */
 export function hideCreateModal() {
-  document.getElementById('create-modal').classList.remove('active');
+  // Reset modal state
+  setModalState('idle');
+
+  // Clear all form inputs
   document.getElementById('branch-name').value = '';
   document.getElementById('from-branch').value = 'main';
   document.getElementById('worktree-name').value = '';
@@ -87,10 +186,11 @@ export function hideCreateModal() {
     agentSelector.selectAgent('claude');
   }
 
-  // Reset progress bar
+  // Reset progress container
   document.getElementById('create-progress').classList.remove('active');
   document.getElementById('progress-header-text').textContent = 'Creating worktree...';
 
+  // Reset all progress steps to pending state
   document.querySelectorAll('.progress-step').forEach(step => {
     step.classList.remove('pending', 'active', 'completed', 'error');
     step.classList.add('pending');
@@ -102,13 +202,18 @@ export function hideCreateModal() {
     if (statusEl) statusEl.textContent = '';
   });
 
-  document.getElementById('create-button').disabled = false;
-  document.getElementById('cancel-button').disabled = false;
-
-  // Clear progress output
+  // Reset progress output and collapse logs
   const progressOutput = document.getElementById('progress-output');
   progressOutput.innerHTML = '';
   progressOutput.classList.remove('active');
+  progressOutput.classList.add('collapsed');
+
+  // Reset log toggle button
+  const logToggle = document.getElementById('log-toggle');
+  logToggle.querySelector('span').textContent = 'Show details';
+
+  // Close the modal
+  document.getElementById('create-modal').classList.remove('active');
 }
 
 /**
@@ -117,6 +222,12 @@ export function hideCreateModal() {
 export async function createWorktree(event, force = false) {
   if (event) {
     event.preventDefault();
+  }
+
+  // CRITICAL: Prevent duplicate requests from rapid clicks
+  if (createInFlight) {
+    console.log('[createWorktree] Request already in flight, ignoring duplicate');
+    return;
   }
 
   // Determine which tab is active
@@ -152,9 +263,11 @@ export async function createWorktree(event, force = false) {
   // Get selected agent
   const selectedAgent = agentSelector?.getSelectedAgentName() || 'claude';
 
-  // Disable buttons and show progress
-  document.getElementById('create-button').disabled = true;
-  document.getElementById('cancel-button').disabled = true;
+  // Mark request as in-flight before any async operations
+  createInFlight = true;
+
+  // Set modal state to creating and show progress
+  setModalState('creating');
   document.getElementById('create-progress').classList.add('active');
   document.getElementById('progress-header-text').textContent = 'Starting...';
 
@@ -163,6 +276,7 @@ export async function createWorktree(event, force = false) {
 
   try {
     const payload = {
+      name: worktreeName, // CRITICAL: Include user-provided name
       branchName,
       agent: selectedAgent
     };
@@ -181,9 +295,8 @@ export async function createWorktree(event, force = false) {
     if (response.status === 409) {
       const data = await response.json();
 
-      // Re-enable buttons since we're showing a modal
-      document.getElementById('create-button').disabled = false;
-      document.getElementById('cancel-button').disabled = false;
+      // Reset state since we're showing a sync modal
+      setModalState('idle');
       document.getElementById('create-progress').classList.remove('active');
       hideSpinner();
 
@@ -223,6 +336,8 @@ export async function createWorktree(event, force = false) {
 
     // Handle 202 Accepted (background creation)
     if (response.status === 202) {
+      createInFlight = false; // Reset guard for 202 background path
+      hideSpinner(); // CRITICAL: Hide spinner to unblock UI
       showToast(`Creating worktree ${result.name}...`);
 
       // Close modal immediately - creation happens in background
@@ -233,22 +348,25 @@ export async function createWorktree(event, force = false) {
     }
 
     if (!result.success) {
-      alert('Failed to create worktree: ' + result.error);
-      document.getElementById('create-button').disabled = false;
-      document.getElementById('cancel-button').disabled = false;
+      // Handle creation failure
+      setModalState('error');
       document.getElementById('create-progress').classList.remove('active');
       hideSpinner();
+      alert('Failed to create worktree: ' + result.error);
     } else {
       // Success case - hide spinner when modal closes
       hideSpinner();
     }
     // Success case is handled by WebSocket progress events
   } catch (error) {
-    alert('Failed to create worktree: ' + error.message);
-    document.getElementById('create-button').disabled = false;
-    document.getElementById('cancel-button').disabled = false;
+    // Handle network/exception errors
+    setModalState('error');
     document.getElementById('create-progress').classList.remove('active');
     hideSpinner();
+    alert('Failed to create worktree: ' + error.message);
+  } finally {
+    // Always reset in-flight guard to allow retries
+    createInFlight = false;
   }
 }
 
@@ -573,6 +691,9 @@ window.showCreateModal = showCreateModal;
 window.hideCreateModal = hideCreateModal;
 window.createWorktree = createWorktree;
 window.switchCreateTab = switchCreateTab;
+window.toggleProgressLogs = toggleProgressLogs;
+window.setModalState = setModalState;
+window.showToast = showToast; // CRITICAL: Export for websockets.js usage
 window.hideCloseModal = hideCloseModal;
 window.openUpdateMainInstructions = openUpdateMainInstructions;
 window.showNewTabMenu = showNewTabMenu;

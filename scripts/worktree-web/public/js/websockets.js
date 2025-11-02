@@ -23,7 +23,9 @@ export function connectWebSocket() {
   // Update status to connecting
   updateConnectionStatus('connecting');
 
-  ws = new WebSocket(`ws://${window.location.host}`);
+  // CRITICAL: Use wss:// on HTTPS to avoid mixed content blocking
+  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${scheme}://${window.location.host}`);
 
   ws.onopen = () => {
     console.log('WebSocket connected');
@@ -111,14 +113,10 @@ function updateConnectionStatus(state) {
 }
 
 /**
- * Handle progress update event
+ * Update progress UI based on step completion
+ * Extracted common progress UI logic for reusability
  */
-function handleProgressUpdate(data) {
-  // Store progress in worktree progressLog
-  if (data.name && data.message && window.appState && window.appState.appendWorktreeProgress) {
-    window.appState.appendWorktreeProgress(data.name, data.message);
-  }
-
+function updateProgressUI(data) {
   const progressContainer = document.getElementById('create-progress');
   const progressOutput = document.getElementById('progress-output');
   const progressHeaderText = document.getElementById('progress-header-text');
@@ -143,7 +141,7 @@ function handleProgressUpdate(data) {
   const allSteps = ['git', 'database', 'ports', 'containers', 'complete'];
   const currentIndex = allSteps.indexOf(data.step);
 
-  // Update all steps
+  // Update all steps - mark completed, active, error, or pending
   document.querySelectorAll('.progress-step').forEach((stepEl) => {
     const stepName = stepEl.getAttribute('data-step');
     const stepIndex = allSteps.indexOf(stepName);
@@ -161,13 +159,10 @@ function handleProgressUpdate(data) {
     }
   });
 
-  // Update step status text
-  const stepElement = document.querySelector(`.progress-step[data-step="${data.step}"]`);
-  if (stepElement) {
-    const statusEl = document.getElementById(`status-${data.step}`);
-    if (statusEl && data.message && data.message.length < 50 && !data.message.includes('\n')) {
-      statusEl.textContent = data.message;
-    }
+  // Update step status text (short messages only)
+  const statusEl = document.getElementById(`status-${data.step}`);
+  if (statusEl && data.message && data.message.length < 50 && !data.message.includes('\n')) {
+    statusEl.textContent = data.message;
   }
 
   // Append to output log
@@ -181,21 +176,29 @@ function handleProgressUpdate(data) {
     // Auto-scroll to bottom
     progressOutput.scrollTop = progressOutput.scrollHeight;
 
-    // Limit to last 150 lines
+    // Limit to last 150 lines to prevent memory bloat
     while (progressOutput.children.length > 150) {
       progressOutput.removeChild(progressOutput.firstChild);
     }
   }
+}
 
-  // If error, re-enable buttons
+/**
+ * Handle progress update event
+ */
+function handleProgressUpdate(data) {
+  // Store progress in worktree progressLog
+  if (data.name && data.message && window.appState && window.appState.appendWorktreeProgress) {
+    window.appState.appendWorktreeProgress(data.name, data.message);
+  }
+
+  // Update UI with progress
+  updateProgressUI(data);
+
+  // If error, auto-expand logs and set error state
   if (data.step === 'error') {
-    const createButton = document.getElementById('create-button');
-    const cancelButton = document.getElementById('cancel-button');
-    if (createButton) createButton.disabled = false;
-    if (cancelButton) cancelButton.disabled = false;
-    setTimeout(() => {
-      window.hideCreateModal?.();
-    }, 3000);
+    window.setModalState?.('error');
+    window.autoExpandLogs?.();
   }
 }
 
@@ -221,7 +224,7 @@ function handleWorktreeCreating(data) {
 }
 
 /**
- * Handle worktree created event
+ * Handle worktree created event - auto-close modal and select the new worktree
  */
 function handleWorktreeCreated(data) {
   console.log('[handleWorktreeCreated] Called with data:', data);
@@ -233,10 +236,29 @@ function handleWorktreeCreated(data) {
 
   // Refresh to show final state
   window.refreshWorktrees?.();
+
+  // Set modal state to success
+  window.setModalState?.('success');
+
+  // Auto-close modal after 1s to show success state
+  setTimeout(() => {
+    window.hideCreateModal?.();
+
+    // Show success toast notification (3-5 seconds)
+    const message = `Created worktree '${data.name}' successfully!`;
+    if (window.showToast) {
+      window.showToast(message, 4000);
+    }
+
+    // Auto-select the newly created worktree
+    if (window.appState && window.appState.selectWorktree) {
+      window.appState.selectWorktree(data.name);
+    }
+  }, 1000);
 }
 
 /**
- * Handle worktree error event
+ * Handle worktree error event - set error state and expand logs
  */
 function handleWorktreeError(data) {
   console.error('[handleWorktreeError] Error creating worktree:', data);
@@ -249,8 +271,15 @@ function handleWorktreeError(data) {
   // Refresh to show error state
   window.refreshWorktrees?.();
 
-  // Show error notification
-  alert(`Failed to create worktree ${data.name}: ${data.error}`);
+  // Set modal state to error and auto-expand logs
+  window.setModalState?.('error');
+  window.autoExpandLogs?.();
+
+  // Show error notification - informative but not blocking
+  console.error(`Failed to create worktree ${data.name}: ${data.error}`);
+  if (window.showToast) {
+    window.showToast(`Error creating ${data.name}: ${data.error}`, 5000);
+  }
 }
 
 /**
@@ -259,3 +288,23 @@ function handleWorktreeError(data) {
 export function getWebSocket() {
   return ws;
 }
+
+/**
+ * Auto-expand logs on errors - exported for global use
+ */
+export function autoExpandLogs() {
+  const logPanel = document.getElementById('progress-output');
+  const logToggle = document.getElementById('log-toggle');
+
+  if (logPanel && logPanel.classList.contains('collapsed')) {
+    logPanel.classList.remove('collapsed');
+  }
+
+  if (logToggle) {
+    const spanEl = logToggle.querySelector('span');
+    if (spanEl) spanEl.textContent = 'Hide details';
+  }
+}
+
+// Make functions available globally
+window.autoExpandLogs = autoExpandLogs;

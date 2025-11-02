@@ -1642,3 +1642,110 @@ input:focus {
   padding: 8px 12px;
   border-radius: 6px;
 }
+
+/* Modal State Management */
+#create-modal[data-state="idle"] {
+  /* Standard idle state */
+}
+
+#create-modal[data-state="creating"] {
+  /* Subtle animation during creation */
+}
+
+#create-modal[data-state="creating"] .progress-header {
+  background: rgba(88, 166, 255, 0.05);
+  border-color: #58a6ff;
+}
+
+#create-modal[data-state="success"] .progress-header {
+  background: rgba(46, 160, 67, 0.05);
+  border-color: #3fb950;
+}
+
+#create-modal[data-state="success"] .progress-header-text {
+  color: #3fb950;
+}
+
+#create-modal[data-state="error"] .progress-header {
+  background: rgba(248, 81, 73, 0.05);
+  border-color: #f85149;
+}
+
+#create-modal[data-state="error"] .progress-header-text {
+  color: #f85149;
+}
+
+#create-modal[data-state="error"] .progress-spinner {
+  border-top-color: #f85149;
+}
+
+#create-modal[data-state="cancelling"] .progress-header {
+  background: rgba(187, 128, 9, 0.05);
+  border-color: #d29922;
+}
+
+/* Collapsible Logs Panel */
+.log-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 12px 0 0 0;
+  padding: 8px 12px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #8b949e;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.log-toggle:hover {
+  background: #21262d;
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
+.log-toggle i {
+  transition: transform 0.2s;
+}
+
+/* Rotate chevron when logs are expanded (remove collapsed class) */
+.progress-output:not(.collapsed) ~ .log-toggle i {
+  transform: rotate(180deg);
+}
+
+.progress-output {
+  margin-top: 0;
+  transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+  max-height: 300px;
+  opacity: 1;
+}
+
+/* Collapsed state: hidden with animation */
+.progress-output.collapsed {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+/* Ensure log toggle is always visible */
+.log-toggle {
+  display: flex;
+}
+
+/* Better focus states for accessibility */
+.log-toggle:focus {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+
+/* Smooth transitions for state changes */
+#create-button,
+#cancel-button {
+  transition: all 0.2s ease;
+}

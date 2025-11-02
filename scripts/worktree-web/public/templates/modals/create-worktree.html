@@ -1,5 +1,5 @@
 <!-- Create Worktree Modal -->
-<div id="create-modal" class="modal">
+<div id="create-modal" class="modal" data-state="idle">
   <div class="modal-content">
     <h2 class="modal-title">Create New Worktree</h2>
 
@@ -70,7 +70,7 @@
         <strong style="color: #c9d1d9;"><i data-lucide="info" class="lucide-sm"></i> Note:</strong> All services will be included and the database will be copied from the main worktree.
       </div>
       <div id="create-progress" class="progress-container">
-        <div class="progress-header">
+        <div class="progress-header" aria-live="polite" aria-atomic="true">
           <div class="progress-spinner"></div>
           <div class="progress-header-text" id="progress-header-text">Creating worktree...</div>
         </div>
@@ -101,7 +101,12 @@
             <div class="progress-step-status" id="status-complete"></div>
           </div>
         </div>
-        <div id="progress-output" class="progress-output"></div>
+        <!-- Collapsible log panel with toggle button -->
+        <div id="progress-output" class="progress-output collapsed"></div>
+        <button type="button" class="log-toggle" id="log-toggle" onclick="toggleProgressLogs()">
+          <i data-lucide="chevron-down" class="lucide-sm"></i>
+          <span>Show details</span>
+        </button>
       </div>
       <div class="modal-actions">
         <button type="button" onclick="hideCreateModal()" id="cancel-button">Cancel</button>
