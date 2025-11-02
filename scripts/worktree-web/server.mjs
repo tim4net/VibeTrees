@@ -471,10 +471,13 @@ function handleTerminalConnection(ws, worktreeName, command, manager) {
       commandStr = 'npx';
       args = ['-y', '@openai/codex@latest', '--dangerously-bypass-approvals-and-sandbox'];
     } else {
-      // Use npx with claude-code package
-      // The --dangerously-skip-permissions flag prevents the interactive approval prompts
-      commandStr = 'npx';
-      args = ['-y', '@anthropic-ai/claude-code@latest', '--dangerously-skip-permissions'];
+      // Claude Code with update and session UUID
+      // Use bash to chain: update → generate UUID → echo UUID → launch
+      const { randomUUID } = await import('crypto');
+      const sessionUUID = randomUUID();
+
+      commandStr = '/bin/bash';
+      args = ['-c', `echo "Updating Claude Code..." && npx -y @anthropic-ai/claude-code@latest update 2>/dev/null || echo "Update skipped" && echo "" && echo "🔑 Session ID: ${sessionUUID}" && echo "" && npx -y @anthropic-ai/claude-code@latest --dangerously-skip-permissions`];
     }
 
     terminal = manager.ptyManager.spawnPTY(sessionId, {
