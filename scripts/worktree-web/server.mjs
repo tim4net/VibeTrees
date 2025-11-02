@@ -12,6 +12,7 @@ import path from 'path';
 import { basename, join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 import { createServer as createNetServer } from 'net';
 import { Profiler } from '../profiler.mjs';
 import { PerformanceOptimizer } from '../performance-optimizer.mjs';
