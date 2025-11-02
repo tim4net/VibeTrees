@@ -92,6 +92,14 @@ export class WorktreeManager {
   }
 
   /**
+   * Get the worktrees directory for the current project
+   * @returns {string} Path to .worktrees directory
+   */
+  getWorktreeBase() {
+    return join(this.getProjectRoot(), '.worktrees');
+  }
+
+  /**
    * Update the root directory for worktree operations
    * @param {string} newRootDir - New root directory path
    */
@@ -833,11 +841,12 @@ export class WorktreeManager {
       .replace(/\//g, '-');              // Replace slashes with dashes for worktree name
 
     const worktreeName = slugifiedBranch;
-    const worktreePath = join(this.worktreeBase, worktreeName);
+    const worktreeBase = this.getWorktreeBase();
+    const worktreePath = join(worktreeBase, worktreeName);
 
 
-    if (!existsSync(this.worktreeBase)) {
-      mkdirSync(this.worktreeBase, { recursive: true });
+    if (!existsSync(worktreeBase)) {
+      mkdirSync(worktreeBase, { recursive: true });
     }
 
     try {
@@ -1477,8 +1486,9 @@ export class WorktreeManager {
   async deleteWorktree(worktreeName) {
     const worktrees = this.listWorktrees();
     const worktree = worktrees.find(w => w.name === worktreeName);
+    const worktreeBase = this.getWorktreeBase();
 
-    if (!worktree || !worktree.path.includes(this.worktreeBase)) {
+    if (!worktree || !worktree.path.includes(worktreeBase)) {
       return { success: false, error: 'Cannot delete main worktree' };
     }
 
