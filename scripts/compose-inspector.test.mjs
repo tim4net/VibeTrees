@@ -417,6 +417,129 @@ networks:
     });
   });
 
+  describe('Port Environment Variables', () => {
+    it('should extract port env var names from raw YAML', async () => {
+      // Note: getPortEnvVars() reads the raw file directly, not using runtime
+      const fs = await import('fs');
+      const path = await import('path');
+      const os = await import('os');
+
+      // Create a temp file with port env vars
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'compose-test-'));
+      const composePath = path.join(tmpDir, 'docker-compose.yml');
+
+      const composeContent = `
+services:
+  mcp-server:
+    image: test
+    ports:
+      - "\${MCP_PORT:-3337}:3337"
+  api-gateway:
+    image: test
+    ports:
+      - "\${API_PORT:-3000}:3000"
+  postgres:
+    image: test
+    ports:
+      - "\${POSTGRES_PORT:-5432}:5432"
+`;
+
+      fs.writeFileSync(composePath, composeContent);
+
+      const runtime = createMockRuntime(''); // Not used for getPortEnvVars
+      const inspector = new ComposeInspector(composePath, runtime);
+      const portEnvVars = inspector.getPortEnvVars();
+
+      expect(portEnvVars).toEqual({
+        'mcp-server': 'MCP_PORT',
+        'api-gateway': 'API_PORT',
+        'postgres': 'POSTGRES_PORT'
+      });
+
+      // Cleanup
+      fs.unlinkSync(composePath);
+      fs.rmdirSync(tmpDir);
+    });
+
+    it('should handle services without port env vars', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const os = await import('os');
+
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'compose-test-'));
+      const composePath = path.join(tmpDir, 'docker-compose.yml');
+
+      const composeContent = `
+services:
+  api:
+    image: test
+    ports:
+      - "3000:3000"
+  db:
+    image: postgres
+`;
+
+      fs.writeFileSync(composePath, composeContent);
+
+      const runtime = createMockRuntime('');
+      const inspector = new ComposeInspector(composePath, runtime);
+      const portEnvVars = inspector.getPortEnvVars();
+
+      expect(portEnvVars).toEqual({});
+
+      // Cleanup
+      fs.unlinkSync(composePath);
+      fs.rmdirSync(tmpDir);
+    });
+
+    it('should extract ALL port env vars for multi-port services', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const os = await import('os');
+
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'compose-test-'));
+      const composePath = path.join(tmpDir, 'docker-compose.yml');
+
+      // Multi-port services like MinIO and Temporal
+      const composeContent = `
+services:
+  minio:
+    image: minio/minio
+    ports:
+      - "\${MINIO_PORT:-9000}:9000"
+      - "\${MINIO_CONSOLE_PORT:-9001}:9001"
+  temporal:
+    image: temporalio/auto-setup
+    ports:
+      - "\${TEMPORAL_PORT:-7233}:7233"
+      - "\${TEMPORAL_UI_PORT:-8233}:8233"
+  single-port:
+    image: postgres
+    ports:
+      - "\${POSTGRES_PORT:-5432}:5432"
+`;
+
+      fs.writeFileSync(composePath, composeContent);
+
+      const runtime = createMockRuntime('');
+      const inspector = new ComposeInspector(composePath, runtime);
+      const portEnvVars = inspector.getPortEnvVars();
+
+      // Should extract all ports with proper keys
+      expect(portEnvVars).toEqual({
+        'minio': 'MINIO_PORT',
+        'minio-console': 'MINIO_CONSOLE_PORT',
+        'temporal': 'TEMPORAL_PORT',
+        'temporal-ui': 'TEMPORAL_UI_PORT',
+        'single-port': 'POSTGRES_PORT'
+      });
+
+      // Cleanup
+      fs.unlinkSync(composePath);
+      fs.rmdirSync(tmpDir);
+    });
+  });
+
   describe('Error Handling', () => {
     it('should throw helpful error when compose config fails', () => {
       const runtime = {

@@ -93,6 +93,14 @@ const port = registry.allocate('feature-xyz', 'api', 3000);
 registry.release('feature-xyz');
 ```
 
+**Automatic Service Discovery**: VibeTrees scans `docker-compose.yml` to:
+1. Auto-detect all services with exposed ports
+2. Extract environment variable names from port definitions (e.g., `${MCP_PORT:-3337}` → `MCP_PORT`)
+3. Allocate unique ports for each worktree
+4. Generate `.env` files with correct variable names
+
+**No manual configuration needed** - just add services to docker-compose.yml with env vars!
+
 ### MCP Integration
 Auto-discovers and configures MCP servers on worktree creation:
 1. Discover servers (local → npm project → npm global)
@@ -150,17 +158,19 @@ Intelligent sync with automatic change detection and service management.
 - `GET /api/worktrees/:name/conflicts`
 - `POST /api/worktrees/:name/conflicts/resolve`
 
-### Sync-on-Create
+### Git Sync
 
-**Automatic staleness detection** when creating worktrees from 'main':
-- Checks if main is behind origin before worktree creation
-- Prompts user: "main is X commits behind. Sync? [Yes/No/Cancel]"
-- Blocks creation if main has uncommitted changes
+**Manual sync when needed**:
+- Worktree creation is **never blocked** by uncommitted changes or staleness
+- Worktrees are isolated - main's state doesn't affect new worktrees
+- Users manually sync main when needed via the sync button
 - Uses AIConflictResolver for simple conflicts during sync
 
-**Workflow**: Check staleness → Prompt user → Sync (if needed) → Create worktree
+**Workflow**: Create worktree immediately → Sync main manually if needed
 
-**API**: POST /api/worktrees returns 409 if sync needed. Include `?force=true` to skip check.
+**API**:
+- `POST /api/worktrees` - Creates worktree immediately (no blocking)
+- `POST /api/worktrees/:name/sync` - Manual sync operation
 
 See [docs/sync-on-create.md](docs/sync-on-create.md) for details.
 
@@ -195,7 +205,7 @@ See [docs/performance-optimization.md](docs/performance-optimization.md) for det
 
 ## Reference
 
-**Docker env vars** per worktree: `POSTGRES_PORT`, `API_PORT`, `CONSOLE_PORT`, `TEMPORAL_PORT`, `TEMPORAL_UI_PORT`, `MINIO_PORT`, `MINIO_CONSOLE_PORT`
+**Docker env vars** per worktree: `POSTGRES_PORT`, `API_PORT`, `CONSOLE_PORT`, `TEMPORAL_PORT`, `TEMPORAL_UI_PORT`, `MINIO_PORT`, `MINIO_CONSOLE_PORT`, `MCP_PORT`
 
 **Commands**: `sudo docker compose up -d | down -v | logs -f | ps -a --format json`
 

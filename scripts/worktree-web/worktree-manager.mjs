@@ -8,7 +8,7 @@
 
 import { execSync, spawn } from 'child_process';
 import { Worker } from 'worker_threads';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
 import { basename, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -100,6 +100,18 @@ export class WorktreeManager {
   }
 
   /**
+   * Run a git command in the project's root directory
+   * @private
+   */
+  _runGitCommand(command, options = {}) {
+    return execSync(command, {
+      encoding: 'utf-8',
+      ...options,
+      cwd: options.cwd || this.getProjectRoot()  // Always default to project root
+    });
+  }
+
+  /**
    * Update the root directory for worktree operations
    * @param {string} newRootDir - New root directory path
    */
@@ -133,7 +145,13 @@ export class WorktreeManager {
    */
   discoverAndAllocatePorts(worktreeName, worktreePath) {
     const composeFile = this.config.get('container.composeFile') || 'docker-compose.yml';
-    const composeFilePath = join(worktreePath, composeFile);
+    // Try worktree path first (file exists after git worktree add), fallback to root
+    let composeFilePath = join(worktreePath, composeFile);
+    console.log(`[PORTS] Checking for compose file at: ${composeFilePath}`);
+    if (!existsSync(composeFilePath)) {
+      composeFilePath = join(this.rootDir, composeFile);
+      console.log(`[PORTS] Not found in worktree, trying root: ${composeFilePath}`);
+    }
 
     // Check if compose file exists
     if (!existsSync(composeFilePath)) {
@@ -141,10 +159,14 @@ export class WorktreeManager {
       return this._allocateDefaultPorts(worktreeName);
     }
 
+    console.log(`[PORTS] Using compose file: ${composeFilePath}`);
+
     try {
       // Use ComposeInspector to discover services
       const inspector = new this.ComposeInspector(composeFilePath, this.runtime);
       const services = inspector.getServices();
+
+      console.log(`[PORTS] Discovered ${services.length} services: ${services.map(s => s.name).join(', ')}`);
 
       const ports = {};
 
@@ -155,19 +177,23 @@ export class WorktreeManager {
         if (service.ports.length === 1) {
           // Single port: use service name directly
           const basePort = service.ports[0];
-          ports[service.name] = this.portRegistry.allocate(worktreeName, service.name, basePort);
+          const allocatedPort = this.portRegistry.allocate(worktreeName, service.name, basePort);
+          ports[service.name] = allocatedPort;
+          console.log(`[PORTS] Allocated ${service.name}: ${basePort} → ${allocatedPort}`);
         } else {
           // Multiple ports: use suffixes based on known port conventions
           for (let i = 0; i < service.ports.length; i++) {
             const basePort = service.ports[i];
             const suffix = this._getPortSuffix(service.name, basePort, i);
             const portKey = suffix ? `${service.name}-${suffix}` : service.name;
-            ports[portKey] = this.portRegistry.allocate(worktreeName, portKey, basePort);
+            const allocatedPort = this.portRegistry.allocate(worktreeName, portKey, basePort);
+            ports[portKey] = allocatedPort;
+            console.log(`[PORTS] Allocated ${portKey}: ${basePort} → ${allocatedPort}`);
           }
         }
       }
 
-      // Ports allocated successfully
+      console.log(`[PORTS] All ports allocated for ${worktreeName}:`, JSON.stringify(ports, null, 2));
       return ports;
     } catch (error) {
       console.warn(`[PORTS] Failed to inspect compose file: ${error.message}, using defaults`);
@@ -179,7 +205,7 @@ export class WorktreeManager {
    * Get a descriptive suffix for additional ports in a multi-port service
    * @private
    * @param {string} serviceName - Name of the service
-   * @param {number} port - The port number
+   * @param {number} port - The port number (not used, kept for API compatibility)
    * @param {number} index - Index in the ports array
    * @returns {string} Suffix to append to service name, or empty string for first port
    */
@@ -187,14 +213,15 @@ export class WorktreeManager {
     // First port doesn't need a suffix (use service name directly)
     if (index === 0) return '';
 
-    // Known port mappings for common services
-    const portMappings = {
-      temporal: { 7233: '', 8233: 'ui' },
-      minio: { 9000: '', 9001: 'console' },
+    // Known service suffix mappings based on index
+    // These must match the order of ports in docker-compose.yml
+    const serviceSuffixes = {
+      temporal: ['', 'ui'],        // ports[0] = main, ports[1] = ui
+      minio: ['', 'console'],      // ports[0] = main, ports[1] = console
     };
 
-    if (portMappings[serviceName] && portMappings[serviceName][port]) {
-      return portMappings[serviceName][port];
+    if (serviceSuffixes[serviceName] && serviceSuffixes[serviceName][index]) {
+      return serviceSuffixes[serviceName][index];
     }
 
     // Fallback: use index-based suffix for unknown ports
@@ -290,10 +317,7 @@ export class WorktreeManager {
 
       // Send port registry data to worker
       // Get all worktree names from synchronous call first
-      const syncWorktrees = execSync('git worktree list --porcelain', {
-        encoding: 'utf-8',
-        cwd: this.getProjectRoot()
-      });
+      const syncWorktrees = this._runGitCommand('git worktree list --porcelain');
       const portRegistryData = {};
       const lines = syncWorktrees.split('\n');
       for (const line of lines) {
@@ -316,10 +340,7 @@ export class WorktreeManager {
    */
   listWorktrees() {
     try {
-      const output = execSync('git worktree list --porcelain', {
-        encoding: 'utf-8',
-        cwd: this.getProjectRoot()  // Run in project directory, not process cwd
-      });
+      const output = this._runGitCommand('git worktree list --porcelain');
       const worktrees = [];
       const lines = output.split('\n');
       let current = {};
@@ -844,26 +865,48 @@ export class WorktreeManager {
     const worktreeBase = this.getWorktreeBase();
     const worktreePath = join(worktreeBase, worktreeName);
 
+    console.log(`\n========================================`);
+    console.log(`[CREATE] Starting worktree creation`);
+    console.log(`[CREATE] Branch: ${branchName} (from ${fromBranch})`);
+    console.log(`[CREATE] Name: ${worktreeName}`);
+    console.log(`[CREATE] Path: ${worktreePath}`);
+    console.log(`========================================\n`);
+
 
     if (!existsSync(worktreeBase)) {
       mkdirSync(worktreeBase, { recursive: true });
     }
 
     try {
+      // PRE-FLIGHT: Clean up any stale git worktree registrations before checking state
+      console.log(`[PRE-FLIGHT] Running git worktree prune to clean stale registrations...`);
+      try {
+        this._runGitCommand('git worktree prune', { stdio: 'pipe' });
+        this._runGitCommand('git worktree repair', { stdio: 'pipe' });
+        console.log(`[PRE-FLIGHT] ✓ Git worktree state cleaned`);
+      } catch (preflightError) {
+        console.warn(`[PRE-FLIGHT] Cleanup warning (non-critical): ${preflightError.message}`);
+      }
+
       // IDEMPOTENCY CHECK 1: Does the branch already exist?
-      const branchExists = execSync(`git branch --list "${slugifiedBranch}"`, {
-        encoding: 'utf-8'
-      }).trim().length > 0;
+      console.log(`[CREATE] Checking if branch exists: ${slugifiedBranch}`);
+      const branchExists = this._runGitCommand(`git branch --list "${slugifiedBranch}"`).trim().length > 0;
+      console.log(`[CREATE] Branch exists: ${branchExists}`);
 
       // IDEMPOTENCY CHECK 2: Does the worktree directory already exist?
+      console.log(`[CREATE] Checking if directory exists: ${worktreePath}`);
       const dirExists = existsSync(worktreePath);
+      console.log(`[CREATE] Directory exists: ${dirExists}`);
 
       // IDEMPOTENCY CHECK 3: Is there a worktree registration?
+      console.log(`[CREATE] Checking if worktree is registered`);
       const worktrees = this.listWorktrees();
       const worktreeRegistered = worktrees.some(wt => wt.name === worktreeName);
+      console.log(`[CREATE] Worktree registered: ${worktreeRegistered}`);
 
       // IDEMPOTENT LOGIC: If everything exists, return success
       if (branchExists && dirExists && worktreeRegistered) {
+        console.log(`[CREATE] Worktree already exists, returning early`);
         this.profiler.end(totalId);
         return {
           success: true,
@@ -877,12 +920,41 @@ export class WorktreeManager {
 
       // Handle orphaned worktree registration (directory deleted but registration remains)
       if (worktreeRegistered && !dirExists) {
-        execSync('git worktree prune', { stdio: 'pipe' });
+        console.log(`[CREATE] Orphaned registration found for ${worktreeName}`);
+        console.log(`[CREATE] Running aggressive cleanup: prune + repair + remove registration...`);
+        try {
+          // Step 1: Prune stale worktrees
+          this._runGitCommand('git worktree prune', { stdio: 'pipe' });
+          console.log(`[CREATE] ✓ Pruned stale registrations`);
+
+          // Step 2: Repair any remaining issues
+          this._runGitCommand('git worktree repair', { stdio: 'pipe' });
+          console.log(`[CREATE] ✓ Repaired git worktree state`);
+
+          // Step 3: Force remove the specific registration if still present
+          try {
+            this._runGitCommand(`git worktree remove --force "${worktreePath}"`, { stdio: 'pipe' });
+            console.log(`[CREATE] ✓ Force removed registration for ${worktreePath}`);
+          } catch (removeError) {
+            // Already cleaned up, ignore
+            console.log(`[CREATE] Registration already cleaned (expected)`);
+          }
+        } catch (cleanupError) {
+          console.warn(`[CREATE] Cleanup warning: ${cleanupError.message}`);
+        }
       }
 
       // Handle orphaned directory (directory exists but not registered)
       if (dirExists && !worktreeRegistered) {
+        console.log(`[CREATE] Orphaned directory found at ${worktreePath}`);
+        console.log(`[CREATE] Removing directory and cleaning git state...`);
         execSync(`rm -rf "${worktreePath}"`, { stdio: 'pipe' });
+        console.log(`[CREATE] ✓ Removed orphaned directory`);
+
+        // Also prune git's internal worktree state to ensure clean slate
+        this._runGitCommand('git worktree prune', { stdio: 'pipe' });
+        this._runGitCommand('git worktree repair', { stdio: 'pipe' });
+        console.log(`[CREATE] ✓ Git worktree state cleaned`);
       }
 
       // Progress: Creating git worktree
@@ -898,7 +970,25 @@ export class WorktreeManager {
         ? `git worktree add "${worktreePath}" "${slugifiedBranch}"`  // Branch exists, just check it out
         : `git worktree add -b "${slugifiedBranch}" "${worktreePath}" "${fromBranch}"`; // Create new branch
 
-      execSync(createCmd, { stdio: 'pipe' });
+      console.log(`[GIT] Executing: ${createCmd} (in ${this.getProjectRoot()})`);
+      try {
+        this._runGitCommand(createCmd, { stdio: 'pipe' });
+        console.log(`[GIT] Worktree created successfully at: ${worktreePath}`);
+      } catch (gitError) {
+        // If git says worktree is already registered but our checks said it wasn't,
+        // this indicates corrupted git state. Use --force to override.
+        if (gitError.message.includes('already registered worktree')) {
+          console.log(`[GIT] Detected corrupted git state, retrying with --force`);
+          const forceCmd = branchExists
+            ? `git worktree add --force "${worktreePath}" "${slugifiedBranch}"`
+            : `git worktree add --force -b "${slugifiedBranch}" "${worktreePath}" "${fromBranch}"`;
+          console.log(`[GIT] Executing: ${forceCmd} (in ${this.getProjectRoot()})`);
+          this._runGitCommand(forceCmd, { stdio: 'pipe' });
+          console.log(`[GIT] Worktree created successfully (with --force) at: ${worktreePath}`);
+        } else {
+          throw gitError;
+        }
+      }
 
 
       // Add worktree-specific files to .gitignore to prevent git conflicts
@@ -906,7 +996,6 @@ export class WorktreeManager {
       const worktreeIgnoreEntries = [
         '',
         '# Worktree-specific files (managed by VibeTrees)',
-        'docker-compose.yml',
         '.env',
       ].join('\n');
 
@@ -938,11 +1027,12 @@ export class WorktreeManager {
       try {
         execSync(`git push -u origin "${slugifiedBranch}"`, {
           cwd: worktreePath,
-          stdio: 'pipe'
+          stdio: 'pipe',
+          timeout: 10000 // 10 second timeout
         });
       } catch (pushError) {
         console.warn(`[CREATE] Failed to push branch to GitHub: ${pushError.message}`);
-        // Don't fail the whole operation if push fails
+        // Don't fail the whole operation if push fails (timeout, network, auth, etc.)
       }
       this.profiler.end(pushId);
 
@@ -979,19 +1069,34 @@ export class WorktreeManager {
       // Only write if .env doesn't already exist (preserve user customizations)
       const envFilePath = join(worktreePath, '.env');
       if (!existsSync(envFilePath)) {
+        console.log(`[ENV] Generating .env file at: ${envFilePath}`);
         const projectName = `vibe_${worktreeName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+        // Extract port env var names from docker-compose.yml
+        // Try worktree path first (already cloned), fallback to root
+        const composeFile = this.config.get('container.composeFile') || 'docker-compose.yml';
+        let composeFilePathForEnv = join(worktreePath, composeFile);
+        if (!existsSync(composeFilePathForEnv)) {
+          composeFilePathForEnv = join(this.rootDir, composeFile);
+        }
+        console.log(`[ENV] Extracting port env vars from: ${composeFilePathForEnv}`);
+        const inspector = new this.ComposeInspector(composeFilePathForEnv, this.runtime);
+        const portEnvVars = inspector.getPortEnvVars();
+        console.log(`[ENV] Extracted port env vars:`, portEnvVars);
 
         // Generate env content dynamically from discovered ports
         let envContent = `COMPOSE_PROJECT_NAME=${projectName}\n`;
         for (const [serviceName, port] of Object.entries(ports)) {
-          // Convert service name to env var format: api-gateway -> API_PORT
-          const envVarBase = this._serviceNameToEnvVar(serviceName);
-          const envVarName = `${envVarBase}_PORT`;
+          // Use exact env var name from docker-compose.yml if available
+          const envVarName = portEnvVars[serviceName] || this._serviceNameToEnvVar(serviceName) + '_PORT';
           envContent += `${envVarName}=${port}\n`;
+          console.log(`[ENV] ${envVarName}=${port}`);
         }
 
         writeFileSync(envFilePath, envContent);
+        console.log(`[ENV] .env file created successfully`);
       } else {
+        console.log(`[ENV] .env file already exists at: ${envFilePath}, preserving user customizations`);
       }
 
       // Generate MCP server configuration for this worktree
@@ -1024,18 +1129,46 @@ export class WorktreeManager {
         try {
           // Check if bootstrap script exists in package.json
           const packageJsonPath = join(worktreePath, 'package.json');
+          const nodeModulesPath = join(worktreePath, 'node_modules');
           let installCommand = 'npm install';
+
+          // IDEMPOTENCY CHECK: Skip if node_modules exists and is fresh
+          if (existsSync(nodeModulesPath) && existsSync(packageJsonPath)) {
+            console.log(`[BOOTSTRAP] Checking if dependencies are already installed...`);
+            try {
+              const nodeModulesStat = statSync(nodeModulesPath);
+              const packageJsonStat = statSync(packageJsonPath);
+
+              if (nodeModulesStat.mtime > packageJsonStat.mtime) {
+                console.log(`[BOOTSTRAP] Dependencies already installed (node_modules newer than package.json), skipping (idempotent)`);
+                this.broadcast('worktree:progress', {
+                  name: worktreeName,
+                  step: 'bootstrap',
+                  message: '✓ Dependencies already installed'
+                });
+                this.profiler.end(bootstrapId);
+                resolve();
+                return;
+              } else {
+                console.log(`[BOOTSTRAP] package.json is newer than node_modules, reinstalling`);
+              }
+            } catch (statError) {
+              console.warn(`[BOOTSTRAP] Could not check timestamps: ${statError.message}, proceeding with install`);
+            }
+          }
 
           if (existsSync(packageJsonPath)) {
             const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
             if (packageJson.scripts && packageJson.scripts.bootstrap) {
               installCommand = 'npm run bootstrap';
+              console.log(`[BOOTSTRAP] Found bootstrap script in package.json`);
               this.broadcast('worktree:progress', {
                 name: worktreeName,
                 step: 'bootstrap',
                 message: 'Building packages (bootstrap)...'
               });
             } else {
+              console.log(`[BOOTSTRAP] No bootstrap script found, using npm install`);
               this.broadcast('worktree:progress', {
                 name: worktreeName,
                 step: 'install',
@@ -1044,11 +1177,15 @@ export class WorktreeManager {
             }
           }
 
+          console.log(`[BOOTSTRAP] Executing: ${installCommand} in ${worktreePath}`);
+          const startTime = Date.now();
           execSync(installCommand, {
             cwd: worktreePath,
             stdio: 'pipe',
             encoding: 'utf-8'
           });
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          console.log(`[BOOTSTRAP] Completed in ${duration}s`);
 
           this.broadcast('worktree:progress', {
             name: worktreeName,
@@ -1058,7 +1195,7 @@ export class WorktreeManager {
           this.profiler.end(bootstrapId);
           resolve();
         } catch (err) {
-          console.error(`[CREATE] Failed to install dependencies:`, err.message);
+          console.error(`[BOOTSTRAP] Failed to install dependencies:`, err.message);
           this.profiler.end(bootstrapId);
           reject(new Error(`Failed to install dependencies: ${err.message}`));
         }
@@ -1073,20 +1210,24 @@ export class WorktreeManager {
         message: '✓ Packages ready'
       });
 
-      // Start containers
-      const dockerId = this.profiler.start('docker-compose-up', totalId);
-      await this.startContainersForWorktree(worktreeName, worktreePath);
-      this.profiler.end(dockerId);
-
-      // Copy database after containers are running
+      // Copy database BEFORE starting containers (database files must be copied while containers are stopped)
       const dbCopyId = this.profiler.start('database-copy', totalId);
       try {
+        console.log(`[CREATE] Copying database before starting containers...`);
         await this.copyDatabase(worktreeName, worktreePath);
+        console.log(`[CREATE] ✓ Database copied successfully`);
       } catch (err) {
         console.error(`[CREATE] Database copy failed (non-critical):`, err.message);
         // Don't fail worktree creation if database copy fails
       }
       this.profiler.end(dbCopyId);
+
+      // Start containers AFTER database is copied
+      const dockerId = this.profiler.start('docker-compose-up', totalId);
+      console.log(`[CREATE] Starting containers with copied database...`);
+      await this.startContainersForWorktree(worktreeName, worktreePath);
+      console.log(`[CREATE] ✓ Containers started successfully`);
+      this.profiler.end(dockerId);
 
       const worktree = {
         name: worktreeName,
@@ -1107,10 +1248,24 @@ export class WorktreeManager {
       // Log performance report
       const report = this.profiler.generateReport();
 
+      console.log(`\n========================================`);
+      console.log(`[CREATE] Worktree creation completed successfully!`);
+      console.log(`[CREATE] Name: ${worktreeName}`);
+      console.log(`[CREATE] Branch: ${slugifiedBranch}`);
+      console.log(`[CREATE] Path: ${worktreePath}`);
+      console.log(`[CREATE] Ports:`, JSON.stringify(ports, null, 2));
+      console.log(`========================================\n`);
+
       this.broadcast('worktree:created', worktree);
       return { success: true, worktree };
     } catch (error) {
       this.profiler.end(totalId);
+      console.log(`\n========================================`);
+      console.log(`[CREATE] Worktree creation FAILED`);
+      console.log(`[CREATE] Name: ${worktreeName}`);
+      console.log(`[CREATE] Error: ${error.message}`);
+      console.log(`[CREATE] Stack: ${error.stack}`);
+      console.log(`========================================\n`);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'error',
@@ -1151,22 +1306,22 @@ export class WorktreeManager {
 
   async copyDatabase(targetWorktreeName, targetWorktreePath) {
     try {
+      console.log(`[DATABASE] Starting database copy for ${targetWorktreeName}`);
       this.broadcast('worktree:progress', {
         name: targetWorktreeName,
         step: 'database',
-        message: 'Copying database...'
+        message: 'Copying database files...'
       });
 
-      // Use pg_dump/pg_restore instead of file copy to avoid checkpoint corruption
-      // This is safer because it works with a running database and creates a consistent snapshot
+      // File-based copy using docker cp - simpler and faster since all worktrees use same PostgreSQL version
+      // This copies the PostgreSQL data directory from source container to target container
 
-      // Find the main worktree's postgres port
+      // Find the main worktree's postgres container
       const worktrees = this.listWorktrees();
       const mainWorktree = worktrees.find(wt => !wt.path.includes('.worktrees'));
 
-      const mainDbPort = mainWorktree ? this._findDatabasePort(mainWorktree.ports || {}) : null;
-
-      if (!mainDbPort) {
+      if (!mainWorktree) {
+        console.log(`[DATABASE] No main worktree found, starting with fresh database`);
         this.broadcast('worktree:progress', {
           name: targetWorktreeName,
           step: 'database',
@@ -1175,70 +1330,167 @@ export class WorktreeManager {
         return;
       }
 
-      const sourcePort = mainDbPort;
+      // Get container names from COMPOSE_PROJECT_NAME
+      const sourceProjectName = `vibe_${mainWorktree.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const targetProjectName = `vibe_${targetWorktreeName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-      // Check if source database is accessible
+      // Docker Compose v2 uses hyphens, not underscores: project-service-1
+      const sourceContainer = `${sourceProjectName}-postgres-1`;
+      const targetContainer = `${targetProjectName}-postgres-1`;
+
+      console.log(`[DATABASE] Source container: ${sourceContainer}`);
+      console.log(`[DATABASE] Target container: ${targetContainer}`);
+
+      // Check if source container exists and is running
       try {
-        execSync(`docker exec ${mainWorktree.name.replace(/[^a-zA-Z0-9]/g, '_')}_postgres_1 pg_isready -U vibe`, {
-          stdio: 'pipe'
-        });
+        const sourceStatus = this.runtime.exec(`ps -a --filter "name=${sourceContainer}" --format "{{.State}}"`, {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe']
+        }).trim();
+
+        if (!sourceStatus || sourceStatus !== 'running') {
+          console.log(`[DATABASE] Source database container not running (status: ${sourceStatus}), starting with fresh database`);
+          this.broadcast('worktree:progress', {
+            name: targetWorktreeName,
+            step: 'database',
+            message: 'Starting with fresh database (source DB not running)'
+          });
+          return;
+        }
+        console.log(`[DATABASE] Source container is running`);
       } catch (e) {
+        console.log(`[DATABASE] Source database container not found, starting with fresh database`);
         this.broadcast('worktree:progress', {
           name: targetWorktreeName,
           step: 'database',
-          message: 'Starting with fresh database (source DB not running)'
+          message: 'Starting with fresh database (source DB not found)'
         });
         return;
       }
 
-      // Copy database using pg_dump/pg_restore for consistent snapshot
-      const targetDbPort = this._findDatabasePort(this.portRegistry.getWorktreePorts(targetWorktreeName));
-
-      if (!targetDbPort) {
-        this.broadcast('worktree:progress', {
-          name: targetWorktreeName,
-          step: 'database',
-          message: 'Starting with fresh database (no target port)'
-        });
-        return;
-      }
-
-      // Wait for target database to be ready (max 30 seconds)
+      // Wait for target container to be ready (max 30 seconds)
+      console.log(`[DATABASE] Waiting for target container to start...`);
       let attempts = 0;
       const maxAttempts = 30;
       while (attempts < maxAttempts) {
         try {
-          execSync(`PGPASSWORD=app pg_isready -h localhost -p ${targetDbPort} -U app -d app`, {
-            stdio: 'pipe'
-          });
-          break;
+          const targetStatus = this.runtime.exec(`ps -a --filter "name=${targetContainer}" --format "{{.State}}"`, {
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe']
+          }).trim();
+
+          if (targetStatus === 'running') {
+            console.log(`[DATABASE] Target container is running (attempt ${attempts + 1})`);
+            break;
+          }
         } catch (e) {
-          attempts++;
-          if (attempts >= maxAttempts) {
+          // Container not found yet
+        }
+
+        attempts++;
+        if (attempts >= maxAttempts) {
+          console.log(`[DATABASE] Timeout waiting for target container after ${maxAttempts}s`);
+          this.broadcast('worktree:progress', {
+            name: targetWorktreeName,
+            step: 'database',
+            message: 'Starting with fresh database (timeout waiting for container)'
+          });
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // IDEMPOTENCY CHECK: Check if target database already has data
+      console.log(`[DATABASE] Checking if target database already has data...`);
+      try {
+        const checkCmd = `exec ${targetContainer} psql -U postgres -d postgres -t -c "SELECT COUNT(*) FROM pg_database WHERE datname = 'app'"`;
+        const dbExists = this.runtime.exec(checkCmd, {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe']
+        }).trim();
+
+        if (parseInt(dbExists) > 0) {
+          // Check if app database has tables
+          const tableCheckCmd = `exec ${targetContainer} psql -U postgres -d app -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"`;
+          const tableCount = this.runtime.exec(tableCheckCmd, {
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe']
+          }).trim();
+
+          const numTables = parseInt(tableCount);
+          if (numTables > 0) {
+            console.log(`[DATABASE] Target database already has ${numTables} tables, skipping copy (idempotent)`);
             this.broadcast('worktree:progress', {
               name: targetWorktreeName,
               step: 'database',
-              message: 'Starting with fresh database (timeout waiting for DB)'
+              message: `✓ Database already populated (${numTables} tables)`
             });
             return;
           }
-          await new Promise(resolve => setTimeout(resolve, 1000));
         }
+        console.log(`[DATABASE] Target database is empty, proceeding with copy`);
+      } catch (checkError) {
+        console.warn(`[DATABASE] Could not check for existing data: ${checkError.message}, proceeding with copy`);
+        // Continue with copy if check fails
       }
 
-
-      // Use pg_dump to export from source and pipe directly to target
-      // This avoids writing large files to disk and is more efficient
-      const dumpCommand = `PGPASSWORD=app pg_dump -h localhost -p ${sourcePort} -U app -d app --no-owner --no-acl`;
-      const restoreCommand = `PGPASSWORD=app psql -h localhost -p ${targetDbPort} -U app -d app -q`;
-
-      execSync(`${dumpCommand} | ${restoreCommand}`, {
-        encoding: 'utf-8',
-        stdio: 'pipe',
-        maxBuffer: 100 * 1024 * 1024 // 100MB buffer for large databases
+      // Stop target container before copying files
+      console.log(`[DATABASE] Stopping target container for file copy...`);
+      this.runtime.exec(`stop ${targetContainer}`, {
+        stdio: 'pipe'
       });
 
-      console.log(`✓ Database copied successfully from main to ${targetWorktreeName}`);
+      // Wait for container to stop
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Copy PostgreSQL data directory from source to target
+      console.log(`[DATABASE] Copying database files from ${sourceContainer} to ${targetContainer}...`);
+      const dbStartTime = Date.now();
+
+      // Create a temporary archive of the source database
+      const tempArchive = `/tmp/postgres-data-${Date.now()}.tar`;
+      console.log(`[DATABASE] Creating archive: ${tempArchive}`);
+
+      // Archive the source data directory
+      this.runtime.exec(`exec ${sourceContainer} tar -czf /tmp/pgdata.tar.gz -C /var/lib/postgresql/data .`, {
+        stdio: 'pipe'
+      });
+
+      // Copy archive from source container to host
+      this.runtime.exec(`cp ${sourceContainer}:/tmp/pgdata.tar.gz ${tempArchive}`, {
+        stdio: 'pipe'
+      });
+
+      // Copy archive from host to target container
+      this.runtime.exec(`cp ${tempArchive} ${targetContainer}:/tmp/pgdata.tar.gz`, {
+        stdio: 'pipe'
+      });
+
+      // Extract archive in target container
+      this.runtime.exec(`exec ${targetContainer} tar -xzf /tmp/pgdata.tar.gz -C /var/lib/postgresql/data`, {
+        stdio: 'pipe'
+      });
+
+      // Clean up temporary files
+      try {
+        fs.unlinkSync(tempArchive);
+        this.runtime.exec(`exec ${sourceContainer} rm /tmp/pgdata.tar.gz`, { stdio: 'pipe' });
+        this.runtime.exec(`exec ${targetContainer} rm /tmp/pgdata.tar.gz`, { stdio: 'pipe' });
+      } catch (cleanupError) {
+        console.warn(`[DATABASE] Cleanup warning: ${cleanupError.message}`);
+      }
+
+      // Restart target container
+      console.log(`[DATABASE] Restarting target container...`);
+      this.runtime.exec(`start ${targetContainer}`, {
+        stdio: 'pipe'
+      });
+
+      // Wait for database to be ready
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const dbDuration = ((Date.now() - dbStartTime) / 1000).toFixed(1);
+      console.log(`[DATABASE] Database copied successfully in ${dbDuration}s`);
       this.broadcast('worktree:progress', {
         name: targetWorktreeName,
         step: 'database',
@@ -1246,7 +1498,7 @@ export class WorktreeManager {
       });
       return;
     } catch (error) {
-      console.error(`Warning: Failed to copy database:`, error.message);
+      console.error(`[DATABASE] Failed to copy database:`, error.message);
       this.broadcast('worktree:progress', {
         name: targetWorktreeName,
         step: 'database',
@@ -1261,6 +1513,7 @@ export class WorktreeManager {
    * @private
    */
   async startContainersForWorktree(worktreeName, worktreePath) {
+    console.log(`[CONTAINERS] Starting containers for ${worktreeName} in ${worktreePath}`);
     this.broadcast('worktree:progress', {
       name: worktreeName,
       step: 'containers',
@@ -1272,6 +1525,9 @@ export class WorktreeManager {
       const composeCmd = `${this.runtime.getComposeCommand()} --env-file .env up -d`;
       const fullCmd = this.runtime.needsElevation() ? `sudo ${composeCmd}` : composeCmd;
 
+      console.log(`[CONTAINERS] Executing: ${fullCmd}`);
+      const startTime = Date.now();
+
       // Start containers with docker-compose up -d
       await this._runCommandWithProgress(
         fullCmd,
@@ -1280,12 +1536,16 @@ export class WorktreeManager {
         { cwd: worktreePath }
       );
 
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`[CONTAINERS] All containers started successfully in ${duration}s`);
+
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'containers',
         message: '✓ All containers started'
       });
     } catch (error) {
+      console.error(`[CONTAINERS] Failed to start containers:`, error.message);
       this.broadcast('worktree:progress', {
         name: worktreeName,
         step: 'containers',
@@ -1378,19 +1638,13 @@ export class WorktreeManager {
 
       // Fetch latest from remote
       try {
-        execSync('git fetch origin', {
-          cwd: process.cwd(),
-          stdio: 'pipe'
-        });
+        this._runGitCommand('git fetch origin', { stdio: 'pipe' });
       } catch (fetchError) {
         console.warn('Warning: Could not fetch from origin:', fetchError.message);
       }
 
       // Check if branch is merged to main
-      const mergedBranches = execSync('git branch -r --merged origin/main', {
-        cwd: process.cwd(),
-        encoding: 'utf-8'
-      });
+      const mergedBranches = this._runGitCommand('git branch -r --merged origin/main');
 
       const isMerged = mergedBranches.includes(`origin/${branch}`);
 
@@ -1460,10 +1714,7 @@ export class WorktreeManager {
    */
   async checkMainWorktreeClean() {
     try {
-      const statusOutput = execSync('git status --porcelain', {
-        cwd: process.cwd(),
-        encoding: 'utf-8'
-      }).trim();
+      const statusOutput = this._runGitCommand('git status --porcelain').trim();
 
       const isClean = !statusOutput;
 
@@ -1502,7 +1753,7 @@ export class WorktreeManager {
       } catch {}
 
       // Remove worktree
-      execSync(`git worktree remove "${worktree.path}" --force`, { stdio: 'pipe' });
+      this._runGitCommand(`git worktree remove "${worktree.path}" --force`, { stdio: 'pipe' });
 
       // Release ports
       this.portRegistry.release(worktreeName);

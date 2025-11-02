@@ -43,6 +43,11 @@ export const SERVICE_DEFINITIONS = {
     basePort: 9001,
     envVar: 'MINIO_CONSOLE_PORT',
     description: 'MinIO web console'
+  },
+  'mcp-server': {
+    basePort: 3337,
+    envVar: 'MCP_PORT',
+    description: 'Model Context Protocol server'
   }
 };
 

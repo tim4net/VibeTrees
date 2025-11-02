@@ -373,21 +373,36 @@ describe('POST /api/worktrees - staleness check logic', () => {
     expect(shouldCheckStaleness).toBe(false);
   });
 
-  it('should return 409-like response with dirty state flag when main has uncommitted changes', () => {
-    // Simulate dirty state check
+  it('should return 409 response when main has uncommitted changes AND is behind', () => {
+    // Simulate both dirty state and staleness
     const dirtyResult = { isDirty: true };
+    const stalenessResult = { behind: 2 };
 
-    // Expected response structure when main has uncommitted changes
+    // Expected response structure when main has both uncommitted changes AND is behind
+    // (only blocks in this case, not for uncommitted changes alone)
     const response = {
-      needsSync: false,
+      needsSync: true,
       hasDirtyState: dirtyResult.isDirty,
-      commitsBehind: 0,
-      message: 'Cannot sync: main has uncommitted changes. Please commit or stash changes first.'
+      commitsBehind: stalenessResult.behind,
+      message: `main is ${stalenessResult.behind} commits behind origin/main, but has uncommitted changes. Commit or stash changes before syncing.`
     };
 
     expect(response.hasDirtyState).toBe(true);
-    expect(response.needsSync).toBe(false);
+    expect(response.needsSync).toBe(true);
+    expect(response.commitsBehind).toBe(2);
     expect(response.message).toContain('uncommitted changes');
+  });
+
+  it('should allow worktree creation when main has uncommitted changes but is up-to-date', () => {
+    // Simulate dirty state but no staleness
+    const dirtyResult = { isDirty: true };
+    const stalenessResult = { behind: 0 };
+
+    // Should NOT block - uncommitted changes don't prevent worktree creation
+    // Only block if ALSO behind
+    const shouldBlock = stalenessResult.behind > 0 && dirtyResult.isDirty;
+
+    expect(shouldBlock).toBe(false);
   });
 
   it('should not check staleness for non-main branches', () => {

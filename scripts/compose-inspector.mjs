@@ -269,6 +269,79 @@ export class ComposeInspector {
   }
 
   /**
+   * Extract environment variable names from raw docker-compose.yml
+   * Parses port definitions like "${MCP_PORT:-3337}:3337" to extract "MCP_PORT"
+   * @returns {Object} Map of service:port-key to environment variable names
+   * @example
+   * {
+   *   "mcp-server": "MCP_PORT",
+   *   "api-gateway": "API_PORT",
+   *   "postgres": "POSTGRES_PORT",
+   *   "minio": "MINIO_PORT",
+   *   "minio:console": "MINIO_CONSOLE_PORT"
+   * }
+   */
+  getPortEnvVars() {
+    try {
+      // Parse raw YAML (not rendered config) to preserve variable references
+      const rawYaml = readFileSync(this.composeFilePath, 'utf-8');
+      const rawConfig = YAML.parse(rawYaml);
+
+      if (!rawConfig.services) {
+        return {};
+      }
+
+      const envVars = {};
+
+      for (const [serviceName, service] of Object.entries(rawConfig.services)) {
+        if (!service.ports || !Array.isArray(service.ports)) {
+          continue;
+        }
+
+        // Extract ALL port environment variables
+        const portEnvVars = [];
+        for (const portDef of service.ports) {
+          if (typeof portDef === 'string') {
+            // Match ${VAR_NAME:-default} or ${VAR_NAME}
+            const match = portDef.match(/\$\{([A-Z_]+)(?::-[^}]+)?\}/);
+            if (match) {
+              portEnvVars.push(match[1]); // Extract VAR_NAME
+            }
+          }
+        }
+
+        // Store env vars with keys that match how ports are allocated
+        // First port: service name only
+        // Additional ports: service:suffix (matching _getPortSuffix logic)
+        if (portEnvVars.length > 0) {
+          envVars[serviceName] = portEnvVars[0]; // First port
+
+          // Additional ports need suffix mapping
+          if (portEnvVars.length > 1) {
+            // Known port suffix mappings (must match _getPortSuffix in worktree-manager.mjs)
+            const suffixMappings = {
+              'TEMPORAL_UI_PORT': 'ui',
+              'MINIO_CONSOLE_PORT': 'console'
+            };
+
+            for (let i = 1; i < portEnvVars.length; i++) {
+              const envVarName = portEnvVars[i];
+              const suffix = suffixMappings[envVarName] || `port${i + 1}`;
+              const key = `${serviceName}-${suffix}`;
+              envVars[key] = envVarName;
+            }
+          }
+        }
+      }
+
+      return envVars;
+    } catch (error) {
+      console.warn(`[ComposeInspector] Failed to extract port env vars: ${error.message}`);
+      return {};
+    }
+  }
+
+  /**
    * Get a summary of the compose configuration
    * @returns {Object} Summary information
    */

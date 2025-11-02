@@ -119,118 +119,8 @@
     </div>
   </div>
 
-  <!-- Create Worktree Modal -->
-  <div id="create-modal" class="modal">
-    <div class="modal-content">
-      <h2 class="modal-title">Create New Worktree</h2>
-
-      <!-- Tab Switcher -->
-      <div class="tab-switcher">
-        <button type="button" class="tab-button active" data-tab="new-branch" onclick="switchCreateTab('new-branch')">
-          New Branch
-        </button>
-        <button type="button" class="tab-button" data-tab="existing-branch" onclick="switchCreateTab('existing-branch')">
-          Existing Branch
-        </button>
-      </div>
-
-      <form onsubmit="createWorktree(event)">
-        <!-- New Branch Tab -->
-        <div id="new-branch-tab" class="tab-content active">
-          <div class="form-group">
-            <label for="branch-name">Branch Name</label>
-            <input
-              type="text"
-              id="branch-name"
-              placeholder="feature/my-feature"
-            />
-          </div>
-          <div class="form-group">
-            <label for="from-branch">Create From</label>
-            <input
-              type="text"
-              id="from-branch"
-              placeholder="main"
-              value="main"
-            />
-          </div>
-        </div>
-
-        <!-- Existing Branch Tab -->
-        <div id="existing-branch-tab" class="tab-content">
-          <div class="form-group">
-            <label for="branch-search">Search Branches</label>
-            <input
-              type="text"
-              id="branch-search"
-              class="branch-search-input"
-              placeholder="Search by name or commit message..."
-            />
-          </div>
-          <div id="branch-selector-container"></div>
-        </div>
-
-        <div class="form-group">
-          <label for="worktree-name">Worktree Name</label>
-          <input
-            type="text"
-            id="worktree-name"
-            placeholder="Will be auto-filled from branch"
-          />
-          <div style="margin-top: 4px; font-size: 11px; color: #8b949e;">
-            Optional: Override the auto-generated worktree name
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="agent-selector-container">AI Agent</label>
-          <div id="agent-selector-container"></div>
-        </div>
-
-        <div style="margin-top: 8px; padding: 12px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; font-size: 12px; color: #8b949e;">
-          <strong style="color: #c9d1d9;"><i data-lucide="info" class="lucide-sm"></i> Note:</strong> All services will be included and the database will be copied from the main worktree.
-        </div>
-        <div id="create-progress" class="progress-container">
-          <div class="progress-header">
-            <div class="progress-spinner"></div>
-            <div class="progress-header-text" id="progress-header-text">Creating worktree...</div>
-          </div>
-          <div class="progress-steps">
-            <div class="progress-step pending" data-step="git">
-              <div class="progress-step-icon"></div>
-              <div class="progress-step-label">Create git worktree</div>
-              <div class="progress-step-status" id="status-git"></div>
-            </div>
-            <div class="progress-step pending" data-step="database">
-              <div class="progress-step-icon"></div>
-              <div class="progress-step-label">Copy database</div>
-              <div class="progress-step-status" id="status-database"></div>
-            </div>
-            <div class="progress-step pending" data-step="ports">
-              <div class="progress-step-icon"></div>
-              <div class="progress-step-label">Allocate ports & configure env</div>
-              <div class="progress-step-status" id="status-ports"></div>
-            </div>
-            <div class="progress-step pending" data-step="containers">
-              <div class="progress-step-icon"></div>
-              <div class="progress-step-label">Start containers</div>
-              <div class="progress-step-status" id="status-containers"></div>
-            </div>
-            <div class="progress-step pending" data-step="complete">
-              <div class="progress-step-icon"></div>
-              <div class="progress-step-label">Complete</div>
-              <div class="progress-step-status" id="status-complete"></div>
-            </div>
-          </div>
-          <div id="progress-output" class="progress-output"></div>
-        </div>
-        <div class="modal-actions">
-          <button type="button" onclick="hideCreateModal()" id="cancel-button">Cancel</button>
-          <button type="submit" class="primary" id="create-button">Create</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <!-- Modals Container (templates loaded dynamically) -->
+  <div id="modals-container"></div>
 
   <!-- New Project Modal -->
   <div id="new-project-modal" class="modal">
@@ -913,11 +803,20 @@
   <!-- Service Startup Modal -->
   <script type="module" src="/js/service-startup.js"></script>
 
+  <!-- Template Loader (must load before main.js) -->
+  <script src="/js/template-loader.js"></script>
+
   <!-- Initialization Progress -->
   <script type="module" src="/js/initialization.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
   <script type="module" src="/js/main.js?v=8"></script>
+
+  <!-- Preload modal templates -->
+  <script>
+    // Load modal templates on page load
+    preloadModals().catch(err => console.error('Failed to preload modals:', err));
+  </script>
 
   <!-- Toast notification -->
   <div id="toast" class="toast" style="display: none;"></div>
