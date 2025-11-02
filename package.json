@@ -14,6 +14,12 @@
   ],
   "scripts": {
     "web": "node scripts/worktree-web/server.mjs",
+    "vibe:start": "bash scripts/vibe-start.sh",
+    "vibe:stop": "bash scripts/vibe-stop.sh",
+    "vibe:restart": "bash scripts/vibe-restart.sh",
+    "vibe:status": "bash scripts/vibe-status.sh",
+    "vibe:logs": "bash scripts/vibe-logs.sh",
+    "vibe:update": "bash scripts/vibe-update.sh",
     "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop vibe-worktrees",
     "pm2:restart": "pm2 restart vibe-worktrees",

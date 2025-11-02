@@ -32,11 +32,19 @@ That's it! The server starts in the background using PM2 and automatically opens
 ### 3. Manage
 
 ```bash
+# Using the global vibe command
 vibe --status      # Check if running
 vibe --logs        # View logs
 vibe --stop        # Stop server
 vibe --restart     # Restart server
 vibe --update      # Update to latest version
+
+# Or using npm scripts (from the VibeTrees directory)
+npm run vibe:status   # Check server status
+npm run vibe:logs     # View logs (Ctrl+C to exit)
+npm run vibe:restart  # Restart server
+npm run vibe:stop     # Stop server
+npm run vibe:update   # Update to latest version
 ```
 
 ## Requirements
@@ -86,18 +94,26 @@ VibeTrees checks for updates automatically every hour. When an update is availab
 
 ```bash
 # Server not responding?
-vibe --restart
+npm run vibe:restart
 
 # Check logs for errors
-vibe --logs
+npm run vibe:logs
+
+# Check server status
+npm run vibe:status
 
 # Clean restart
-vibe --stop
-vibe
+npm run vibe:stop
+npm run vibe:start
 
-# Check PM2 status directly
+# Or using the global command
+vibe --restart
+vibe --logs
+vibe --status
+
+# Check PM2 directly
 pm2 status vibe-worktrees
-pm2 logs vibe-worktrees
+pm2 logs vibe-worktrees --lines 50
 ```
 
 ## License
