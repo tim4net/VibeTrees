@@ -267,7 +267,23 @@ worktreeManager.updateChecker.start();
 function createApp() {
   const app = express();
   const server = createServer(app);
-  const wss = new WebSocketServer({ server });
+
+  // Configure WebSocket server for optimal terminal latency
+  const wss = new WebSocketServer({
+    server,
+    // Only compress large frames to avoid latency on small echoes
+    perMessageDeflate: {
+      threshold: 256  // Only compress frames > 256 bytes
+    }
+  });
+
+  // Enable TCP_NODELAY on WebSocket connections to prevent Nagle delays
+  wss.on('connection', (ws, req) => {
+    if (ws._socket) {
+      ws._socket.setNoDelay(true);
+    }
+  });
+
   const manager = worktreeManager; // Use module-level instance
 
   app.use(express.json());
