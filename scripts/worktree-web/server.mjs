@@ -217,12 +217,33 @@ try {
 } catch (error) {
   console.error(`⚠️  ${error.message}`);
   console.warn('⚠️  Docker services will not be available. Terminals and other features will work.');
-  // Create a stub runtime that always returns empty results
+
+  // Create a stub runtime that provides no-op implementations
+  // This allows the app to run without Docker while gracefully degrading functionality
   runtime = {
     getRuntime: () => 'none',
     getComposeCommand: () => '',
     needsElevation: () => false,
-    isAvailable: () => false
+    isAvailable: () => false,
+
+    // exec() returns empty output (no containers found)
+    exec: (command, options = {}) => {
+      if (options.encoding === 'utf-8') return '';
+      return Buffer.from('');
+    },
+
+    // execCompose() returns empty output (no services)
+    execCompose: (command, options = {}) => {
+      if (options.encoding === 'utf-8') return '';
+      return Buffer.from('');
+    },
+
+    // getInfo() returns stub information
+    getInfo: () => ({
+      runtime: 'none',
+      composeCommand: '',
+      needsSudo: false
+    })
   };
 }
 
