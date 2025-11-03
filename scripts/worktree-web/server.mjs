@@ -21,6 +21,7 @@ import { ServiceConfig } from '../service-config.mjs';
 import { InitializationManager } from '../initialization-manager.mjs';
 import { ProjectManager } from '../project-manager.mjs';
 import { UpdateChecker } from '../update-checker.mjs';
+import { NullRuntime } from '../null-runtime.mjs';
 import { handleLogsConnection, handleCombinedLogsConnection, handleTerminalConnection } from './websocket-handlers.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -218,33 +219,8 @@ try {
   console.error(`⚠️  ${error.message}`);
   console.warn('⚠️  Docker services will not be available. Terminals and other features will work.');
 
-  // Create a stub runtime that provides no-op implementations
-  // This allows the app to run without Docker while gracefully degrading functionality
-  runtime = {
-    getRuntime: () => 'none',
-    getComposeCommand: () => '',
-    needsElevation: () => false,
-    isAvailable: () => false,
-
-    // exec() returns empty output (no containers found)
-    exec: (command, options = {}) => {
-      if (options.encoding === 'utf-8') return '';
-      return Buffer.from('');
-    },
-
-    // execCompose() returns empty output (no services)
-    execCompose: (command, options = {}) => {
-      if (options.encoding === 'utf-8') return '';
-      return Buffer.from('');
-    },
-
-    // getInfo() returns stub information
-    getInfo: () => ({
-      runtime: 'none',
-      composeCommand: '',
-      needsSudo: false
-    })
-  };
+  // Use NullRuntime class for proper no-op implementation
+  runtime = new NullRuntime();
 }
 
 const config = new ConfigManager(process.cwd());
