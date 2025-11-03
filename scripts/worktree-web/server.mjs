@@ -209,12 +209,27 @@ const { WorktreeManager } = await import('./worktree-manager.mjs');
 
 const WORKTREE_BASE = join(process.cwd(), '.worktrees');
 
-const runtime = new ContainerRuntime();
+// Initialize container runtime with proper error handling
+let runtime;
+try {
+  runtime = new ContainerRuntime();
+  console.log(`🐳 Container runtime: ${runtime.getRuntime()} (${runtime.getComposeCommand()})`);
+} catch (error) {
+  console.error(`⚠️  ${error.message}`);
+  console.warn('⚠️  Docker services will not be available. Terminals and other features will work.');
+  // Create a stub runtime that always returns empty results
+  runtime = {
+    getRuntime: () => 'none',
+    getComposeCommand: () => '',
+    needsElevation: () => false,
+    isAvailable: () => false
+  };
+}
+
 const config = new ConfigManager(process.cwd());
 config.load(); // Load or create default config
-const mcpManager = new McpManager(process.cwd(), runtime);
 
-console.log(`🐳 Container runtime: ${runtime.getRuntime()} (${runtime.getComposeCommand()})`);
+const mcpManager = new McpManager(process.cwd(), runtime);
 console.log(`🔌 MCP servers discovered: ${mcpManager.discoverServers().length}`);
 console.log(`🤖 AI agents available: ${agentRegistry.list().join(', ')}`);
 
