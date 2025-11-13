@@ -240,7 +240,7 @@ export class WorktreeManager {
   }
 
   /**
-   * Fallback to default port allocation for project-riftwing compatibility
+   * Fallback to default port allocation for standard services
    * @private
    */
   _allocateDefaultPorts(worktreeName) {
