@@ -85,22 +85,22 @@
         -->
         <div class="terminal-launch-buttons">
           <button class="small" onclick="openShellForSelected()" title="Open Shell">
-            <i data-lucide="terminal" class="lucide-sm"></i> Shell
+            <i data-lucide="terminal" class="lucide-sm"></i><span class="button-text">Shell</span>
           </button>
           <button class="small" onclick="openClaudeForSelected()" title="Open Claude">
-            <img src="/icons/anthropic.svg" style="width: 12px; height: 12px; vertical-align: middle; filter: brightness(0) invert(1);" /> Claude
+            <img src="/icons/anthropic.svg" style="width: 12px; height: 12px; vertical-align: middle; filter: brightness(0) invert(1);" /><span class="button-text">Claude</span>
           </button>
           <button class="small" onclick="openCodexForSelected()" title="Open Codex">
-            <img src="/icons/openai.svg" style="width: 12px; height: 12px; vertical-align: middle; filter: brightness(0) invert(1);" /> Codex
+            <img src="/icons/openai.svg" style="width: 12px; height: 12px; vertical-align: middle; filter: brightness(0) invert(1);" /><span class="button-text">Codex</span>
           </button>
           <button class="small" onclick="openWebUIForSelected()" title="Open Web UI">
-            <i data-lucide="globe" class="lucide-sm"></i> Web
+            <i data-lucide="globe" class="lucide-sm"></i><span class="button-text">Web</span>
           </button>
           <button class="small" onclick="openLogsForSelected()" title="Open Combined Logs">
-            <i data-lucide="scroll-text" class="lucide-sm"></i> Logs
+            <i data-lucide="scroll-text" class="lucide-sm"></i><span class="button-text">Logs</span>
           </button>
           <button class="small" id="sync-button" onclick="handleSyncButtonClick(event)" title="Sync worktree with remote" style="display: none;">
-            <i data-lucide="git-pull-request-arrow" class="lucide-sm"></i> Sync
+            <i data-lucide="git-pull-request-arrow" class="lucide-sm"></i><span class="button-text">Sync</span>
           </button>
         </div>
         <div class="terminal-tabs" id="terminal-tabs">

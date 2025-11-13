@@ -112,11 +112,11 @@ function renderConflictDialog(worktreeName, conflicts) {
         </div>
       </div>
 
-      <div class="conflict-action-card" onclick="window.conflictUI.handleAIResolve('${worktreeName}')">
+      <div class="conflict-action-card" onclick="window.conflictUI.handleClaudeResolve('${worktreeName}')">
         <i data-lucide="sparkles" class="conflict-action-icon"></i>
-        <div class="conflict-action-title">AI Assist</div>
+        <div class="conflict-action-title">Claude Code Assist</div>
         <div class="conflict-action-description">
-          Let AI attempt to resolve simple conflicts
+          Open Claude Code with guided conflict resolution
         </div>
       </div>
 
@@ -165,77 +165,71 @@ export async function handleRollback(worktreeName) {
 }
 
 /**
- * Handle AI resolve action
+ * Handle Claude Code conflict resolution
  */
-export async function handleAIResolve(worktreeName) {
-  console.log('[conflict-ui] Attempting AI resolution for', worktreeName);
+export async function handleClaudeResolve(worktreeName) {
+  console.log('[conflict-ui] Opening Claude Code for conflict resolution:', worktreeName);
 
-  hideConflictDialog();
+  const modal = document.getElementById('conflict-modal');
 
   // Show progress
-  const modal = document.getElementById('conflict-modal');
   modal.querySelector('.conflict-modal-content').innerHTML = `
-    <div class="modal-title">AI Conflict Resolution</div>
+    <div class="modal-title">Opening Claude Code</div>
     <div class="sync-progress">
       <div class="progress-spinner"></div>
-      <div class="progress-text">AI is analyzing conflicts...</div>
-      <div class="progress-detail">This may take a moment</div>
+      <div class="progress-text">Launching Claude Code with conflict resolution prompt...</div>
     </div>
   `;
   modal.classList.add('active');
 
   try {
-    const response = await fetch(`/api/worktrees/${worktreeName}/conflicts/resolve`, {
+    const response = await fetch(`/api/worktrees/${worktreeName}/conflicts/claude-resolve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method: 'ai' })
+      headers: { 'Content-Type': 'application/json' }
     });
 
     const result = await response.json();
 
     if (result.success) {
-      modal.querySelector('.conflict-modal-content').innerHTML = `
-        <div class="modal-title">AI Resolution Complete</div>
-        <div class="success-message">
-          <i data-lucide="check-circle" style="width: 64px; height: 64px; color: #2ea043;"></i>
-          <h3>Conflicts resolved successfully!</h3>
-          <p>${result.resolvedCount || 0} file${result.resolvedCount !== 1 ? 's' : ''} resolved</p>
-        </div>
-        <div class="modal-actions">
-          <button class="primary" onclick="window.conflictUI.hideConflictDialog()">Close</button>
-        </div>
-      `;
+      hideConflictDialog();
 
-      // Refresh worktrees
-      if (window.refreshWorktrees) {
-        await window.refreshWorktrees();
-      }
+      // Show success notification
+      setTimeout(() => {
+        if (window.showToast) {
+          window.showToast(
+            `Claude Code opened with ${result.conflictCount} conflict${result.conflictCount !== 1 ? 's' : ''} to resolve`,
+            'success'
+          );
+        } else {
+          alert(`Claude Code opened!\n\n${result.conflictCount} conflict${result.conflictCount !== 1 ? 's' : ''} detected in:\n${result.files.join('\n')}\n\nClaude will guide you through safe resolution.`);
+        }
+      }, 500);
     } else {
       modal.querySelector('.conflict-modal-content').innerHTML = `
-        <div class="modal-title">AI Resolution Failed</div>
+        <div class="modal-title">Failed to Open Claude Code</div>
         <div class="error-message">
           <i data-lucide="x-circle" style="width: 64px; height: 64px; color: #f85149;"></i>
-          <h3>Could not resolve all conflicts</h3>
-          <div class="error-detail">${escapeHtml(result.error || 'Some conflicts require manual resolution')}</div>
+          <h3>Could not launch Claude Code</h3>
+          <div class="error-detail">${escapeHtml(result.error || 'Unknown error')}</div>
         </div>
         <div class="modal-actions">
           <button onclick="window.conflictUI.hideConflictDialog()">Close</button>
           <button class="primary" onclick="window.conflictUI.handleManualResolve('${worktreeName}')">
-            Open Terminal
+            Open Terminal Instead
           </button>
         </div>
       `;
-    }
 
-    // Reinit icons
-    if (window.lucide) window.lucide.createIcons();
+      // Reinit icons
+      if (window.lucide) window.lucide.createIcons();
+    }
   } catch (error) {
-    console.error('[conflict-ui] AI resolution error:', error);
+    console.error('[conflict-ui] Error opening Claude Code:', error);
     modal.querySelector('.conflict-modal-content').innerHTML = `
-      <div class="modal-title">AI Resolution Error</div>
+      <div class="modal-title">Error</div>
       <div class="error-message">
         <i data-lucide="x-circle" style="width: 64px; height: 64px; color: #f85149;"></i>
-        <h3>Failed to resolve conflicts</h3>
+        <h3>Failed to open Claude Code</h3>
         <div class="error-detail">${escapeHtml(error.message)}</div>
       </div>
       <div class="modal-actions">
@@ -246,6 +240,14 @@ export async function handleAIResolve(worktreeName) {
     // Reinit icons
     if (window.lucide) window.lucide.createIcons();
   }
+}
+
+/**
+ * Handle AI resolve action (deprecated - kept for backwards compatibility)
+ */
+export async function handleAIResolve(worktreeName) {
+  // Redirect to Claude Code resolution
+  return handleClaudeResolve(worktreeName);
 }
 
 /**
@@ -287,5 +289,6 @@ window.conflictUI = {
   hideConflictDialog,
   handleRollback,
   handleAIResolve,
+  handleClaudeResolve,
   handleManualResolve
 };

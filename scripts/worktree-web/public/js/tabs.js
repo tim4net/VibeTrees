@@ -175,3 +175,52 @@ export function getWorktreeTabCount(worktreeName) {
 // Regression prevention: tests/e2e/terminal-functionality.spec.mjs includes a test
 // that fails if duplicate buttons are detected.
 // ============================================================================
+
+// ============================================================================
+// RESPONSIVE LAUNCHER BUTTONS
+// ============================================================================
+/**
+ * Initialize responsive behavior for launcher buttons
+ * Switches to icon-only mode when space is limited
+ */
+export function initResponsiveLauncher() {
+  const terminalHeader = document.querySelector('.terminal-header');
+  const launchButtons = document.querySelector('.terminal-launch-buttons');
+
+  if (!terminalHeader || !launchButtons) {
+    return;
+  }
+
+  // Observe size changes on terminal header
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const headerWidth = entry.contentRect.width;
+      const tabs = document.querySelector('.terminal-tabs');
+      const tabsCount = tabs ? tabs.querySelectorAll('.terminal-tab:not(.hidden)').length : 0;
+
+      // Calculate space needed for tabs (estimate)
+      const estimatedTabsWidth = tabsCount * 140; // Average tab width
+      const availableSpace = headerWidth - estimatedTabsWidth;
+
+      // Switch to compact mode if space is tight (< 300px available for buttons)
+      if (availableSpace < 300) {
+        launchButtons.classList.add('compact');
+      } else {
+        launchButtons.classList.remove('compact');
+      }
+    }
+  });
+
+  resizeObserver.observe(terminalHeader);
+
+  // Also listen to tab changes to re-evaluate
+  appState.on('tab:added', () => {
+    // Trigger re-evaluation
+    resizeObserver.observe(terminalHeader);
+  });
+
+  appState.on('tab:removed', () => {
+    // Trigger re-evaluation
+    resizeObserver.observe(terminalHeader);
+  });
+}

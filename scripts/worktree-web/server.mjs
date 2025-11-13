@@ -1057,6 +1057,92 @@ function createApp() {
     }
   });
 
+  // Open Claude Code with conflict resolution prompt
+  app.post('/api/worktrees/:name/conflicts/claude-resolve', async (req, res) => {
+    const { name } = req.params;
+    const worktree = getWorktreeOrError(name, res);
+    if (!worktree) return;
+
+    try {
+      // Get conflicts
+      const conflictsResult = await manager.getConflicts(name, worktree.path);
+
+      if (!conflictsResult.conflicts || conflictsResult.conflicts.length === 0) {
+        return res.json({
+          success: false,
+          error: 'No conflicts detected'
+        });
+      }
+
+      // Create conflict resolution prompt
+      const conflictFiles = conflictsResult.conflicts.map(c => c.path).join('\n  - ');
+      const prompt = `I have merge conflicts that need to be resolved safely. Please help me resolve them.
+
+**Conflicted files:**
+  - ${conflictFiles}
+
+**Instructions:**
+1. Review each conflicted file carefully
+2. Understand both changes (ours vs theirs)
+3. Resolve conflicts by keeping the correct changes
+4. Ensure the code still works after resolution
+5. Stage the resolved files with \`git add\`
+6. Do NOT commit yet - I'll review first
+
+**Safety guidelines:**
+- Never blindly accept one side without understanding
+- Preserve functionality from both branches when possible
+- Keep comments and documentation intact
+- Test that imports and references are still valid
+
+Please start by showing me the first conflicted file and explaining the conflict.`;
+
+      // Write prompt to a temporary file in the worktree
+      const promptPath = join(worktree.path, '.claude', 'conflict-prompt.md');
+      const claudeDir = join(worktree.path, '.claude');
+
+      if (!existsSync(claudeDir)) {
+        mkdirSync(claudeDir, { recursive: true });
+      }
+
+      writeFileSync(promptPath, prompt);
+
+      // Open Claude Code in the worktree with the prompt
+      const { spawn } = await import('child_process');
+      const claudePath = join(homedir(), '.local', 'bin', 'claude');
+
+      // Check if Claude is installed
+      if (!existsSync(claudePath)) {
+        return res.json({
+          success: false,
+          error: 'Claude Code not installed. Run: curl -fsSL https://claude.ai/install.sh | bash'
+        });
+      }
+
+      // Spawn Claude Code with the prompt as initial message
+      const claude = spawn(claudePath, [prompt], {
+        cwd: worktree.path,
+        detached: true,
+        stdio: 'ignore'
+      });
+
+      claude.unref();
+
+      res.json({
+        success: true,
+        message: 'Opening Claude Code with conflict resolution prompt',
+        conflictCount: conflictsResult.conflicts.length,
+        files: conflictsResult.conflicts.map(c => c.path)
+      });
+    } catch (error) {
+      console.error('Error opening Claude Code for conflict resolution:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   app.post('/api/worktrees/:name/conflicts/ai-assist', async (req, res) => {
       const { name } = req.params;
       const worktree = getWorktreeOrError(name, res);

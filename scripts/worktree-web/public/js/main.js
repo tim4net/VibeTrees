@@ -7,7 +7,7 @@ import { appState } from './state.js';
 import { connectWebSocket } from './websockets.js';
 import { initSidebar, renderWorktrees } from './sidebar.js';
 import { initContextMenus } from './context-menus.js';
-import { initTabFiltering } from './tabs.js';
+import { initTabFiltering, initResponsiveLauncher } from './tabs.js';
 import { initTerminals } from './terminals.js';
 import { initPerformanceMetrics } from './performance-metrics.js';
 import { pollingManager } from './polling.js';
@@ -53,6 +53,7 @@ function initApp() {
   initContextMenus();
   initSidebar();
   initTabFiltering();
+  initResponsiveLauncher();
   initTerminals();
   initPerformanceMetrics();
   initStatusBar();

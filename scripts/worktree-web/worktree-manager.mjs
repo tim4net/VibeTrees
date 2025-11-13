@@ -1737,23 +1737,46 @@ export class WorktreeManager {
   async deleteWorktree(worktreeName) {
     const worktrees = this.listWorktrees();
     const worktree = worktrees.find(w => w.name === worktreeName);
-    const worktreeBase = this.getWorktreeBase();
 
-    if (!worktree || !worktree.path.includes(worktreeBase)) {
+    if (!worktree) {
+      return { success: false, error: `Worktree '${worktreeName}' not found` };
+    }
+
+    // Check if this is the main worktree by seeing if it's in the .worktrees directory
+    // Use startsWith to ensure we're checking the directory structure, not just substring match
+    const worktreeBase = this.getWorktreeBase();
+    const isInWorktreesDir = worktree.path.startsWith(worktreeBase + path.sep);
+
+    if (!isInWorktreesDir) {
       return { success: false, error: 'Cannot delete main worktree' };
     }
 
     try {
-      // Stop services and clean up images
-      try {
-        this.runtime.execCompose('--env-file .env down -v --rmi local', {
-          cwd: worktree.path,
-          stdio: 'pipe'
-        });
-      } catch {}
+      // Stop services and clean up images (only if directory exists)
+      if (existsSync(worktree.path)) {
+        try {
+          this.runtime.execCompose('--env-file .env down -v --rmi local', {
+            cwd: worktree.path,
+            stdio: 'pipe'
+          });
+        } catch (dockerError) {
+          // Docker cleanup failed, but continue with worktree removal
+          console.warn(`[DELETE] Docker cleanup failed for ${worktreeName}:`, dockerError.message);
+        }
+      }
 
-      // Remove worktree
-      this._runGitCommand(`git worktree remove "${worktree.path}" --force`, { stdio: 'pipe' });
+      // Remove worktree (works for both existing and prunable worktrees)
+      try {
+        this._runGitCommand(`git worktree remove "${worktree.path}" --force`, { stdio: 'pipe' });
+      } catch (removeError) {
+        // If directory doesn't exist, try prune instead
+        if (!existsSync(worktree.path)) {
+          console.log(`[DELETE] Directory doesn't exist, pruning stale registration for ${worktreeName}`);
+          this._runGitCommand('git worktree prune', { stdio: 'pipe' });
+        } else {
+          throw removeError;
+        }
+      }
 
       // Release ports
       this.portRegistry.release(worktreeName);

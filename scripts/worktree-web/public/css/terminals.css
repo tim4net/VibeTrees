@@ -24,12 +24,28 @@
   padding: 6px 8px;
   border-right: 1px solid #30363d;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .terminal-launch-buttons button {
   padding: 4px 10px;
   font-size: 12px;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+/* Icon-only mode for launcher buttons when space is tight */
+.terminal-launch-buttons.compact button span.button-text {
+  display: none;
+}
+
+.terminal-launch-buttons.compact button {
+  padding: 4px 8px;
+  min-width: 32px;
+  justify-content: center;
 }
 
 .terminal-tabs {
@@ -76,9 +92,24 @@
   font-size: 13px;
   white-space: nowrap;
   transition: all 0.2s;
-  flex-shrink: 0;
-  min-width: 0;
-  max-width: 300px;
+  flex: 0 1 auto; /* Allow shrinking */
+  min-width: 80px; /* Minimum width before scrolling */
+  max-width: 200px; /* Reduced from 300px for better density */
+}
+
+/* Responsive tab sizing - shrink more aggressively when many tabs */
+.terminal-tabs:has(.terminal-tab:nth-child(6)) .terminal-tab {
+  max-width: 160px;
+}
+
+.terminal-tabs:has(.terminal-tab:nth-child(8)) .terminal-tab {
+  max-width: 140px;
+}
+
+.terminal-tabs:has(.terminal-tab:nth-child(10)) .terminal-tab {
+  max-width: 120px;
+  padding: 6px 8px;
+  gap: 6px;
 }
 
 /* Tab label with ellipsis for overflow */
