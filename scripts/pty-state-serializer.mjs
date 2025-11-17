@@ -13,34 +13,51 @@ export class PTYStateSerializer {
    * @param {object} pty - PTY instance
    * @returns {object} Terminal state
    */
-  captureState(sessionId, pty) {
-    const state = {
-      sessionId,
-      buffer: [],
-      dimensions: { cols: 80, rows: 24 },
-      timestamp: Date.now()
-    };
-
-    // Access internal xterm.js terminal if available (node-pty integration)
-    if (pty._terminal) {
-      const terminal = pty._terminal;
-      const buffer = terminal.buffer.active;
-
-      state.dimensions = {
-        cols: terminal.cols,
-        rows: terminal.rows
+  captureState(sessionId, session) {
+    // Validate session has required xterm components
+    if (!session || !session.xterm || !session.serializeAddon) {
+      // Fallback for legacy PTY-only sessions
+      const state = {
+        sessionId,
+        buffer: [],
+        dimensions: { cols: 80, rows: 24 },
+        timestamp: Date.now()
       };
 
-      // Capture all lines in active buffer
-      for (let i = 0; i < buffer.length; i++) {
-        const line = buffer.getLine(i);
-        if (line) {
-          state.buffer.push(line.translateToString());
+      // Try legacy _terminal access for backward compat
+      if (session && session._terminal) {
+        const terminal = session._terminal;
+        const buffer = terminal.buffer.active;
+        state.dimensions = { cols: terminal.cols, rows: terminal.rows };
+        for (let i = 0; i < buffer.length; i++) {
+          const line = buffer.getLine(i);
+          if (line) state.buffer.push(line.translateToString());
         }
       }
+
+      return state;
     }
 
-    return state;
+    // New xterm-headless path
+    try {
+      const DEFAULT_SCROLLBACK = 10000;
+      const state = {
+        sessionId,
+        serialized: session.serializeAddon.serialize({
+          scrollback: DEFAULT_SCROLLBACK
+        }),
+        dimensions: {
+          cols: session.xterm.cols,
+          rows: session.xterm.rows
+        },
+        timestamp: Date.now()
+      };
+
+      return state;
+    } catch (error) {
+      console.error(`Failed to capture terminal state:`, error.message);
+      return null;
+    }
   }
 
   /**

@@ -8,7 +8,7 @@
 
 import { execSync, spawn } from 'child_process';
 import { Worker } from 'worker_threads';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, statSync } from 'fs';
 import { basename, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -272,6 +272,86 @@ export class WorktreeManager {
     }
 
     return null;
+  }
+
+  /**
+   * Ensure .env file has entries for all services in docker-compose.yml
+   * Detects newly added services and automatically allocates ports + updates .env
+   * @param {string} worktreeName - Name of the worktree
+   * @param {string} worktreePath - Path to the worktree
+   * @returns {Object} { added: number, services: string[] } - Info about added services
+   */
+  ensureEnvEntriesForServices(worktreeName, worktreePath) {
+    const envFilePath = join(worktreePath, '.env');
+
+    // If .env doesn't exist, nothing to update (will be created on startServices)
+    if (!existsSync(envFilePath)) {
+      return { added: 0, services: [] };
+    }
+
+    // Get services from docker-compose.yml
+    const composeFile = this.config.get('container.composeFile') || 'docker-compose.yml';
+    const composeFilePath = join(worktreePath, composeFile);
+
+    if (!existsSync(composeFilePath)) {
+      return { added: 0, services: [] };
+    }
+
+    try {
+      // Discover services from compose file
+      const inspector = new this.ComposeInspector(composeFilePath, this.runtime);
+      const services = inspector.getServices();
+
+      // Read existing .env file
+      const envContent = readFileSync(envFilePath, 'utf-8');
+      const existingEnvVars = new Set();
+
+      // Parse existing PORT variables
+      envContent.split('\n').forEach(line => {
+        const match = line.match(/^([A-Z_]+)_PORT=/);
+        if (match) {
+          existingEnvVars.add(match[1]);
+        }
+      });
+
+      // Find services that need .env entries
+      const missingServices = [];
+      const newEntries = [];
+
+      for (const service of services) {
+        if (service.ports.length === 0) continue;
+
+        const envVarBase = this._serviceNameToEnvVar(service.name);
+
+        if (!existingEnvVars.has(envVarBase)) {
+          // This service needs a .env entry
+          const basePort = service.ports[0]; // Use first port
+          const allocatedPort = this.portRegistry.allocate(worktreeName, service.name, basePort);
+          const envVarName = `${envVarBase}_PORT`;
+
+          newEntries.push(`${envVarName}=${allocatedPort}`);
+          missingServices.push(service.name);
+
+          console.log(`[ENV-SYNC] Added missing service: ${service.name} → ${envVarName}=${allocatedPort}`);
+        }
+      }
+
+      // Append new entries to .env file if any
+      if (newEntries.length > 0) {
+        const appendContent = '\n# Auto-added services\n' + newEntries.join('\n') + '\n';
+        appendFileSync(envFilePath, appendContent);
+
+        console.log(`[ENV-SYNC] Updated .env with ${newEntries.length} new service(s): ${missingServices.join(', ')}`);
+      }
+
+      return {
+        added: newEntries.length,
+        services: missingServices
+      };
+    } catch (error) {
+      console.error('[ENV-SYNC] Failed to sync .env with docker-compose.yml:', error.message);
+      return { added: 0, services: [] };
+    }
   }
 
   broadcast(event, data) {
@@ -1817,6 +1897,14 @@ export class WorktreeManager {
 
         writeFileSync(envFilePath, envContent);
       } else {
+        // .env exists - check if it needs updates for new services
+        const syncResult = this.ensureEnvEntriesForServices(worktreeName, worktree.path);
+        if (syncResult.added > 0) {
+          this.broadcast('env:updated', {
+            worktree: worktreeName,
+            addedServices: syncResult.services
+          });
+        }
       }
 
       // Start Docker services

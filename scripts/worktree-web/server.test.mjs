@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { checkMainStaleness, checkMainDirtyState } from './server.mjs';
+
+// Avoid loading the native node-pty binary in parallel test workers.
+vi.mock('node-pty', () => ({
+  default: { spawn: vi.fn() },
+  spawn: vi.fn()
+}));
+
+const { checkMainStaleness, checkMainDirtyState } = await import('./server.mjs');
 
 /**
  * Minimal WorktreeWebManager mock for testing extractPortsFromDockerStatus

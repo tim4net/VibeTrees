@@ -727,6 +727,17 @@ export function setupPtyTerminal(tabId, panel, worktreeName, command, terminals,
             if (msg.tookOver) {
               console.warn(`[TAKEOVER] This session was taken over from another client`);
             }
+
+            // Send initial terminal dimensions to server after session established
+            if (terminalSocket.readyState === WebSocket.OPEN) {
+              terminalSocket.send(JSON.stringify({
+                type: 'resize',
+                cols: terminal.cols,
+                rows: terminal.rows
+              }));
+              console.log(`[Terminal] Sent initial dimensions: ${terminal.cols}x${terminal.rows}`);
+            }
+
             return; // Don't write to terminal
           }
 

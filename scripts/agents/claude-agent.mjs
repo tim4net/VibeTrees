@@ -46,7 +46,8 @@ export class ClaudeAgent extends AgentInterface {
   }
 
   getDefaultArgs() {
-    return [];
+    // Default install arguments for Claude Code npm package (used by bootstrap scripts)
+    return ['-y', '@anthropic-ai/claude-code@latest'];
   }
 
   getConfigPath(worktreePath) {

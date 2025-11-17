@@ -1497,6 +1497,28 @@ Please start by showing me the first conflicted file and explaining the conflict
     res.json(startResult);
   });
 
+  // Sync .env file with docker-compose.yml services
+  app.post('/api/worktrees/:name/services/sync-env', async (req, res) => {
+    const { name } = req.params;
+    const worktree = getWorktreeOrError(name, res);
+
+    if (!worktree) {
+      return res.json({ success: false, error: 'Worktree not found' });
+    }
+
+    try {
+      const result = manager.ensureEnvEntriesForServices(name, worktree.path);
+      res.json({
+        success: true,
+        added: result.added,
+        services: result.services
+      });
+    } catch (error) {
+      console.error(`Failed to sync .env for ${name}:`, error.message);
+      res.json({ success: false, error: error.message });
+    }
+  });
+
   app.post('/api/worktrees/:name/services/:service/restart', async (req, res) => {
     const { name, service } = req.params;
     const worktree = getWorktreeOrError(name, res);

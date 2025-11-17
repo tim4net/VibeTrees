@@ -7,6 +7,48 @@ vi.mock('node-pty', () => ({
   }
 }));
 
+// Mock @xterm/headless for terminal restoration tests
+// These are module-level variables that tests can set
+globalThis.mockTerminal = undefined;
+globalThis.mockSerializeAddon = undefined;
+globalThis.mockTerminalConstructor = undefined;
+globalThis.mockSerializeConstructor = undefined;
+
+vi.mock('@xterm/headless', () => {
+  // Use Proxy to intercept constructor calls and return exact objects
+  const Terminal = new Proxy(function() {}, {
+    construct(target, args) {
+      const [options] = args;
+      const result = globalThis.mockTerminalConstructor
+        ? globalThis.mockTerminalConstructor(options)
+        : (globalThis.mockTerminal || {
+            write: vi.fn(),
+            cols: options?.cols || 80,
+            rows: options?.rows || 24,
+            loadAddon: vi.fn()
+          });
+      return result;
+    }
+  });
+
+  const SerializeAddon = new Proxy(function() {}, {
+    construct(target, args) {
+      const result = globalThis.mockSerializeConstructor
+        ? globalThis.mockSerializeConstructor()
+        : (globalThis.mockSerializeAddon || {});
+      return result;
+    }
+  });
+
+  return {
+    Terminal,
+    SerializeAddon
+  };
+});
+
+// Create local aliases for convenience
+let mockTerminal, mockSerializeAddon, mockTerminalConstructor, mockSerializeConstructor;
+
 import { PTYSessionManager } from './pty-session-manager.mjs';
 import pty from 'node-pty';
 
@@ -249,6 +291,350 @@ describe('PTYSessionManager', () => {
 
       const orphans = manager.getOrphanedSessions();
       expect(orphans).not.toContain(sessionId);
+    });
+  });
+
+  describe('auto-save functionality', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should start auto-save timer on construction', () => {
+      vi.useFakeTimers();
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn()
+      };
+
+      const manager = new PTYSessionManager({
+        serializer: mockSerializer,
+        autoSaveInterval: 5000
+      });
+
+      expect(manager._autoSaveTimer).toBeDefined();
+    });
+
+    it('should call captureState for sessions with xterm on timer tick', async () => {
+      vi.useFakeTimers();
+      const mockSerializer = {
+        captureState: vi.fn().mockReturnValue({ buffer: ['test'], dimensions: { cols: 80, rows: 24 } }),
+        saveState: vi.fn().mockResolvedValue(undefined)
+      };
+
+      const manager = new PTYSessionManager({
+        serializer: mockSerializer,
+        autoSaveInterval: 5000
+      });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      const mockXterm = { cols: 80, rows: 24 };
+      const mockSerializeAddon = {};
+      manager._sessions.get(sessionId).xterm = mockXterm;
+      manager._sessions.get(sessionId).serializeAddon = mockSerializeAddon;
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      const session = manager._sessions.get(sessionId);
+      expect(mockSerializer.captureState).toHaveBeenCalledWith(sessionId, session);
+    });
+
+    it('should call saveState with captured state', async () => {
+      vi.useFakeTimers();
+      const capturedState = { buffer: ['test'], dimensions: { cols: 80, rows: 24 } };
+      const mockSerializer = {
+        captureState: vi.fn().mockReturnValue(capturedState),
+        saveState: vi.fn().mockResolvedValue(undefined)
+      };
+
+      const manager = new PTYSessionManager({
+        serializer: mockSerializer,
+        autoSaveInterval: 5000
+      });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      const mockXterm = { cols: 80, rows: 24 };
+      const mockSerializeAddon = {};
+      manager._sessions.get(sessionId).xterm = mockXterm;
+      manager._sessions.get(sessionId).serializeAddon = mockSerializeAddon;
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockSerializer.saveState).toHaveBeenCalledWith(capturedState);
+    });
+
+    it('should skip sessions without xterm', async () => {
+      vi.useFakeTimers();
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn().mockResolvedValue(undefined)
+      };
+
+      const manager = new PTYSessionManager({
+        serializer: mockSerializer,
+        autoSaveInterval: 5000
+      });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      // Don't set xterm on session
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockSerializer.captureState).not.toHaveBeenCalled();
+      expect(mockSerializer.saveState).not.toHaveBeenCalled();
+    });
+
+    it('should handle errors gracefully', async () => {
+      vi.useFakeTimers();
+      const mockSerializer = {
+        captureState: vi.fn().mockImplementation(() => {
+          throw new Error('Capture failed');
+        }),
+        saveState: vi.fn()
+      };
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const manager = new PTYSessionManager({
+        serializer: mockSerializer,
+        autoSaveInterval: 5000
+      });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      const mockXterm = { cols: 80, rows: 24 };
+      const mockSerializeAddon = {};
+      manager._sessions.get(sessionId).xterm = mockXterm;
+      manager._sessions.get(sessionId).serializeAddon = mockSerializeAddon;
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Auto-save failed'),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should clear timer on destroy', async () => {
+      vi.useFakeTimers();
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        deleteState: vi.fn().mockResolvedValue(undefined)
+      };
+
+      const manager = new PTYSessionManager({
+        serializer: mockSerializer,
+        autoSaveInterval: 5000
+      });
+
+      const sessionId = manager.createSession('feature-test', 'claude', '/path/to/worktree');
+      manager._sessions.get(sessionId).pty = mockPty;
+
+      await manager.destroySession(sessionId);
+
+      expect(manager._autoSaveTimer).toBeUndefined();
+    });
+  });
+
+  describe('session recovery with xterm', () => {
+    beforeEach(() => {
+      // Reset module-level mocks before each test
+      globalThis.mockTerminal = undefined;
+      globalThis.mockSerializeAddon = undefined;
+      globalThis.mockTerminalConstructor = undefined;
+      globalThis.mockSerializeConstructor = undefined;
+    });
+
+    it('should restore terminal from serialized state', async () => {
+      const savedState = {
+        sessionId: 'test-session-123',
+        buffer: ['line1\r\n', 'line2\r\n'],
+        dimensions: { cols: 80, rows: 24 },
+        timestamp: Date.now()
+      };
+
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        loadState: vi.fn().mockResolvedValue(savedState)
+      };
+
+      // Set up module-level mocks
+      globalThis.mockTerminal = {
+        write: vi.fn(),
+        cols: 80,
+        rows: 24,
+        loadAddon: vi.fn()
+      };
+
+      globalThis.mockSerializeAddon = {};
+
+      globalThis.mockTerminalConstructor = vi.fn(() => globalThis.mockTerminal);
+      globalThis.mockSerializeConstructor = vi.fn(() => globalThis.mockSerializeAddon);
+
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
+      const result = await manager.restoreTerminal('test-session-123');
+
+      expect(result).toBeDefined();
+      expect(result.terminal).toBe(globalThis.mockTerminal);
+      // Note: Using toEqual instead of toBe because vitest's mock system
+      // wraps the SerializeAddon constructor return value, preventing exact reference equality
+      expect(result.serializeAddon).toEqual(globalThis.mockSerializeAddon);
+    });
+
+    it('should create Terminal with saved dimensions', async () => {
+      const savedState = {
+        sessionId: 'test-session-123',
+        buffer: ['line1\r\n'],
+        dimensions: { cols: 100, rows: 30 },
+        timestamp: Date.now()
+      };
+
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        loadState: vi.fn().mockResolvedValue(savedState)
+      };
+
+      // Set up module-level mocks
+      globalThis.mockTerminal = {
+        write: vi.fn(),
+        cols: 100,
+        rows: 30,
+        loadAddon: vi.fn()
+      };
+
+      globalThis.mockSerializeAddon = {};
+
+      globalThis.mockTerminalConstructor = vi.fn(() => globalThis.mockTerminal);
+      globalThis.mockSerializeConstructor = vi.fn(() => globalThis.mockSerializeAddon);
+
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
+      await manager.restoreTerminal('test-session-123');
+
+      expect(globalThis.mockTerminalConstructor).toHaveBeenCalledWith({
+        cols: 100,
+        rows: 30,
+        allowProposedApi: true
+      });
+    });
+
+    it('should write serialized data to terminal', async () => {
+      const savedState = {
+        sessionId: 'test-session-123',
+        buffer: ['line1\r\n', 'line2\r\n', 'line3\r\n'],
+        dimensions: { cols: 80, rows: 24 },
+        timestamp: Date.now()
+      };
+
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        loadState: vi.fn().mockResolvedValue(savedState)
+      };
+
+      // Set up module-level mocks
+      globalThis.mockTerminal = {
+        write: vi.fn(),
+        cols: 80,
+        rows: 24,
+        loadAddon: vi.fn()
+      };
+
+      globalThis.mockSerializeAddon = {};
+
+      globalThis.mockTerminalConstructor = vi.fn(() => globalThis.mockTerminal);
+      globalThis.mockSerializeConstructor = vi.fn(() => globalThis.mockSerializeAddon);
+
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
+      await manager.restoreTerminal('test-session-123');
+
+      savedState.buffer.forEach(line => {
+        expect(globalThis.mockTerminal.write).toHaveBeenCalledWith(line);
+      });
+    });
+
+    it('should return terminal + serializeAddon', async () => {
+      const savedState = {
+        sessionId: 'test-session-123',
+        buffer: ['test\r\n'],
+        dimensions: { cols: 80, rows: 24 },
+        timestamp: Date.now()
+      };
+
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        loadState: vi.fn().mockResolvedValue(savedState)
+      };
+
+      // Set up module-level mocks
+      globalThis.mockTerminal = {
+        write: vi.fn(),
+        cols: 80,
+        rows: 24,
+        loadAddon: vi.fn()
+      };
+
+      globalThis.mockSerializeAddon = {};
+
+      globalThis.mockTerminalConstructor = vi.fn(() => globalThis.mockTerminal);
+      globalThis.mockSerializeConstructor = vi.fn(() => globalThis.mockSerializeAddon);
+
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
+      const result = await manager.restoreTerminal('test-session-123');
+
+      expect(result).toEqual({
+        terminal: globalThis.mockTerminal,
+        serializeAddon: globalThis.mockSerializeAddon
+      });
+    });
+
+    it('should return null for missing state', async () => {
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        loadState: vi.fn().mockResolvedValue(null)
+      };
+
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
+      const result = await manager.restoreTerminal('nonexistent');
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle corrupt state', async () => {
+      const corruptState = {
+        sessionId: 'test-session-123',
+        // Missing buffer and dimensions
+        timestamp: Date.now()
+      };
+
+      const mockSerializer = {
+        captureState: vi.fn(),
+        saveState: vi.fn(),
+        loadState: vi.fn().mockResolvedValue(corruptState)
+      };
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const manager = new PTYSessionManager({ serializer: mockSerializer });
+
+      const result = await manager.restoreTerminal('test-session-123');
+
+      expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to restore terminal'),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

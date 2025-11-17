@@ -12,6 +12,53 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
+import xtermPkg from '@xterm/headless';
+import serializePkg from '@xterm/addon-serialize';
+
+const { Terminal } = xtermPkg;
+const { SerializeAddon } = serializePkg;
+
+/**
+ * Ensure a headless xterm + serialize addon exists for a PTY session so output
+ * can be piped through xterm before reaching the WebSocket client.
+ * @param {Object} session - PTY session object
+ * @param {number} cols - terminal columns
+ * @param {number} rows - terminal rows
+ * @returns {Terminal} initialized headless terminal instance
+ */
+function ensureHeadlessTerminal(session, cols = 120, rows = 30) {
+  if (!session.xterm) {
+    session.xterm = new Terminal({
+      cols,
+      rows,
+      scrollback: 1000,
+      allowProposedApi: true
+    });
+    session.serializeAddon = new SerializeAddon();
+    session.xterm.loadAddon(session.serializeAddon);
+  }
+
+  return session.xterm;
+}
+
+/**
+ * Dispose xterm resources attached to a PTY session.
+ * @param {Object} session - PTY session object
+ */
+function disposeHeadlessTerminal(session) {
+  if (!session) return;
+
+  if (session.xtermDataDisposable) {
+    session.xtermDataDisposable.dispose();
+    session.xtermDataDisposable = null;
+  }
+
+  if (session.xterm) {
+    session.xterm.dispose();
+    session.xterm = null;
+    session.serializeAddon = null;
+  }
+}
 
 /**
  * Format a log line with ANSI colors based on log level
@@ -199,7 +246,6 @@ export function handleTerminalConnection(ws, worktreeName, command, manager, ena
     return;
   }
 
-  const sessionKey = `${worktreeName}:${command}`;
   let sessionId;
   let session;
 
@@ -216,6 +262,9 @@ export function handleTerminalConnection(ws, worktreeName, command, manager, ena
     sessionId = manager.ptyManager.createSession(worktreeName, command, worktree.path);
     session = manager.ptyManager.getSession(sessionId);
   }
+
+  // Ensure headless xterm is available for this session (used for serialization + WS piping)
+  const headlessTerm = ensureHeadlessTerminal(session, 120, 30);
 
   // Generate unique client ID for this WebSocket connection
   const clientId = `${sessionId}-${Date.now()}`;
@@ -277,6 +326,11 @@ export function handleTerminalConnection(ws, worktreeName, command, manager, ena
     if (session.activeListener) {
       terminal.removeListener('data', session.activeListener);
       session.activeListener = null;
+    }
+
+    if (session.xtermDataDisposable) {
+      session.xtermDataDisposable.dispose();
+      session.xtermDataDisposable = null;
     }
 
     // Clean up old WebSocket message handler to prevent duplicates
@@ -394,10 +448,20 @@ export function handleTerminalConnection(ws, worktreeName, command, manager, ena
     ws.send(data);
   };
 
-  terminal.onData(onData);
+  // Bridge PTY -> (headless xterm + WebSocket)
+  // PTY output goes to BOTH: xterm (for buffer state) AND WebSocket (for display)
+  const ptyToXtermAndWs = (data) => {
+    // Update server-side xterm buffer (for serialization)
+    headlessTerm.write(data);
+
+    // Also send to WebSocket with backpressure logic
+    onData(data);
+  };
+
+  terminal.onData(ptyToXtermAndWs);
 
   // Store listener reference for cleanup
-  session.activeListener = onData;
+  session.activeListener = ptyToXtermAndWs;
 
   // OPTIMIZED: Minimal overhead message handler
   const messageHandler = (data) => {
@@ -412,7 +476,8 @@ export function handleTerminalConnection(ws, worktreeName, command, manager, ena
 
         // Handle resize control message
         if (msg.type === 'resize' && msg.cols && msg.rows) {
-          terminal.resize(msg.cols, msg.rows);
+          terminal.resize(msg.cols, msg.rows);  // Resize PTY
+          headlessTerm.resize(msg.cols, msg.rows);  // Also resize xterm-headless buffer
           return;
         }
 
@@ -500,6 +565,8 @@ export function handleTerminalConnection(ws, worktreeName, command, manager, ena
       terminal.removeListener('data', session.activeListener);
       session.activeListener = null;
     }
+
+    disposeHeadlessTerminal(session);
 
     // Detach client but keep session alive for reconnection
     manager.ptyManager.detachClient(sessionId);

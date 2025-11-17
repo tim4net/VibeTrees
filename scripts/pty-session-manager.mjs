@@ -13,6 +13,30 @@ export class PTYSessionManager {
     this._cleanupTimer = setInterval(() => {
       this._cleanupOrphanedSessions();
     }, 5 * 60 * 1000);
+
+    // Start auto-save timer
+    this._autoSaveTimer = setInterval(() => {
+      this._autoSaveAllSessions();
+    }, this.autoSaveInterval);
+  }
+
+  /**
+   * Auto-save all sessions with xterm terminals
+   * @private
+   */
+  async _autoSaveAllSessions() {
+    for (const [sessionId, session] of this._sessions) {
+      if (session.xterm && session.serializeAddon) {
+        try {
+          const state = this.serializer.captureState(sessionId, session);
+          if (state) {
+            await this.serializer.saveState(state);
+          }
+        } catch (error) {
+          console.error(`Auto-save failed for session ${sessionId}:`, error);
+        }
+      }
+    }
   }
 
   /**
@@ -149,6 +173,11 @@ export class PTYSessionManager {
 
       this._sessions.delete(sessionId);
     }
+
+    // If this is the last session, clean up timers
+    if (this._sessions.size === 0) {
+      this.destroy();
+    }
   }
 
   /**
@@ -158,6 +187,48 @@ export class PTYSessionManager {
    */
   async recoverSession(sessionId) {
     return await this.serializer.loadState(sessionId);
+  }
+
+  /**
+   * Restore terminal from saved state
+   * @param {string} sessionId - Session ID
+   * @returns {Promise<object|null>} Terminal restoration result with terminal and serializeAddon
+   */
+  async restoreTerminal(sessionId) {
+    const savedState = await this.serializer.loadState(sessionId);
+
+    if (!savedState || !savedState.buffer || !savedState.dimensions) {
+      if (savedState) {
+        console.error(`Failed to restore terminal:`, new Error('Invalid state structure'));
+      }
+      return null;
+    }
+
+    try {
+      const { Terminal } = await import('@xterm/headless');
+      const { SerializeAddon } = await import('@xterm/addon-serialize');
+
+      const terminal = new Terminal({
+        cols: savedState.dimensions.cols,
+        rows: savedState.dimensions.rows,
+        allowProposedApi: true
+      });
+      const serializeAddon = new SerializeAddon();
+      terminal.loadAddon(serializeAddon);
+
+      // Restore buffer
+      for (const line of savedState.buffer) {
+        terminal.write(line);
+      }
+
+      return {
+        terminal,
+        serializeAddon
+      };
+    } catch (error) {
+      console.error(`Failed to restore terminal:`, error);
+      return null;
+    }
   }
 
   /**
@@ -188,6 +259,20 @@ export class PTYSessionManager {
     for (const sessionId of orphans) {
       console.log(`Cleaning up orphaned session: ${sessionId}`);
       await this.destroySession(sessionId);
+    }
+  }
+
+  /**
+   * Destroy the session manager and clear all timers
+   */
+  destroy() {
+    if (this._autoSaveTimer) {
+      clearInterval(this._autoSaveTimer);
+      this._autoSaveTimer = undefined;
+    }
+    if (this._cleanupTimer) {
+      clearInterval(this._cleanupTimer);
+      this._cleanupTimer = undefined;
     }
   }
 }

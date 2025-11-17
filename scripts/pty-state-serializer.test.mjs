@@ -80,6 +80,96 @@ describe('PTYStateSerializer', () => {
     });
   });
 
+  describe('captureState with xterm-headless', () => {
+    it('should serialize using serializeAddon and include metadata', () => {
+      const mockSession = {
+        xterm: { cols: 120, rows: 30 },
+        serializeAddon: { serialize: vi.fn().mockReturnValue('serialized data') }
+      };
+
+      const state = serializer.captureState(sessionId, mockSession);
+
+      expect(mockSession.serializeAddon.serialize).toHaveBeenCalledWith(
+        expect.objectContaining({ scrollback: 10000 })
+      );
+      expect(state.serialized).toBe('serialized data');
+      expect(state.dimensions).toEqual({ cols: 120, rows: 30 });
+      expect(state.timestamp).toBeDefined();
+    });
+
+    it('should fall back to legacy path when serializeAddon missing', () => {
+      const state = serializer.captureState(sessionId, {
+        xterm: { cols: 80, rows: 24 }
+      });
+
+      expect(state).toMatchObject({
+        sessionId,
+        dimensions: { cols: 80, rows: 24 }
+      });
+      expect(state.serialized).toBeUndefined();
+    });
+
+    it('should fall back to legacy path when xterm missing', () => {
+      const state = serializer.captureState(sessionId, {
+        serializeAddon: { serialize: vi.fn() }
+      });
+
+      expect(state).toMatchObject({
+        sessionId,
+        dimensions: { cols: 80, rows: 24 }
+      });
+      expect(state.serialized).toBeUndefined();
+    });
+
+    it('should handle serialize() throwing error (return null)', () => {
+      const mockSession = {
+        xterm: { cols: 120, rows: 30 },
+        serializeAddon: { serialize: vi.fn(() => { throw new Error('boom'); }) }
+      };
+
+      const state = serializer.captureState(sessionId, mockSession);
+
+      expect(state).toBeNull();
+    });
+
+    it('should pass scrollback option to serialize()', () => {
+      const serializeSpy = vi.fn().mockReturnValue('data');
+      const mockSession = {
+        xterm: { cols: 100, rows: 40 },
+        serializeAddon: { serialize: serializeSpy }
+      };
+
+      serializer.captureState(sessionId, mockSession);
+
+      expect(serializeSpy).toHaveBeenCalledWith(expect.objectContaining({ scrollback: 10000 }));
+    });
+
+    it('should use default scrollback limit', () => {
+      const serializeSpy = vi.fn().mockReturnValue('data');
+      const mockSession = {
+        xterm: { cols: 90, rows: 25 },
+        serializeAddon: { serialize: serializeSpy }
+      };
+
+      serializer.captureState(sessionId, mockSession);
+
+      const callArg = serializeSpy.mock.calls[0][0];
+      expect(callArg.scrollback).toBe(10000);
+    });
+
+    it('should include dimensions and timestamp', () => {
+      const mockSession = {
+        xterm: { cols: 110, rows: 50 },
+        serializeAddon: { serialize: vi.fn().mockReturnValue('serialized') }
+      };
+
+      const state = serializer.captureState(sessionId, mockSession);
+
+      expect(state.dimensions).toEqual({ cols: 110, rows: 50 });
+      expect(state.timestamp).toBeDefined();
+    });
+  });
+
   describe('State Persistence', () => {
     it('should save state to filesystem', async () => {
       const state = {

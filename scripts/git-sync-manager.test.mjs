@@ -619,7 +619,7 @@ describe('GitSyncManager', () => {
   const mockBaseBranch = 'main';
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   afterEach(() => {

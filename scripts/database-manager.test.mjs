@@ -32,7 +32,8 @@ describe('DatabaseManager', () => {
       query: vi.fn().mockResolvedValue({ rows: [{ size: '52428800' }] }), // 50MB
       end: vi.fn()
     };
-    pg.Client = vi.fn(() => mockClient);
+    // Use a constructable mock for `new pg.Client()`
+    pg.Client = vi.fn(function () { return mockClient; });
 
     // Mock SafetyChecks
     SafetyChecks.estimateDatabaseSize = vi.fn().mockResolvedValue(50 * 1024 * 1024); // 50MB

@@ -188,9 +188,18 @@ API: `POST /api/worktrees/:name/database/export`, `POST /api/worktrees/:name/dat
 See [docs/database-workflow.md](docs/database-workflow.md) for details.
 
 ### Terminal Persistence
-Sessions survive browser refresh. State saved every 5s to `~/.vibetrees/sessions/{id}/pty-state.json`.
+Full terminal persistence with complete buffer restoration. Auto-saves every 5s to `~/.vibetrees/sessions/{id}/pty-state.json`.
 
-Components: `PTYSessionManager`, `PTYStateSerializer`
+**Architecture**: `node-pty` → `xterm-headless` buffer → `SerializeAddon` → disk storage
+
+**Features**:
+- Complete scrollback history (10,000 lines)
+- ANSI codes and colors preserved
+- Browser refresh seamless recovery
+- Server restart support
+- Orphan cleanup (1 hour timeout)
+
+**Components**: `PTYSessionManager`, `PTYStateSerializer`, `xterm-headless`, `SerializeAddon`
 
 See [docs/terminal-persistence.md](docs/terminal-persistence.md) for details.
 

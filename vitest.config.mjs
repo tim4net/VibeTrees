@@ -2,8 +2,13 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Use threads pool with proper cleanup
+    // Use threads by default; fall back to forks for native-module specs
     pool: 'threads',
+    // Run node-pty dependent tests in a single forked worker to avoid
+    // ERR_DLOPEN_FAILED self-registration issues when parallelized.
+    poolMatchGlobs: [
+      ['scripts/worktree-web/server.test.mjs', 'forks']
+    ],
     poolOptions: {
       threads: {
         // Use fewer threads to reduce resource usage
@@ -14,6 +19,9 @@ export default defineConfig({
         // Ensure threads are killed after tests complete
         singleThread: false,
       },
+      forks: {
+        singleFork: true
+      }
     },
     // Set reasonable timeouts to prevent hanging
     testTimeout: 10000, // 10 seconds per test

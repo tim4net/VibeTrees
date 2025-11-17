@@ -14,7 +14,8 @@ describe('DatabaseValidator', () => {
       query: vi.fn(),
       end: vi.fn()
     };
-    pg.Client = vi.fn(() => mockClient);
+    // Use a constructable mock (arrow functions can't be used with `new`)
+    pg.Client = vi.fn(function () { return mockClient; });
 
     validator = new DatabaseValidator({
       host: 'localhost',
