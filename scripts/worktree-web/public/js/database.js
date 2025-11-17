@@ -18,6 +18,7 @@ class DatabaseUI {
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const viewSchemaBtn = document.getElementById('viewSchemaBtn');
+    const backupBtn = document.getElementById('backupDatabase');
 
     if (exportBtn) {
       exportBtn.addEventListener('click', () => this.handleExport());
@@ -27,6 +28,9 @@ class DatabaseUI {
     }
     if (viewSchemaBtn) {
       viewSchemaBtn.addEventListener('click', () => this.handleViewSchema());
+    }
+    if (backupBtn) {
+      backupBtn.addEventListener('click', () => this.handleBackup());
     }
   }
 
@@ -146,6 +150,38 @@ class DatabaseUI {
     } catch (error) {
       console.error('Schema error:', error);
       alert(`Failed to load schema: ${error.message}`);
+    }
+  }
+
+  async handleBackup() {
+    if (!this.currentWorktree) {
+      alert('Please select a worktree first');
+      return;
+    }
+
+    const button = document.getElementById('backupDatabase');
+    const originalText = button.querySelector('span').textContent;
+
+    button.disabled = true;
+    button.querySelector('span').textContent = 'Creating backup...';
+
+    try {
+      const response = await fetch(`/api/worktrees/${this.currentWorktree}/database/backup`, {
+        method: 'POST'
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`✓ Backup created successfully\n\nFile: ${result.backupPath.split('/').pop()}\nTime: ${new Date(result.timestamp).toLocaleString()}`);
+      } else {
+        alert(`✗ Backup failed\n\n${result.error}`);
+      }
+    } catch (error) {
+      alert(`✗ Backup failed\n\n${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.querySelector('span').textContent = originalText;
     }
   }
 }

@@ -17,7 +17,9 @@ describe('DatabaseBackupScheduler', () => {
     // Mock DatabaseBackupManager
     mockBackupManager = {
       createBackup: vi.fn().mockResolvedValue({ success: true }),
-      generateBackupDocs: vi.fn().mockReturnValue({ success: true })
+      generateBackupDocs: vi.fn().mockReturnValue({ success: true }),
+      listBackups: vi.fn().mockReturnValue([]),
+      pruneOldBackups: vi.fn().mockReturnValue({ pruned: 0, kept: 1, errors: 0 })
     };
 
     vi.mocked(DatabaseBackupManager).mockImplementation(function() {
@@ -49,26 +51,52 @@ describe('DatabaseBackupScheduler', () => {
   });
 
   describe('start', () => {
-    it('should schedule nightly backups at 2am', () => {
-      scheduler.start();
+    it('should schedule nightly backups at 2am', async () => {
+      await scheduler.start();
 
       expect(scheduler.isRunning()).toBe(true);
     });
 
-    it('should not start if already running', () => {
-      scheduler.start();
+    it('should not start if already running', async () => {
+      await scheduler.start();
       const firstInterval = scheduler.intervalId;
 
-      scheduler.start(); // Try to start again
+      await scheduler.start(); // Try to start again
 
       // Should still be the same interval
       expect(scheduler.intervalId).toBe(firstInterval);
     });
+
+    it('should create initial backup if none exist on startup', async () => {
+      // Mock empty backups list
+      mockBackupManager.listBackups.mockReturnValue([]);
+
+      await scheduler.start();
+
+      expect(mockBackupManager.listBackups).toHaveBeenCalledWith('main');
+      expect(mockBackupManager.createBackup).toHaveBeenCalledWith(
+        'main',
+        '/test/project',
+        { postgres: 5432 }
+      );
+    });
+
+    it('should skip initial backup if backups already exist', async () => {
+      // Mock existing backups
+      mockBackupManager.listBackups.mockReturnValue([
+        { filename: 'backup-2025-11-17-020000.sql', timestamp: new Date() }
+      ]);
+
+      await scheduler.start();
+
+      expect(mockBackupManager.listBackups).toHaveBeenCalledWith('main');
+      expect(mockBackupManager.createBackup).not.toHaveBeenCalled();
+    });
   });
 
   describe('stop', () => {
-    it('should stop the scheduler', () => {
-      scheduler.start();
+    it('should stop the scheduler', async () => {
+      await scheduler.start();
       expect(scheduler.isRunning()).toBe(true);
 
       scheduler.stop();
@@ -125,6 +153,15 @@ describe('DatabaseBackupScheduler', () => {
         mockBackupManager.createBackup
       );
     });
+
+    it('should prune old backups after successful backup', async () => {
+      await scheduler.runBackup();
+
+      expect(mockBackupManager.pruneOldBackups).toHaveBeenCalledWith('main', 7);
+      expect(mockBackupManager.pruneOldBackups).toHaveBeenCalledAfter(
+        mockBackupManager.createBackup
+      );
+    });
   });
 
   describe('getNextBackupTime', () => {
@@ -176,12 +213,12 @@ describe('DatabaseBackupScheduler', () => {
       // Set current time to 1:59am
       vi.setSystemTime(new Date('2025-11-17T01:59:00'));
 
-      scheduler.start();
+      await scheduler.start();
 
       // Fast-forward 2 minutes to 2:01am
       await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
 
-      // Backup should have been triggered
+      // Backup should have been triggered (initial + scheduled)
       expect(mockBackupManager.createBackup).toHaveBeenCalled();
     });
   });

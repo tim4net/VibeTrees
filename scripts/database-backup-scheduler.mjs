@@ -23,14 +23,18 @@ export class DatabaseBackupScheduler {
   /**
    * Start the scheduler
    * Checks every minute if it's time to run backup
+   * On first start, creates initial backup if none exist
    */
-  start() {
+  async start() {
     if (this.intervalId) {
       console.log('[DatabaseBackupScheduler] Already running');
       return;
     }
 
     console.log('[DatabaseBackupScheduler] Starting nightly backup scheduler (2am daily)');
+
+    // Check for existing backups on startup
+    await this._checkForInitialBackup();
 
     // Check every minute if it's time to backup
     this.intervalId = setInterval(() => {
@@ -39,6 +43,37 @@ export class DatabaseBackupScheduler {
 
     // Also check immediately on start
     this._checkAndRunBackup();
+  }
+
+  /**
+   * Check if main worktree has any backups, create one if missing
+   * @private
+   */
+  async _checkForInitialBackup() {
+    try {
+      // Find main worktree
+      const worktrees = this.worktreeManager.listWorktrees();
+      const mainWorktree = worktrees.find(wt => !wt.path.includes('.worktrees'));
+
+      if (!mainWorktree) {
+        console.log('[DatabaseBackupScheduler] No main worktree found, skipping initial backup check');
+        return;
+      }
+
+      // Check if any backups exist for main
+      const backups = this.backupManager.listBackups(mainWorktree.name);
+
+      if (backups.length === 0) {
+        console.log('[DatabaseBackupScheduler] No backups found for main worktree, creating initial backup...');
+        await this.runBackup();
+        console.log('[DatabaseBackupScheduler] Initial backup complete');
+      } else {
+        console.log(`[DatabaseBackupScheduler] Found ${backups.length} existing backup(s) for main worktree`);
+      }
+    } catch (error) {
+      console.error(`[DatabaseBackupScheduler] Initial backup check failed: ${error.message}`);
+      // Don't throw - scheduler should continue even if initial backup fails
+    }
   }
 
   /**
@@ -106,6 +141,12 @@ export class DatabaseBackupScheduler {
       if (result.success) {
         console.log(`[DatabaseBackupScheduler] Backup completed successfully: ${result.backupPath}`);
         this.lastBackupTime = new Date();
+
+        // Prune old backups (keep last 7 days)
+        const pruneResult = this.backupManager.pruneOldBackups(mainWorktree.name, 7);
+        if (pruneResult.pruned > 0) {
+          console.log(`[DatabaseBackupScheduler] Cleanup: pruned ${pruneResult.pruned} old backup(s)`);
+        }
 
         // Generate documentation
         this.backupManager.generateBackupDocs();

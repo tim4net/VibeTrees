@@ -3,7 +3,7 @@ import { DatabaseBackupManager } from './database-backup-manager.mjs';
 import { DatabaseManager } from './database-manager.mjs';
 import { ComposeInspector } from './compose-inspector.mjs';
 import path from 'path';
-import fs from 'fs';
+import * as fs from 'fs';
 
 // Mock dependencies
 vi.mock('fs');
@@ -342,6 +342,177 @@ describe('DatabaseBackupManager', () => {
       const result = manager.listBackups(worktreeName);
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('pruneOldBackups', () => {
+    it('should delete backups older than 7 days', () => {
+      const worktreeName = 'main';
+      const now = new Date('2025-11-17T02:00:00');
+
+      // Mock listBackups to return old and new backups
+      vi.spyOn(manager, 'listBackups').mockReturnValue([
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-16-020000.sql',
+          filename: 'backup-2025-11-16-020000.sql',
+          timestamp: new Date('2025-11-16T02:00:00'), // 1 day old
+          size: 1024000
+        },
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-09-020000.sql',
+          filename: 'backup-2025-11-09-020000.sql',
+          timestamp: new Date('2025-11-09T02:00:00'), // 8 days old
+          size: 1024000
+        },
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-01-020000.sql',
+          filename: 'backup-2025-11-01-020000.sql',
+          timestamp: new Date('2025-11-01T02:00:00'), // 16 days old
+          size: 1024000
+        }
+      ]);
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.unlinkSync).mockReturnValue(undefined);
+
+      // Mock Date.now() to return consistent timestamp
+      vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
+
+      const result = manager.pruneOldBackups(worktreeName, 7);
+
+      expect(result.pruned).toBe(2); // 2 old backups deleted
+      expect(result.kept).toBe(1); // 1 recent backup kept
+      expect(result.errors).toBe(0);
+
+      // Verify unlinkSync was called for old backups
+      expect(fs.unlinkSync).toHaveBeenCalledTimes(2);
+      expect(fs.unlinkSync).toHaveBeenCalledWith('/test/project/.vibetrees/backups/main/backup-2025-11-09-020000.sql');
+      expect(fs.unlinkSync).toHaveBeenCalledWith('/test/project/.vibetrees/backups/main/backup-2025-11-01-020000.sql');
+    });
+
+    it('should keep backups newer than 7 days', () => {
+      const worktreeName = 'main';
+      const now = new Date('2025-11-17T02:00:00');
+
+      // Mock listBackups to return only recent backups
+      vi.spyOn(manager, 'listBackups').mockReturnValue([
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-17-020000.sql',
+          filename: 'backup-2025-11-17-020000.sql',
+          timestamp: new Date('2025-11-17T02:00:00'), // Today
+          size: 1024000
+        },
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-16-020000.sql',
+          filename: 'backup-2025-11-16-020000.sql',
+          timestamp: new Date('2025-11-16T02:00:00'), // 1 day old
+          size: 1024000
+        },
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-11-020000.sql',
+          filename: 'backup-2025-11-11-020000.sql',
+          timestamp: new Date('2025-11-11T02:00:00'), // 6 days old
+          size: 1024000
+        }
+      ]);
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.unlinkSync).mockReturnValue(undefined);
+      vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
+
+      const result = manager.pruneOldBackups(worktreeName, 7);
+
+      expect(result.pruned).toBe(0); // No old backups deleted
+      expect(result.kept).toBe(3); // All backups kept
+      expect(result.errors).toBe(0);
+
+      // Verify unlinkSync was not called
+      expect(fs.unlinkSync).not.toHaveBeenCalled();
+    });
+
+    it('should handle custom retention period', () => {
+      const worktreeName = 'main';
+      const now = new Date('2025-11-17T02:00:00');
+
+      // Mock listBackups
+      vi.spyOn(manager, 'listBackups').mockReturnValue([
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-16-020000.sql',
+          filename: 'backup-2025-11-16-020000.sql',
+          timestamp: new Date('2025-11-16T02:00:00'), // 1 day old
+          size: 1024000
+        },
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-13-020000.sql',
+          filename: 'backup-2025-11-13-020000.sql',
+          timestamp: new Date('2025-11-13T02:00:00'), // 4 days old
+          size: 1024000
+        }
+      ]);
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.unlinkSync).mockReturnValue(undefined);
+      vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
+
+      // Use custom retention period of 3 days
+      const result = manager.pruneOldBackups(worktreeName, 3);
+
+      expect(result.pruned).toBe(1); // 1 old backup deleted (4 days old)
+      expect(result.kept).toBe(1); // 1 recent backup kept (1 day old)
+      expect(result.errors).toBe(0);
+
+      expect(fs.unlinkSync).toHaveBeenCalledTimes(1);
+      expect(fs.unlinkSync).toHaveBeenCalledWith('/test/project/.vibetrees/backups/main/backup-2025-11-13-020000.sql');
+    });
+
+    it('should handle missing backup directory', () => {
+      const worktreeName = 'main';
+
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const result = manager.pruneOldBackups(worktreeName, 7);
+
+      expect(result.pruned).toBe(0);
+      expect(result.kept).toBe(0);
+      expect(result.errors).toBe(0);
+    });
+
+    it('should handle file deletion errors', () => {
+      const worktreeName = 'main';
+      const now = new Date('2025-11-17T02:00:00');
+
+      // Mock listBackups to return old backups
+      vi.spyOn(manager, 'listBackups').mockReturnValue([
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-01-020000.sql',
+          filename: 'backup-2025-11-01-020000.sql',
+          timestamp: new Date('2025-11-01T02:00:00'), // 16 days old
+          size: 1024000
+        },
+        {
+          path: '/test/project/.vibetrees/backups/main/backup-2025-11-02-020000.sql',
+          filename: 'backup-2025-11-02-020000.sql',
+          timestamp: new Date('2025-11-02T02:00:00'), // 15 days old
+          size: 1024000
+        }
+      ]);
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      // Mock unlinkSync to throw error on first file, succeed on second
+      vi.mocked(fs.unlinkSync).mockImplementationOnce(() => {
+        throw new Error('Permission denied');
+      }).mockImplementationOnce(() => undefined);
+
+      vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
+
+      const result = manager.pruneOldBackups(worktreeName, 7);
+
+      expect(result.pruned).toBe(1); // 1 successfully deleted
+      expect(result.kept).toBe(0); // Both were old
+      expect(result.errors).toBe(1); // 1 failed to delete
+
+      expect(fs.unlinkSync).toHaveBeenCalledTimes(2);
     });
   });
 });

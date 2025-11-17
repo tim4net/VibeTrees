@@ -274,8 +274,8 @@ const backupScheduler = new DatabaseBackupScheduler({
   projectRoot: initialRootDir,
   runtime
 });
-backupScheduler.start();
-console.log('[DATABASE-BACKUP] Nightly backup scheduler started (2am daily)');
+await backupScheduler.start();
+console.log('[DATABASE-BACKUP] Nightly backup scheduler started (2am daily, 7-day retention)');
 
 /**
  * Format log line by adding color and structure
@@ -1475,6 +1475,50 @@ Please start by showing me the first conflicted file and explaining the conflict
       res.json({ tables, schema });
     } catch (error) {
       sendError(res, error);
+    }
+  });
+
+  // Backup database
+  app.post('/api/worktrees/:name/database/backup', async (req, res) => {
+    try {
+      const worktreeName = req.params.name;
+      const worktree = manager.listWorktrees().find(w => w.name === worktreeName);
+
+      if (!worktree) {
+        return res.status(404).json({ success: false, error: 'Worktree not found' });
+      }
+
+      const { DatabaseBackupManager } = await import('../database-backup-manager.mjs');
+      const backupManager = new DatabaseBackupManager({
+        projectRoot: initialRootDir,
+        runtime
+      });
+
+      const result = await backupManager.createBackup(
+        worktreeName,
+        worktree.path,
+        worktree.ports || {}
+      );
+
+      if (result.success) {
+        // Update documentation after manual backup
+        backupManager.generateBackupDocs();
+
+        res.json({
+          success: true,
+          backupPath: result.backupPath,
+          timestamp: result.timestamp,
+          message: `Backup created successfully`
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error || result.reason
+        });
+      }
+    } catch (error) {
+      console.error(`[API] Database backup error:`, error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

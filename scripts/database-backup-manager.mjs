@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import { DatabaseManager } from './database-manager.mjs';
 import { ComposeInspector } from './compose-inspector.mjs';
@@ -206,6 +206,56 @@ export class DatabaseBackupManager {
     } catch (error) {
       console.error(`[DatabaseBackupManager] Failed to list backups: ${error.message}`);
       return [];
+    }
+  }
+
+  /**
+   * Prune backups older than specified days
+   * @param {string} worktreeName - Worktree name
+   * @param {number} daysToKeep - Number of days to keep (default: 7)
+   * @returns {{pruned: number, kept: number, errors: number}}
+   */
+  pruneOldBackups(worktreeName, daysToKeep = 7) {
+    try {
+      const worktreeBackupDir = path.join(this.backupDir, worktreeName);
+
+      if (!existsSync(worktreeBackupDir)) {
+        return { pruned: 0, kept: 0, errors: 0 };
+      }
+
+      const now = Date.now();
+      const maxAge = daysToKeep * 24 * 60 * 60 * 1000; // Convert days to milliseconds
+
+      const backups = this.listBackups(worktreeName);
+      let pruned = 0;
+      let kept = 0;
+      let errors = 0;
+
+      for (const backup of backups) {
+        const age = now - backup.timestamp.getTime();
+
+        if (age > maxAge) {
+          try {
+            unlinkSync(backup.path);
+            console.log(`[DatabaseBackupManager] Pruned old backup: ${backup.filename} (${Math.floor(age / (24 * 60 * 60 * 1000))} days old)`);
+            pruned++;
+          } catch (error) {
+            console.error(`[DatabaseBackupManager] Failed to prune ${backup.filename}: ${error.message}`);
+            errors++;
+          }
+        } else {
+          kept++;
+        }
+      }
+
+      if (pruned > 0) {
+        console.log(`[DatabaseBackupManager] Pruned ${pruned} old backup(s), kept ${kept}, errors: ${errors}`);
+      }
+
+      return { pruned, kept, errors };
+    } catch (error) {
+      console.error(`[DatabaseBackupManager] Failed to prune backups: ${error.message}`);
+      return { pruned: 0, kept: 0, errors: 1 };
     }
   }
 

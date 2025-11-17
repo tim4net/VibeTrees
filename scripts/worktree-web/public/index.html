@@ -481,6 +481,17 @@
       </div>
       <div class="modal-body">
         <div class="db-section">
+          <h3>Backup Database</h3>
+          <p style="font-size: 13px; color: var(--text-secondary); margin: 8px 0;">
+            Create a manual backup of this worktree's database to .vibetrees/backups/
+          </p>
+          <button id="backupDatabase" class="db-btn">
+            <i data-lucide="archive" class="lucide-sm"></i>
+            <span>Create Backup Now</span>
+          </button>
+        </div>
+
+        <div class="db-section">
           <h3>Export Database</h3>
           <div class="form-group">
             <label for="exportType">Export Type:</label>
