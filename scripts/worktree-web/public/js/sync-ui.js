@@ -458,10 +458,10 @@ function showSyncError(worktreeName, errorMessage) {
 
     <div class="modal-actions">
       <button onclick="window.syncUI.hideSyncDialog()">Close</button>
-      <button onclick="window.syncUI.openAIHelperForError('${worktreeName}', 'claude', ${JSON.stringify(errorMessage)})" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
+      <button data-worktree="${worktreeName}" data-agent="claude" data-error="${escapeHtml(errorMessage)}" class="ai-helper-btn" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
         <i data-lucide="bot" class="lucide-sm"></i> Ask Claude
       </button>
-      <button onclick="window.syncUI.openAIHelperForError('${worktreeName}', 'codex', ${JSON.stringify(errorMessage)})" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
+      <button data-worktree="${worktreeName}" data-agent="codex" data-error="${escapeHtml(errorMessage)}" class="ai-helper-btn" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
         <i data-lucide="sparkles" class="lucide-sm"></i> Ask Codex
       </button>
       <button class="primary" onclick="window.syncUI.showSyncDialog('${worktreeName}')">Try Again</button>
@@ -470,6 +470,16 @@ function showSyncError(worktreeName, errorMessage) {
 
   // Reinit icons
   if (window.lucide) window.lucide.createIcons();
+
+  // Attach event listeners to AI helper buttons
+  modal.querySelectorAll('.ai-helper-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const worktree = btn.dataset.worktree;
+      const agent = btn.dataset.agent;
+      const error = btn.dataset.error;
+      openAIHelperForError(worktree, agent, error);
+    });
+  });
 }
 
 /**
@@ -503,10 +513,10 @@ function showSyncConflicts(worktreeName, result) {
 
     <div class="modal-actions">
       <button onclick="window.syncUI.rollbackSync('${worktreeName}')">Rollback</button>
-      <button onclick="window.syncUI.openAIHelperForConflicts('${worktreeName}', 'claude', ${JSON.stringify(result.conflicts || [])})" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
+      <button data-worktree="${worktreeName}" data-agent="claude" data-conflicts="${escapeHtml(JSON.stringify(result.conflicts || []))}" class="ai-conflict-btn" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
         <i data-lucide="bot" class="lucide-sm"></i> Ask Claude
       </button>
-      <button onclick="window.syncUI.openAIHelperForConflicts('${worktreeName}', 'codex', ${JSON.stringify(result.conflicts || [])})" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
+      <button data-worktree="${worktreeName}" data-agent="codex" data-conflicts="${escapeHtml(JSON.stringify(result.conflicts || []))}" class="ai-conflict-btn" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%); border-color: #1f6feb;">
         <i data-lucide="sparkles" class="lucide-sm"></i> Ask Codex
       </button>
     </div>
@@ -514,6 +524,16 @@ function showSyncConflicts(worktreeName, result) {
 
   // Reinit icons
   if (window.lucide) window.lucide.createIcons();
+
+  // Attach event listeners to AI conflict resolution buttons
+  modal.querySelectorAll('.ai-conflict-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const worktree = btn.dataset.worktree;
+      const agent = btn.dataset.agent;
+      const conflicts = JSON.parse(btn.dataset.conflicts || '[]');
+      openAIHelperForConflicts(worktree, agent, conflicts);
+    });
+  });
 }
 
 /**
