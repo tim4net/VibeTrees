@@ -1309,6 +1309,18 @@ export class WorktreeManager {
       console.log(`[CREATE] ✓ Containers started successfully`);
       this.profiler.end(dockerId);
 
+      // Restore database from main backup AFTER containers are running
+      const restoreId = this.profiler.start('database-restore', totalId);
+      try {
+        console.log(`[CREATE] Checking for main backup to restore...`);
+        await this.restoreDatabaseFromBackup(worktreeName, worktreePath, ports);
+        console.log(`[CREATE] ✓ Database restore completed`);
+      } catch (err) {
+        console.error(`[CREATE] Database restore failed (non-critical):`, err.message);
+        // Don't fail worktree creation if restore fails
+      }
+      this.profiler.end(restoreId);
+
       const worktree = {
         name: worktreeName,
         path: worktreePath,
@@ -1585,6 +1597,136 @@ export class WorktreeManager {
         message: `⚠ Database copy failed: ${error.message}`
       });
       // Don't fail worktree creation if database copy fails
+    }
+  }
+
+  /**
+   * Restore database from main backup
+   * @param {string} worktreeName - Name of the target worktree
+   * @param {string} worktreePath - Path to the target worktree
+   * @param {Object} ports - Allocated ports for the worktree
+   */
+  async restoreDatabaseFromBackup(worktreeName, worktreePath, ports) {
+    try {
+      // Skip if this is the main worktree
+      if (!worktreePath.includes('.worktrees')) {
+        console.log(`[DATABASE-RESTORE] Skipping restore for main worktree`);
+        return;
+      }
+
+      // Import DatabaseBackupManager
+      const { DatabaseBackupManager } = await import('../database-backup-manager.mjs');
+      const backupManager = new DatabaseBackupManager({
+        projectRoot: this.rootDir,
+        runtime: this.runtime
+      });
+
+      // Check for latest main backup
+      const latestBackup = backupManager.getLatestBackup('main');
+
+      if (!latestBackup) {
+        console.log(`[DATABASE-RESTORE] No main backup found, skipping restore`);
+        this.broadcast('worktree:progress', {
+          name: worktreeName,
+          step: 'database-restore',
+          message: 'No backup found, starting fresh'
+        });
+        return;
+      }
+
+      console.log(`[DATABASE-RESTORE] Found backup: ${latestBackup.filename}`);
+      this.broadcast('worktree:progress', {
+        name: worktreeName,
+        step: 'database-restore',
+        message: `Restoring from ${latestBackup.filename}...`
+      });
+
+      // Detect database service
+      const dbInfo = await backupManager.detectDatabase(worktreePath);
+
+      if (!dbInfo.hasDatabase) {
+        console.log(`[DATABASE-RESTORE] No database service detected, skipping restore`);
+        return;
+      }
+
+      if (dbInfo.type !== 'postgres') {
+        console.log(`[DATABASE-RESTORE] Database type ${dbInfo.type} not supported for restore`);
+        return;
+      }
+
+      // Get database port
+      const dbPort = ports[dbInfo.service] || ports.postgres || 5432;
+
+      // Wait for database to be ready (up to 30 seconds)
+      console.log(`[DATABASE-RESTORE] Waiting for database to be ready...`);
+      let dbReady = false;
+      for (let i = 0; i < 30; i++) {
+        try {
+          const { DatabaseManager } = await import('../database-manager.mjs');
+          const dbManager = new DatabaseManager({
+            host: 'localhost',
+            port: dbPort,
+            database: 'postgres',
+            user: 'postgres',
+            password: 'postgres'
+          });
+
+          // Try to estimate database size (will fail if not connected)
+          await dbManager._estimateDatabaseSize();
+          dbReady = true;
+          console.log(`[DATABASE-RESTORE] Database ready after ${i + 1}s`);
+          break;
+        } catch (error) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      if (!dbReady) {
+        console.warn(`[DATABASE-RESTORE] Database not ready after 30s, skipping restore`);
+        this.broadcast('worktree:progress', {
+          name: worktreeName,
+          step: 'database-restore',
+          message: 'Database not ready, skipping restore'
+        });
+        return;
+      }
+
+      // Import backup
+      const { DatabaseManager } = await import('../database-manager.mjs');
+      const dbManager = new DatabaseManager({
+        host: 'localhost',
+        port: dbPort,
+        database: 'postgres',
+        user: 'postgres',
+        password: 'postgres'
+      });
+
+      console.log(`[DATABASE-RESTORE] Restoring backup: ${latestBackup.path}`);
+      const result = await dbManager.importWithTransaction(latestBackup.path);
+
+      if (result.success) {
+        console.log(`[DATABASE-RESTORE] Restore completed successfully`);
+        this.broadcast('worktree:progress', {
+          name: worktreeName,
+          step: 'database-restore',
+          message: '✓ Database restored from main backup'
+        });
+      } else {
+        console.error(`[DATABASE-RESTORE] Restore failed: ${result.error}`);
+        this.broadcast('worktree:progress', {
+          name: worktreeName,
+          step: 'database-restore',
+          message: `⚠ Restore failed: ${result.error}`
+        });
+      }
+    } catch (error) {
+      console.error(`[DATABASE-RESTORE] Error: ${error.message}`);
+      this.broadcast('worktree:progress', {
+        name: worktreeName,
+        step: 'database-restore',
+        message: `⚠ Restore error: ${error.message}`
+      });
+      // Don't throw - allow worktree creation to continue
     }
   }
 

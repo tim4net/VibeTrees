@@ -39,6 +39,9 @@ coverage/
 .worktrees/
 !.worktrees/.gitkeep
 
+# Database backups (automatically generated)
+.vibetrees/backups/
+
 # User-specific Claude settings (keep settings.local.json for this repo only)
 .claude/settings.json
 # .claude/settings.local.json is tracked for project-specific permissions

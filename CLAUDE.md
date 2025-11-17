@@ -187,6 +187,32 @@ API: `POST /api/worktrees/:name/database/export`, `POST /api/worktrees/:name/dat
 
 See [docs/database-workflow.md](docs/database-workflow.md) for details.
 
+### Automatic Database Backups
+Nightly backups with automatic restoration for new worktrees.
+
+**Workflow**:
+1. Nightly backup of main worktree database (2am daily)
+2. Backups stored in `.vibetrees/backups/main/backup-YYYY-MM-DD-HHmmss.sql`
+3. New worktrees automatically restore latest main backup after containers start
+4. Documentation auto-generated at `.vibetrees/backups/README.md`
+
+**Components**:
+- `DatabaseBackupManager` - Backup creation, restoration, documentation
+- `DatabaseBackupScheduler` - Nightly scheduling (2am daily)
+
+**Features**:
+- Automatic detection of database services (postgres, mysql, mariadb)
+- Smart restore: waits for containers to be ready before importing
+- Non-blocking: backup/restore failures don't prevent worktree creation
+- Gitignored: `.vibetrees/backups/` excluded from version control
+
+**Manual operations**:
+```javascript
+const backupManager = new DatabaseBackupManager({ projectRoot, runtime });
+await backupManager.createBackup('main', worktreePath, ports);
+const latest = backupManager.getLatestBackup('main');
+```
+
 ### Terminal Persistence
 Full terminal persistence with complete buffer restoration. Auto-saves every 5s to `~/.vibetrees/sessions/{id}/pty-state.json`.
 

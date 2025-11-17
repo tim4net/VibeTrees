@@ -267,6 +267,16 @@ const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), '
 worktreeManager.updateChecker = new UpdateChecker(packageJson.version);
 worktreeManager.updateChecker.start();
 
+// Initialize database backup scheduler
+const { DatabaseBackupScheduler } = await import('../database-backup-scheduler.mjs');
+const backupScheduler = new DatabaseBackupScheduler({
+  worktreeManager,
+  projectRoot: initialRootDir,
+  runtime
+});
+backupScheduler.start();
+console.log('[DATABASE-BACKUP] Nightly backup scheduler started (2am daily)');
+
 /**
  * Format log line by adding color and structure
  */
