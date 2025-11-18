@@ -153,35 +153,43 @@ class DatabaseUI {
     }
   }
 
-  async handleBackup() {
-    if (!this.currentWorktree) {
+  async handleBackup(worktreeName = null) {
+    const targetWorktree = worktreeName || this.currentWorktree;
+
+    if (!targetWorktree) {
       alert('Please select a worktree first');
       return;
     }
 
     const button = document.getElementById('backupDatabase');
-    const originalText = button.querySelector('span').textContent;
+    let originalText = null;
 
-    button.disabled = true;
-    button.querySelector('span').textContent = 'Creating backup...';
+    // If called from modal (button exists), update button state
+    if (button && button.querySelector('span')) {
+      originalText = button.querySelector('span').textContent;
+      button.disabled = true;
+      button.querySelector('span').textContent = 'Creating backup...';
+    }
 
     try {
-      const response = await fetch(`/api/worktrees/${this.currentWorktree}/database/backup`, {
+      const response = await fetch(`/api/worktrees/${targetWorktree}/database/backup`, {
         method: 'POST'
       });
 
       const result = await response.json();
 
       if (result.success) {
-        alert(`✓ Backup created successfully\n\nFile: ${result.backupPath.split('/').pop()}\nTime: ${new Date(result.timestamp).toLocaleString()}`);
+        alert(`✓ Backup created successfully\n\nWorktree: ${targetWorktree}\nFile: ${result.backupPath.split('/').pop()}\nTime: ${new Date(result.timestamp).toLocaleString()}`);
       } else {
         alert(`✗ Backup failed\n\n${result.error}`);
       }
     } catch (error) {
       alert(`✗ Backup failed\n\n${error.message}`);
     } finally {
-      button.disabled = false;
-      button.querySelector('span').textContent = originalText;
+      if (button && originalText) {
+        button.disabled = false;
+        button.querySelector('span').textContent = originalText;
+      }
     }
   }
 }
@@ -191,6 +199,7 @@ const dbUI = new DatabaseUI();
 
 // Expose for use in other scripts
 window.dbUI = dbUI;
+window.databaseModule = dbUI;  // Alias for compatibility
 
 // Helper functions for modal management
 function showDatabaseModal(worktreeName) {
@@ -206,3 +215,7 @@ function closeDatabaseModal() {
   document.getElementById('importFile').value = '';
   document.getElementById('schemaDisplay').style.display = 'none';
 }
+
+// Expose modal functions globally
+window.openDatabaseModal = showDatabaseModal;
+window.closeDatabaseModal = closeDatabaseModal;

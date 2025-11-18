@@ -52,6 +52,11 @@ export function worktreeContextMenuAction(action) {
     case 'viewAllLogs':
       openCombinedLogs(worktreeName);
       break;
+    case 'backupDatabase':
+      if (window.dbUI && window.dbUI.handleBackup) {
+        window.dbUI.handleBackup(worktreeName);
+      }
+      break;
     case 'database':
       if (window.openDatabaseModal) {
         window.openDatabaseModal(worktreeName);
