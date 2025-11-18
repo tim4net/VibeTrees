@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
+import yaml from 'js-yaml';
 import { DatabaseManager } from './database-manager.mjs';
 import { ComposeInspector } from './compose-inspector.mjs';
 
@@ -103,14 +104,19 @@ export class DatabaseBackupManager {
       const backupPath = path.join(worktreeBackupDir, `backup-${timestamp}.sql`);
 
       console.log(`[DatabaseBackupManager] Creating backup for ${worktreeName} at ${backupPath}`);
+      console.log(`[DatabaseBackupManager] Database service: ${dbInfo.service}, type: ${dbInfo.type}`);
+
+      // Read database credentials from docker-compose.yml
+      const credentials = this._extractDatabaseCredentials(worktreePath, dbInfo.service);
+      console.log(`[DatabaseBackupManager] Using credentials - user: ${credentials.user}, database: ${credentials.database}`);
 
       // Create DatabaseManager instance
       const dbManager = new DatabaseManager({
         host: 'localhost',
         port: dbPort,
-        database: 'postgres',
-        user: 'postgres',
-        password: 'postgres'
+        database: credentials.database,
+        user: credentials.user,
+        password: credentials.password
       });
 
       // Export database
@@ -327,5 +333,67 @@ export class DatabaseBackupManager {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
     return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  }
+
+  /**
+   * Extract database credentials from docker-compose.yml
+   * @private
+   * @param {string} worktreePath - Path to worktree
+   * @param {string} serviceName - Database service name
+   * @returns {{database: string, user: string, password: string}}
+   */
+  _extractDatabaseCredentials(worktreePath, serviceName) {
+    try {
+      const composeFile = path.join(worktreePath, 'docker-compose.yml');
+
+      // Load and parse docker-compose.yml directly
+      const composeContent = readFileSync(composeFile, 'utf8');
+      const config = yaml.load(composeContent);
+
+      if (!config.services || !config.services[serviceName]) {
+        console.log(`[DatabaseBackupManager] Service ${serviceName} not found in docker-compose.yml, using defaults`);
+        return {
+          database: 'postgres',
+          user: 'postgres',
+          password: 'postgres'
+        };
+      }
+
+      const service = config.services[serviceName];
+      const env = service.environment || {};
+
+      // Environment can be array format or object format
+      let envObj = {};
+      if (Array.isArray(env)) {
+        // Convert array format ["KEY=value"] to object {KEY: "value"}
+        env.forEach(item => {
+          const [key, ...valueParts] = item.split('=');
+          envObj[key] = valueParts.join('=');
+        });
+      } else {
+        envObj = env;
+      }
+
+      const credentials = {
+        database: envObj.POSTGRES_DB || envObj.MYSQL_DATABASE || envObj.MARIADB_DATABASE || 'postgres',
+        user: envObj.POSTGRES_USER || envObj.MYSQL_USER || envObj.MARIADB_USER || 'postgres',
+        password: envObj.POSTGRES_PASSWORD || envObj.MYSQL_PASSWORD || envObj.MARIADB_PASSWORD || 'postgres'
+      };
+
+      console.log(`[DatabaseBackupManager] Extracted credentials for ${serviceName}:`, {
+        ...credentials,
+        password: '***' // Don't log password
+      });
+
+      return credentials;
+    } catch (error) {
+      console.error(`[DatabaseBackupManager] Failed to extract credentials: ${error.message}`);
+      // Fallback to defaults
+      return {
+        database: 'postgres',
+        user: 'postgres',
+        password: 'postgres'
+      };
+    }
   }
 }
