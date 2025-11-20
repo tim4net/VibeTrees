@@ -124,16 +124,23 @@ describe('xterm-headless integration', () => {
 
   describe('Data flow - PTY to xterm', () => {
     it('should pipe PTY output through xterm-headless write()', () => {
+      vi.useFakeTimers();
       openTerminal();
 
       const xterm = xtermInstances[0];
       expect(xterm).toBeDefined();
 
       fakePty.emitData('hello');
+
+      // xterm buffer update is batched - advance timer to trigger flush
+      vi.advanceTimersByTime(100);
       expect(xterm?.write).toHaveBeenCalledWith('hello');
+
+      vi.useRealTimers();
     });
 
     it('should handle PTY data events correctly', () => {
+      vi.useFakeTimers();
       openTerminal();
 
       const xterm = xtermInstances[0];
@@ -142,13 +149,19 @@ describe('xterm-headless integration', () => {
       const bufferChunk = Buffer.from('\x1b[35mcolored\x1b[0m');
       fakePty.emitData(bufferChunk);
 
-      // Buffer payloads should pass through unchanged
-      expect(xterm?.write).toHaveBeenCalledWith(bufferChunk);
+      // xterm buffer update is batched - advance timer to trigger flush
+      vi.advanceTimersByTime(100);
+
+      // Buffer batching converts to string via join(''), so expect the string representation
+      expect(xterm?.write).toHaveBeenCalledWith('\x1b[35mcolored\x1b[0m');
+
+      vi.useRealTimers();
     });
   });
 
   describe('Data flow - PTY to both xterm and WebSocket', () => {
     it('should send PTY output to both xterm buffer and WebSocket', () => {
+      vi.useFakeTimers();
       openTerminal();
 
       const xterm = xtermInstances[0];
@@ -157,14 +170,18 @@ describe('xterm-headless integration', () => {
       // Emit data from PTY
       fakePty.emitData('hello from pty');
 
-      // Should update xterm buffer (for serialization)
+      // WebSocket send happens immediately (on critical path)
+      expect(ws.send).toHaveBeenCalledWith('hello from pty');
+
+      // xterm buffer update is batched - advance timer to trigger flush
+      vi.advanceTimersByTime(100);
       expect(xterm?.write).toHaveBeenCalledWith('hello from pty');
 
-      // Should also send to WebSocket (for display)
-      expect(ws.send).toHaveBeenCalledWith('hello from pty');
+      vi.useRealTimers();
     });
 
     it('should preserve ANSI escape codes in both paths', () => {
+      vi.useFakeTimers();
       openTerminal();
 
       const xterm = xtermInstances[0];
@@ -173,11 +190,14 @@ describe('xterm-headless integration', () => {
       const ansiPayload = '\x1b[32mREADY\x1b[0m';
       fakePty.emitData(ansiPayload);
 
-      // Should write to xterm buffer
+      // Should send to WebSocket immediately with ANSI codes intact
+      expect(ws.send).toHaveBeenCalledWith(ansiPayload);
+
+      // xterm buffer update is batched - advance timer to trigger flush
+      vi.advanceTimersByTime(100);
       expect(xterm?.write).toHaveBeenCalledWith(ansiPayload);
 
-      // Should also send to WebSocket with ANSI codes intact
-      expect(ws.send).toHaveBeenCalledWith(ansiPayload);
+      vi.useRealTimers();
     });
   });
 

@@ -448,20 +448,42 @@ export function handleTerminalConnection(ws, worktreeName, command, manager, ena
     ws.send(data);
   };
 
-  // Bridge PTY -> (headless xterm + WebSocket)
-  // PTY output goes to BOTH: xterm (for buffer state) AND WebSocket (for display)
-  const ptyToXtermAndWs = (data) => {
-    // Update server-side xterm buffer (for serialization)
-    headlessTerm.write(data);
+  // Batched buffer update for xterm-headless (off critical path)
+  // Instead of updating buffer on every byte (slow), batch updates every 100ms
+  let xtermUpdateBuffer = [];
+  let xtermUpdateTimer = null;
 
-    // Also send to WebSocket with backpressure logic
-    onData(data);
+  const flushXtermBuffer = () => {
+    if (xtermUpdateBuffer.length > 0) {
+      const combined = xtermUpdateBuffer.join('');
+      headlessTerm.write(combined);
+      xtermUpdateBuffer = [];
+    }
+    xtermUpdateTimer = null;
   };
 
-  terminal.onData(ptyToXtermAndWs);
+  const queueXtermUpdate = (data) => {
+    xtermUpdateBuffer.push(data);
+    if (!xtermUpdateTimer) {
+      xtermUpdateTimer = setTimeout(flushXtermBuffer, 100); // Batch every 100ms
+    }
+  };
+
+  // Bridge PTY -> WebSocket (direct, fast path)
+  // Buffer updates happen async/batched to avoid blocking
+  const ptyToWs = (data) => {
+    // Send immediately to WebSocket (critical path - no delay)
+    onData(data);
+
+    // Queue buffer update for later (non-blocking)
+    queueXtermUpdate(data);
+  };
+
+  terminal.onData(ptyToWs);
 
   // Store listener reference for cleanup
-  session.activeListener = ptyToXtermAndWs;
+  session.activeListener = ptyToWs;
+  session.xtermUpdateTimer = xtermUpdateTimer;
 
   // OPTIMIZED: Minimal overhead message handler
   const messageHandler = (data) => {
@@ -554,6 +576,16 @@ export function handleTerminalConnection(ws, worktreeName, command, manager, ena
     if (session && session.drainInterval) {
       clearInterval(session.drainInterval);
       session.drainInterval = null;
+    }
+
+    // Clean up xterm buffer update timer
+    if (session && session.xtermUpdateTimer) {
+      clearTimeout(session.xtermUpdateTimer);
+      session.xtermUpdateTimer = null;
+      // Flush any pending buffer updates before closing
+      if (typeof flushXtermBuffer === 'function') {
+        flushXtermBuffer();
+      }
     }
 
     // Ensure PTY is resumed if it was paused
