@@ -6,7 +6,7 @@ AI guidance for working with **VibeTrees** - a web-based orchestration tool for 
 
 ```bash
 npm run web              # Start web UI (localhost:3335)
-npm test                 # Run test suite (621 tests)
+npm test                 # Run test suite (939 tests)
 npm run test:watch       # Watch mode
 ```
 
@@ -15,7 +15,7 @@ npm run test:watch       # Watch mode
 - **TDD**: Write tests first, implement minimal code to pass
 - **DRY**: Extract shared logic into reusable modules
 - **SOLID**: Single responsibility, proper separation of concerns
-- **621 tests**: Comprehensive coverage maintained
+- **939 tests**: Comprehensive coverage maintained
 
 ## Architecture
 
@@ -38,6 +38,7 @@ Web UI / CLI → Core Orchestration → Infrastructure
 - `pty-session-manager.mjs` - Terminal persistence
 - `mcp-manager.mjs` - MCP server discovery
 - `agents/` - Pluggable AI agent system
+- `zen-mcp/` - Multi-model AI provider integration
 
 ## Development Workflow
 
@@ -124,6 +125,20 @@ const agent = agentRegistry.create('claude', { worktreePath });
 API: `GET /api/agents`, `GET /api/agents/:name`, `GET /api/agents/availability`
 
 See [docs/adding-agents.md](docs/adding-agents.md) for custom agents.
+
+### Zen MCP Integration
+Multi-model AI access via Zen MCP. Configured providers are auto-injected into worktree MCP settings.
+
+**Configuration**: `~/.vibetrees/zen-mcp-config.json`
+
+**Supported providers**: OpenRouter, OpenAI, Anthropic, Google AI
+
+**API**:
+- `GET/POST /api/zen-mcp/config` - Configuration CRUD
+- `POST /api/zen-mcp/test` - Test provider connection
+- `GET /api/zen-mcp/status` - Installation status
+
+See [docs/zen-mcp-integration.md](docs/zen-mcp-integration.md) for details.
 
 ### Dependency Management
 Automatic dependency installation with smart fallback.
@@ -262,5 +277,6 @@ See [docs/performance-optimization.md](docs/performance-optimization.md) for det
 - `docs/database-workflow.md` - Database operations
 - `docs/terminal-persistence.md` - Terminal session recovery
 - `docs/performance-optimization.md` - Performance profiling
+- `docs/zen-mcp-integration.md` - Zen MCP configuration guide
 
 **IMPORTANT**: DO NOT KILL PROCESSES YOU DID NOT SPAWN

@@ -187,7 +187,8 @@ describe('Telemetry', () => {
 
       const duration = await timer.end();
 
-      expect(duration).toBeGreaterThanOrEqual(100);
+      // Allow 1ms tolerance for timer precision
+      expect(duration).toBeGreaterThanOrEqual(99);
       expect(telemetry.metrics.has('test-operation')).toBe(true);
     });
   });

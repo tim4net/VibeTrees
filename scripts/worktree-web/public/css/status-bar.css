@@ -98,11 +98,25 @@
   color: #6e7681;
 }
 
+/* Zen MCP status colors */
+.status-segment.zen-mcp.configured {
+  color: #2ea043;
+}
+
+.status-segment.zen-mcp.partial {
+  color: #e5a935;
+}
+
+.status-segment.zen-mcp.unconfigured {
+  color: #6e7681;
+}
+
 /* Count badges */
 .ahead-count,
 .behind-count,
 .change-count,
-.service-count {
+.service-count,
+.zen-mcp-count {
   font-weight: 600;
   font-size: 11px;
 }

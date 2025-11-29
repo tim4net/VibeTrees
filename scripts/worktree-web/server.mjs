@@ -22,6 +22,7 @@ import { InitializationManager } from '../initialization-manager.mjs';
 import { ProjectManager } from '../project-manager.mjs';
 import { UpdateChecker } from '../update-checker.mjs';
 import { NullRuntime } from '../null-runtime.mjs';
+import { ZenMcpFacade } from '../zen-mcp/index.mjs';
 import { handleLogsConnection, handleCombinedLogsConnection, handleTerminalConnection } from './websocket-handlers.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -276,6 +277,20 @@ const backupScheduler = new DatabaseBackupScheduler({
 });
 await backupScheduler.start();
 console.log('[DATABASE-BACKUP] Nightly backup scheduler started (2am daily, 7-day retention)');
+
+// Initialize Zen MCP facade
+const zenMcp = new ZenMcpFacade();
+
+// Pre-install Zen MCP in background (non-blocking)
+zenMcp.ensureReady().then(result => {
+  if (result.success) {
+    console.log(`[ZEN-MCP] Installed: ${result.version || 'ready'}`);
+  } else {
+    console.warn(`[ZEN-MCP] Install deferred: ${result.error || 'will retry on first use'}`);
+  }
+}).catch(err => {
+  console.warn('[ZEN-MCP] Background install failed, will retry on first use:', err.message);
+});
 
 /**
  * Format log line by adding color and structure
@@ -1810,6 +1825,61 @@ Please start by showing me the first conflicted file and explaining the conflict
       }
     } catch (error) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Zen MCP Configuration API
+  app.get('/api/zen-mcp/config', async (req, res) => {
+    try {
+      const config = zenMcp.getConfigForApi();
+      res.json({ success: true, ...config });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/api/zen-mcp/config', async (req, res) => {
+    try {
+      const { provider, apiKey } = req.body;
+      if (!provider || !apiKey) {
+        return res.status(400).json({ success: false, error: 'Missing provider or apiKey' });
+      }
+      const result = await zenMcp.saveApiKey(provider, apiKey);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete('/api/zen-mcp/config/:provider', async (req, res) => {
+    try {
+      const { provider } = req.params;
+      const result = zenMcp.removeApiKey(provider);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/api/zen-mcp/test', async (req, res) => {
+    try {
+      const { provider, apiKey } = req.body;
+      if (!provider || !apiKey) {
+        return res.status(400).json({ success: false, error: 'Missing provider or apiKey' });
+      }
+      const result = await zenMcp.testProvider(provider, apiKey);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get('/api/zen-mcp/status', async (req, res) => {
+    try {
+      const status = await zenMcp.getStatus();
+      res.json({ success: true, ...status });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

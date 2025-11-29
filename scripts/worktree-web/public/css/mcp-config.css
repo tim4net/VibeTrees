@@ -1,0 +1,821 @@
+/**
+ * Zen MCP Configuration Panel Styles
+ *
+ * A bottom-pinned panel in the sidebar for configuring Zen MCP providers.
+ * Features collapsible design with provider cards, status indicators,
+ * and form inputs matching the existing VibeTrees theme.
+ */
+
+/* ===================================
+   Panel Container
+   =================================== */
+
+.mcp-config-panel {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* ===================================
+   Toggle Button
+   =================================== */
+
+.mcp-panel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.mcp-panel-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: transparent;
+}
+
+.mcp-panel-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.mcp-panel-toggle-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.mcp-panel-toggle-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.mcp-panel-toggle-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.mcp-panel-toggle-summary {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mcp-panel-toggle-chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+  font-size: 12px;
+}
+
+.mcp-panel-toggle[aria-expanded="true"] .mcp-panel-toggle-chevron {
+  transform: rotate(180deg);
+}
+
+/* ===================================
+   Status Indicators
+   =================================== */
+
+.mcp-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mcp-status-dot.unconfigured {
+  background: var(--text-tertiary);
+  box-shadow: 0 0 4px rgba(110, 118, 129, 0.4);
+}
+
+.mcp-status-dot.partial {
+  background: var(--warning);
+  box-shadow: 0 0 6px rgba(210, 153, 34, 0.6);
+}
+
+.mcp-status-dot.configured {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(46, 160, 67, 0.6);
+}
+
+.mcp-status-dot.error {
+  background: var(--error);
+  box-shadow: 0 0 6px rgba(248, 81, 73, 0.6);
+}
+
+/* ===================================
+   Panel Content
+   =================================== */
+
+.mcp-panel-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.mcp-panel-content.expanded {
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  opacity: 1;
+  padding: 12px;
+}
+
+.mcp-panel-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mcp-panel-content::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+.mcp-panel-content::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 4px;
+}
+
+.mcp-panel-content::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* ===================================
+   Provider Cards
+   =================================== */
+
+.mcp-providers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mcp-provider {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.mcp-provider.status-unconfigured {
+  border-left: 3px solid #484f58;
+  opacity: 0.75;
+}
+
+.mcp-provider.status-partial {
+  border-left: 3px solid #d29922;
+  background: linear-gradient(to right, rgba(210, 153, 34, 0.05) 0%, #0d1117 100%);
+  box-shadow: 0 1px 3px rgba(210, 153, 34, 0.1);
+}
+
+.mcp-provider.status-configured {
+  border-left: 3px solid #2ea043;
+  background: linear-gradient(to right, rgba(46, 160, 67, 0.08) 0%, #0d1117 100%);
+  box-shadow: 0 1px 3px rgba(46, 160, 67, 0.15);
+  opacity: 1;
+}
+
+.mcp-provider.status-configured .mcp-provider-icon {
+  box-shadow: 0 2px 8px rgba(46, 160, 67, 0.4);
+  transform: scale(1.05);
+}
+
+.mcp-provider.status-configured .mcp-provider-name {
+  color: #2ea043;
+  font-weight: 600;
+}
+
+.mcp-provider.status-error {
+  border-left: 3px solid #f85149;
+  background: linear-gradient(to right, rgba(248, 81, 73, 0.05) 0%, #0d1117 100%);
+  box-shadow: 0 1px 3px rgba(248, 81, 73, 0.1);
+}
+
+.mcp-provider:hover {
+  border-color: #58a6ff;
+  box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.mcp-provider.status-configured:hover {
+  box-shadow: 0 2px 10px rgba(46, 160, 67, 0.3);
+}
+
+/* ===================================
+   Provider Header
+   =================================== */
+
+.mcp-provider-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.mcp-provider-header:hover {
+  background: rgba(56, 139, 253, 0.05);
+}
+
+.mcp-provider-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+/* Provider-specific icon colors */
+.mcp-provider-icon.openrouter {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.mcp-provider-icon.openai {
+  background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
+}
+
+.mcp-provider-icon.google {
+  background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc04 75%, #ea4335 100%);
+}
+
+.mcp-provider-icon.azure {
+  background: linear-gradient(135deg, #0078d4 0%, #0063b1 100%);
+}
+
+.mcp-provider-icon.xai {
+  background: linear-gradient(135deg, #000000 0%, #333333 100%);
+}
+
+.mcp-provider-icon.dial {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+.mcp-provider-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mcp-provider-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mcp-provider-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #c9d1d9;
+  line-height: 1.3;
+}
+
+.mcp-provider-desc {
+  font-size: 12px;
+  color: #8b949e;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.mcp-provider-status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcp-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.mcp-status-badge.unconfigured {
+  background: rgba(110, 118, 129, 0.15);
+  color: #8b949e;
+}
+
+.mcp-status-badge.configured {
+  background: rgba(46, 160, 67, 0.15);
+  color: #2ea043;
+}
+
+.mcp-status-badge .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mcp-status-badge.unconfigured .status-dot {
+  background: #6e7681;
+}
+
+.mcp-status-badge.configured .status-dot {
+  background: #2ea043;
+  box-shadow: 0 0 4px rgba(46, 160, 67, 0.6);
+}
+
+.mcp-provider-chevron {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.mcp-provider.expanded .mcp-provider-chevron {
+  transform: rotate(180deg);
+}
+
+/* ===================================
+   Provider Form
+   =================================== */
+
+.mcp-provider-form {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  border-top: 1px solid var(--border-secondary);
+}
+
+.mcp-provider.expanded .mcp-provider-form {
+  max-height: 400px;
+  opacity: 1;
+  padding: 12px;
+}
+
+.mcp-form-group {
+  margin-bottom: 12px;
+}
+
+.mcp-form-group:last-child {
+  margin-bottom: 0;
+}
+
+.mcp-form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.mcp-form-label .required {
+  color: var(--error);
+  margin-left: 2px;
+}
+
+/* ===================================
+   Input Fields
+   =================================== */
+
+.mcp-key-input-wrapper {
+  position: relative;
+  display: flex;
+  gap: 6px;
+}
+
+.mcp-key-input {
+  flex: 1;
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  padding-right: 36px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+  transition: border-color 0.2s ease;
+}
+
+.mcp-key-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+.mcp-key-input.valid {
+  border-color: var(--success);
+}
+
+.mcp-key-input.invalid {
+  border-color: var(--error);
+}
+
+.mcp-key-input[type="password"] {
+  letter-spacing: 2px;
+}
+
+.mcp-toggle-visibility {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.mcp-toggle-visibility:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.mcp-toggle-visibility:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.mcp-input-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.mcp-input-hint a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.mcp-input-hint a:hover {
+  text-decoration: underline;
+}
+
+/* ===================================
+   Buttons
+   =================================== */
+
+.mcp-form-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.mcp-test-btn {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.mcp-test-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+
+.mcp-test-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mcp-test-btn.testing {
+  pointer-events: none;
+}
+
+.mcp-test-btn.testing i {
+  animation: spin 1s linear infinite;
+}
+
+.mcp-save-btn {
+  flex: 2;
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border: 1px solid #238636;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(35, 134, 54, 0.3);
+}
+
+.mcp-save-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
+  box-shadow: 0 4px 10px rgba(35, 134, 54, 0.4);
+  transform: translateY(-1px);
+}
+
+.mcp-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.mcp-cancel-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mcp-cancel-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+/* ===================================
+   Feedback Messages
+   =================================== */
+
+.mcp-feedback-message {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mcp-feedback-message i {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.mcp-error-message {
+  background: var(--error-bg);
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+
+.mcp-success-message {
+  background: var(--success-bg);
+  border: 1px solid var(--success);
+  color: var(--success);
+}
+
+.mcp-warning-message {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning);
+  color: var(--warning);
+}
+
+.mcp-info-message {
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* ===================================
+   Collapsed Sidebar State
+   =================================== */
+
+.sidebar.collapsed .mcp-config-panel {
+  border-top: 1px solid var(--border-primary);
+}
+
+.sidebar.collapsed .mcp-panel-toggle {
+  flex-direction: column;
+  padding: 8px 4px;
+  min-height: 60px;
+  gap: 4px;
+}
+
+.sidebar.collapsed .mcp-panel-toggle-icon {
+  font-size: 18px;
+}
+
+.sidebar.collapsed .mcp-panel-toggle-content,
+.sidebar.collapsed .mcp-panel-toggle-chevron {
+  display: none;
+}
+
+.sidebar.collapsed .mcp-panel-content {
+  display: none;
+}
+
+/* Show tooltip on hover in collapsed state */
+.sidebar.collapsed .mcp-panel-toggle {
+  position: relative;
+}
+
+.sidebar.collapsed .mcp-panel-toggle::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 8px;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+  box-shadow: var(--shadow-md);
+}
+
+.sidebar.collapsed .mcp-panel-toggle:hover::after {
+  opacity: 1;
+}
+
+/* ===================================
+   Animations
+   =================================== */
+
+@keyframes slideDown {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 500px;
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mcp-status-dot.testing {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ===================================
+   Accessibility
+   =================================== */
+
+/* Focus visible styles */
+.mcp-provider-header:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.mcp-test-btn:focus-visible,
+.mcp-save-btn:focus-visible,
+.mcp-cancel-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .mcp-panel-toggle-chevron,
+  .mcp-provider-chevron,
+  .mcp-panel-content,
+  .mcp-provider-form,
+  .mcp-test-btn.testing i {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .mcp-provider {
+    border-width: 2px;
+  }
+
+  .mcp-key-input:focus {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+  }
+
+  .mcp-status-dot {
+    border: 1px solid currentColor;
+  }
+}
+
+/* ===================================
+   Empty State
+   =================================== */
+
+.mcp-empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.mcp-empty-state i {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.mcp-empty-state p {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ===================================
+   Loading State
+   =================================== */
+
+.mcp-loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mcp-loading i {
+  animation: spin 1s linear infinite;
+}

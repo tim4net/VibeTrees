@@ -1,4 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Mock node-pty before importing agents that depend on it
+vi.mock('node-pty', () => ({
+  default: {
+    spawn: vi.fn(() => ({
+      on: vi.fn(),
+      write: vi.fn(),
+      kill: vi.fn(),
+    })),
+  },
+}));
+
 import { AgentRegistry, agentRegistry } from './index.mjs';
 import { ClaudeAgent } from './claude-agent.mjs';
 import { CodexAgent } from './codex-agent.mjs';

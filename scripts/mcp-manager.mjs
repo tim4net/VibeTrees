@@ -12,12 +12,14 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 
 import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
+import { ZenMcpConfig } from './zen-mcp/zen-mcp-config.mjs';
 
 export class McpManager {
-  constructor(projectRoot, runtime) {
+  constructor(projectRoot, runtime, options = {}) {
     this.projectRoot = projectRoot;
     this.runtime = runtime;
     this.mcpCacheDir = join(homedir(), '.vibe-worktrees', 'mcp-cache');
+    this.zenMcp = options.zenMcp || new ZenMcpConfig();
     this._ensureCacheDir();
   }
 
@@ -271,6 +273,15 @@ export class McpManager {
           VIBE_PROJECT_ROOT: this.projectRoot,
           VIBE_WORKTREE_PATH: worktreePath
         }
+      };
+    }
+
+    // Add Zen MCP if configured
+    if (this.zenMcp.isConfigured()) {
+      mcpServers['zen'] = {
+        command: 'bash',
+        args: this.zenMcp.installer.getCommand(),
+        env: this.zenMcp.getEnvVars()
       };
     }
 

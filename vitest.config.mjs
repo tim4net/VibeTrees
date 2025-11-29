@@ -2,12 +2,15 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Exclude Playwright E2E tests (they run separately with playwright test)
+    exclude: ['**/node_modules/**', '**/tests/e2e/**'],
     // Use threads by default; fall back to forks for native-module specs
     pool: 'threads',
     // Run node-pty dependent tests in a single forked worker to avoid
     // ERR_DLOPEN_FAILED self-registration issues when parallelized.
     poolMatchGlobs: [
-      ['scripts/worktree-web/server.test.mjs', 'forks']
+      ['scripts/worktree-web/server.test.mjs', 'forks'],
+      ['scripts/agents/agent-registry.test.mjs', 'forks']
     ],
     poolOptions: {
       threads: {

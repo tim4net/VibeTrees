@@ -36,8 +36,9 @@
   <link rel="stylesheet" href="/css/agents.css?v=2">
   <link rel="stylesheet" href="/css/sync.css?v=2">
   <link rel="stylesheet" href="/css/conflict.css?v=2">
-  <link rel="stylesheet" href="/css/status-bar.css?v=2">
+  <link rel="stylesheet" href="/css/status-bar.css?v=3">
   <link rel="stylesheet" href="/css/spinner.css?v=1">
+  <link rel="stylesheet" href="/css/mcp-config.css?v=3">
 </head>
 <body>
   <div class="app-container">
@@ -71,6 +72,351 @@
           <div>Loading worktrees...</div>
         </div>
       </div>
+
+      <!-- Zen MCP Configuration Panel -->
+      <div class="mcp-config-panel" id="mcp-config-panel">
+        <!-- Collapsed Header (always visible) -->
+        <button
+          class="mcp-panel-toggle"
+          id="mcp-panel-toggle"
+          aria-expanded="false"
+          aria-controls="mcp-panel-content"
+          title="Configure AI Model Providers"
+        >
+          <div class="mcp-toggle-left">
+            <i data-lucide="brain-circuit" class="lucide-sm"></i>
+            <span class="mcp-toggle-title">Zen MCP</span>
+          </div>
+          <div class="mcp-toggle-right">
+            <span class="mcp-status-summary" id="mcp-status-summary">
+              <span class="mcp-status-dot unconfigured"></span>
+              <span class="mcp-status-text">No providers configured</span>
+            </span>
+            <i data-lucide="chevron-up" class="lucide-sm mcp-chevron"></i>
+          </div>
+        </button>
+
+        <!-- Expanded Content -->
+        <div
+          class="mcp-panel-content"
+          id="mcp-panel-content"
+          role="region"
+          aria-labelledby="mcp-panel-toggle"
+          hidden
+        >
+          <!-- Provider List -->
+          <div class="mcp-providers" role="list">
+            <!-- OpenRouter Provider -->
+            <div class="mcp-provider" data-provider="openrouter" role="listitem">
+              <div class="mcp-provider-header" tabindex="0" role="button" aria-expanded="false">
+                <div class="mcp-provider-info">
+                  <div class="mcp-provider-icon openrouter">
+                    <i data-lucide="route" class="lucide-sm"></i>
+                  </div>
+                  <div class="mcp-provider-details">
+                    <span class="mcp-provider-name">OpenRouter</span>
+                    <span class="mcp-provider-desc">GPT-4, Claude, Gemini via one API</span>
+                  </div>
+                </div>
+                <div class="mcp-provider-status">
+                  <span class="mcp-status-badge unconfigured">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Not configured</span>
+                  </span>
+                </div>
+              </div>
+              <div class="mcp-provider-config" hidden>
+                <div class="mcp-input-group">
+                  <label for="openrouter-key" class="visually-hidden">OpenRouter API Key</label>
+                  <div class="mcp-key-input-wrapper">
+                    <input
+                      type="password"
+                      id="openrouter-key"
+                      class="mcp-key-input"
+                      data-provider="openrouter"
+                      placeholder="sk-or-v1-..."
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <button type="button" class="mcp-toggle-visibility" aria-label="Show API key" title="Show/hide key">
+                      <i data-lucide="eye" class="lucide-sm"></i>
+                    </button>
+                  </div>
+                  <button type="button" class="mcp-test-btn" title="Test connection">
+                    <i data-lucide="zap" class="lucide-sm"></i>
+                    <span>Test</span>
+                  </button>
+                </div>
+                <div class="mcp-key-actions">
+                  <button type="button" class="mcp-save-btn primary small">
+                    <i data-lucide="check" class="lucide-sm"></i> <span>Save</span>
+                  </button>
+                  <button type="button" class="mcp-cancel-btn small"><span>Cancel</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- OpenAI Provider -->
+            <div class="mcp-provider" data-provider="openai" role="listitem">
+              <div class="mcp-provider-header" tabindex="0" role="button" aria-expanded="false">
+                <div class="mcp-provider-info">
+                  <div class="mcp-provider-icon openai">
+                    <img src="/icons/openai.svg" alt="" />
+                  </div>
+                  <div class="mcp-provider-details">
+                    <span class="mcp-provider-name">OpenAI</span>
+                    <span class="mcp-provider-desc">GPT-4o, o1, o3</span>
+                  </div>
+                </div>
+                <div class="mcp-provider-status">
+                  <span class="mcp-status-badge unconfigured">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Not configured</span>
+                  </span>
+                </div>
+              </div>
+              <div class="mcp-provider-config" hidden>
+                <div class="mcp-input-group">
+                  <label for="openai-key" class="visually-hidden">OpenAI API Key</label>
+                  <div class="mcp-key-input-wrapper">
+                    <input
+                      type="password"
+                      id="openai-key"
+                      class="mcp-key-input"
+                      data-provider="openai"
+                      placeholder="sk-..."
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <button type="button" class="mcp-toggle-visibility" aria-label="Show API key" title="Show/hide key">
+                      <i data-lucide="eye" class="lucide-sm"></i>
+                    </button>
+                  </div>
+                  <button type="button" class="mcp-test-btn" title="Test connection">
+                    <i data-lucide="zap" class="lucide-sm"></i>
+                    <span>Test</span>
+                  </button>
+                </div>
+                <div class="mcp-key-actions">
+                  <button type="button" class="mcp-save-btn primary small">
+                    <i data-lucide="check" class="lucide-sm"></i> <span>Save</span>
+                  </button>
+                  <button type="button" class="mcp-cancel-btn small"><span>Cancel</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Google Gemini Provider -->
+            <div class="mcp-provider" data-provider="gemini" role="listitem">
+              <div class="mcp-provider-header" tabindex="0" role="button" aria-expanded="false">
+                <div class="mcp-provider-info">
+                  <div class="mcp-provider-icon google">
+                    <i data-lucide="sparkles" class="lucide-sm"></i>
+                  </div>
+                  <div class="mcp-provider-details">
+                    <span class="mcp-provider-name">Google Gemini</span>
+                    <span class="mcp-provider-desc">Gemini Pro, Gemini Ultra, and other Google AI models</span>
+                  </div>
+                </div>
+                <div class="mcp-provider-status">
+                  <span class="mcp-status-badge unconfigured">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Not configured</span>
+                  </span>
+                </div>
+              </div>
+              <div class="mcp-provider-config" hidden>
+                <div class="mcp-input-group">
+                  <label for="gemini-key" class="visually-hidden">Google Gemini API Key</label>
+                  <div class="mcp-key-input-wrapper">
+                    <input
+                      type="password"
+                      id="gemini-key"
+                      class="mcp-key-input"
+                      data-provider="gemini"
+                      placeholder="AIza..."
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <button type="button" class="mcp-toggle-visibility" aria-label="Show API key" title="Show/hide key">
+                      <i data-lucide="eye" class="lucide-sm"></i>
+                    </button>
+                  </div>
+                  <button type="button" class="mcp-test-btn" title="Test connection">
+                    <i data-lucide="zap" class="lucide-sm"></i>
+                    <span>Test</span>
+                  </button>
+                </div>
+                <div class="mcp-key-actions">
+                  <button type="button" class="mcp-save-btn primary small">
+                    <i data-lucide="check" class="lucide-sm"></i> <span>Save</span>
+                  </button>
+                  <button type="button" class="mcp-cancel-btn small"><span>Cancel</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Azure OpenAI Provider -->
+            <div class="mcp-provider" data-provider="azure" role="listitem">
+              <div class="mcp-provider-header" tabindex="0" role="button" aria-expanded="false">
+                <div class="mcp-provider-info">
+                  <div class="mcp-provider-icon azure">
+                    <i data-lucide="cloud" class="lucide-sm"></i>
+                  </div>
+                  <div class="mcp-provider-details">
+                    <span class="mcp-provider-name">Azure OpenAI</span>
+                    <span class="mcp-provider-desc">Enterprise Azure OpenAI deployments</span>
+                  </div>
+                </div>
+                <div class="mcp-provider-status">
+                  <span class="mcp-status-badge unconfigured">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Not configured</span>
+                  </span>
+                </div>
+              </div>
+              <div class="mcp-provider-config" hidden>
+                <div class="mcp-input-group">
+                  <label for="azure-key" class="visually-hidden">Azure OpenAI API Key</label>
+                  <div class="mcp-key-input-wrapper">
+                    <input
+                      type="password"
+                      id="azure-key"
+                      class="mcp-key-input"
+                      data-provider="azure"
+                      placeholder="Your Azure key..."
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <button type="button" class="mcp-toggle-visibility" aria-label="Show API key" title="Show/hide key">
+                      <i data-lucide="eye" class="lucide-sm"></i>
+                    </button>
+                  </div>
+                  <button type="button" class="mcp-test-btn" title="Test connection">
+                    <i data-lucide="zap" class="lucide-sm"></i>
+                    <span>Test</span>
+                  </button>
+                </div>
+                <div class="mcp-key-actions">
+                  <button type="button" class="mcp-save-btn primary small">
+                    <i data-lucide="check" class="lucide-sm"></i> <span>Save</span>
+                  </button>
+                  <button type="button" class="mcp-cancel-btn small"><span>Cancel</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- XAI (Grok) Provider -->
+            <div class="mcp-provider" data-provider="xai" role="listitem">
+              <div class="mcp-provider-header" tabindex="0" role="button" aria-expanded="false">
+                <div class="mcp-provider-info">
+                  <div class="mcp-provider-icon xai">
+                    <i data-lucide="zap" class="lucide-sm"></i>
+                  </div>
+                  <div class="mcp-provider-details">
+                    <span class="mcp-provider-name">XAI (Grok)</span>
+                    <span class="mcp-provider-desc">Grok models from X.AI</span>
+                  </div>
+                </div>
+                <div class="mcp-provider-status">
+                  <span class="mcp-status-badge unconfigured">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Not configured</span>
+                  </span>
+                </div>
+              </div>
+              <div class="mcp-provider-config" hidden>
+                <div class="mcp-input-group">
+                  <label for="xai-key" class="visually-hidden">XAI API Key</label>
+                  <div class="mcp-key-input-wrapper">
+                    <input
+                      type="password"
+                      id="xai-key"
+                      class="mcp-key-input"
+                      data-provider="xai"
+                      placeholder="xai-..."
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <button type="button" class="mcp-toggle-visibility" aria-label="Show API key" title="Show/hide key">
+                      <i data-lucide="eye" class="lucide-sm"></i>
+                    </button>
+                  </div>
+                  <button type="button" class="mcp-test-btn" title="Test connection">
+                    <i data-lucide="zap" class="lucide-sm"></i>
+                    <span>Test</span>
+                  </button>
+                </div>
+                <div class="mcp-key-actions">
+                  <button type="button" class="mcp-save-btn primary small">
+                    <i data-lucide="check" class="lucide-sm"></i> <span>Save</span>
+                  </button>
+                  <button type="button" class="mcp-cancel-btn small"><span>Cancel</span></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- DIAL Provider -->
+            <div class="mcp-provider" data-provider="dial" role="listitem">
+              <div class="mcp-provider-header" tabindex="0" role="button" aria-expanded="false">
+                <div class="mcp-provider-info">
+                  <div class="mcp-provider-icon dial">
+                    <i data-lucide="plug" class="lucide-sm"></i>
+                  </div>
+                  <div class="mcp-provider-details">
+                    <span class="mcp-provider-name">DIAL</span>
+                    <span class="mcp-provider-desc">Vendor-agnostic AI access via DIAL</span>
+                  </div>
+                </div>
+                <div class="mcp-provider-status">
+                  <span class="mcp-status-badge unconfigured">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Not configured</span>
+                  </span>
+                </div>
+              </div>
+              <div class="mcp-provider-config" hidden>
+                <div class="mcp-input-group">
+                  <label for="dial-key" class="visually-hidden">DIAL API Key</label>
+                  <div class="mcp-key-input-wrapper">
+                    <input
+                      type="password"
+                      id="dial-key"
+                      class="mcp-key-input"
+                      data-provider="dial"
+                      placeholder="Your DIAL key..."
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                    <button type="button" class="mcp-toggle-visibility" aria-label="Show API key" title="Show/hide key">
+                      <i data-lucide="eye" class="lucide-sm"></i>
+                    </button>
+                  </div>
+                  <button type="button" class="mcp-test-btn" title="Test connection">
+                    <i data-lucide="zap" class="lucide-sm"></i>
+                    <span>Test</span>
+                  </button>
+                </div>
+                <div class="mcp-key-actions">
+                  <button type="button" class="mcp-save-btn primary small">
+                    <i data-lucide="check" class="lucide-sm"></i> <span>Save</span>
+                  </button>
+                  <button type="button" class="mcp-cancel-btn small"><span>Cancel</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Help Link -->
+          <div class="mcp-help">
+            <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">
+              <i data-lucide="external-link" class="lucide-sm"></i>
+              <span>Get API keys</span>
+            </a>
+          </div>
+        </div>
+      </div>
+      <!-- End Zen MCP Configuration Panel -->
 
     </div>
 
@@ -782,6 +1128,17 @@
       <span class="text-minimal"></span>
     </div>
 
+    <div class="status-divider">│</div>
+
+    <!-- Zen MCP Status -->
+    <div class="status-segment clickable zen-mcp unconfigured" id="zen-mcp-status" onclick="document.getElementById('mcp-panel-toggle').click()" title="Click to configure AI providers">
+      <i data-lucide="brain-circuit" class="status-icon"></i>
+      <span class="zen-mcp-count">0</span>
+      <span class="text-full">AI providers</span>
+      <span class="text-short">AI</span>
+      <span class="text-minimal"></span>
+    </div>
+
     <div class="status-spacer"></div>
 
     <!-- Update Available Notification -->
@@ -826,6 +1183,9 @@
 
   <!-- Application JavaScript (ES6 Module) -->
   <script type="module" src="/js/main.js?v=8"></script>
+
+  <!-- MCP Configuration -->
+  <script src="/js/mcp-config.js"></script>
 
   <!-- Preload modal templates -->
   <script>
