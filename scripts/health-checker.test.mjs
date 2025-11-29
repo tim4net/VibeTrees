@@ -16,7 +16,8 @@ describe('HealthChecker', () => {
 
     mockRuntime = {
       runtime: 'docker',
-      needsSudo: false
+      needsSudo: false,
+      exec: vi.fn((cmd, opts) => execSync(`docker ${cmd}`, opts))
     };
 
     checker = new HealthChecker({

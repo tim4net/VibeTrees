@@ -7,7 +7,7 @@ import { parentPort } from 'worker_threads';
 import { execSync } from 'child_process';
 import { basename } from 'path';
 
-parentPort.on('message', ({ portRegistry, rootDir }) => {
+parentPort.on('message', ({ portRegistry, rootDir, runtimeInfo }) => {
   try {
     const output = execSync('git worktree list --porcelain', {
       encoding: 'utf-8',
@@ -25,7 +25,7 @@ parentPort.on('message', ({ portRegistry, rootDir }) => {
         current.branch = line.substring('branch '.length).replace('refs/heads/', '');
       } else if (line === '') {
         if (current.path) {
-          processWorktree(current, portRegistry, rootDir);
+          processWorktree(current, portRegistry, rootDir, runtimeInfo);
           worktrees.push(current);
           current = {};
         }
@@ -33,7 +33,7 @@ parentPort.on('message', ({ portRegistry, rootDir }) => {
     }
 
     if (current.path) {
-      processWorktree(current, portRegistry, rootDir);
+      processWorktree(current, portRegistry, rootDir, runtimeInfo);
       worktrees.push(current);
     }
 
@@ -43,14 +43,14 @@ parentPort.on('message', ({ portRegistry, rootDir }) => {
   }
 });
 
-function processWorktree(worktree, portRegistry, rootDir) {
+function processWorktree(worktree, portRegistry, rootDir, runtimeInfo) {
   // Use 'main' for root worktree or main branch, otherwise use directory name
   const isRootWorktree = !worktree.path.includes('.worktrees');
   worktree.name = (isRootWorktree || worktree.branch === 'main') ? 'main' : basename(worktree.path);
   worktree.ports = portRegistry[worktree.name] || {};
 
-  // Get Docker status
-  worktree.dockerStatus = getDockerStatus(worktree.path, worktree.name);
+  // Get Docker/Podman status
+  worktree.dockerStatus = getDockerStatus(worktree.path, worktree.name, runtimeInfo);
 
   // Extract ports from running containers if registry is empty
   if (Object.keys(worktree.ports).length === 0 && worktree.dockerStatus.length > 0) {
@@ -73,57 +73,82 @@ function processWorktree(worktree, portRegistry, rootDir) {
   worktree.lastCommit = getLastCommit(worktree.path);
 }
 
-function getDockerStatus(path, name) {
+function getDockerStatus(path, name, runtimeInfo = {}) {
   try {
     // Use label-based filtering to find containers by working directory
     // This works even if COMPOSE_PROJECT_NAME has changed since containers were started
-    // Try with sudo first (most common setup), fall back to non-sudo
+    const runtime = runtimeInfo.runtime || 'docker';
+    const needsSudo = runtimeInfo.needsSudo ?? false;
+
+    // Build the command based on detected runtime
+    const baseCmd = `${runtime} ps -a --filter "label=com.docker.compose.project.working_dir=${path}" --format json`;
+    const cmd = needsSudo ? `sudo ${baseCmd}` : baseCmd;
+
     let output;
     try {
-      output = execSync(`sudo docker ps -a --filter "label=com.docker.compose.project.working_dir=${path}" --format json 2>/dev/null`, {
+      output = execSync(`${cmd} 2>/dev/null`, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
     } catch {
-      // Try without sudo
-      output = execSync(`docker ps -a --filter "label=com.docker.compose.project.working_dir=${path}" --format json 2>/dev/null`, {
+      // Fallback: try without sudo if sudo failed, or with sudo if non-sudo failed
+      const fallbackCmd = needsSudo ? baseCmd : `sudo ${baseCmd}`;
+      output = execSync(`${fallbackCmd} 2>/dev/null`, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
     }
 
-    const containers = output.trim().split('\n')
-      .filter(line => line.trim())
-      .map(line => JSON.parse(line))
-      .filter(c => c.Names); // Basic filter - check Names exists
+    // Parse JSON - handle both Docker (newline-delimited) and Podman (single array) formats
+    const trimmed = output.trim();
+    let containers;
+    if (trimmed.startsWith('[')) {
+      // Podman returns a JSON array
+      containers = JSON.parse(trimmed);
+    } else {
+      // Docker returns newline-delimited JSON objects
+      containers = trimmed.split('\n')
+        .filter(line => line.trim())
+        .map(line => JSON.parse(line));
+    }
+    containers = containers.filter(c => c.Names); // Basic filter - check Names exists
 
     // Map containers to service objects with extracted service names
     const mapped = containers
       .map(c => {
-        // Extract service name from Labels string (Docker returns labels as comma-separated string)
+        // Extract service name from Labels
         let serviceName = null;
 
-        if (c.Labels && typeof c.Labels === 'string') {
-          const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
-          serviceName = serviceMatch ? serviceMatch[1] : null;
+        if (c.Labels) {
+          if (typeof c.Labels === 'string') {
+            // Docker returns labels as comma-separated string
+            const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
+            serviceName = serviceMatch ? serviceMatch[1] : null;
+          } else if (typeof c.Labels === 'object') {
+            // Podman returns labels as an object
+            serviceName = c.Labels['com.docker.compose.service'] || null;
+          }
         }
 
         // Fallback: parse from container name if label extraction failed
         if (!serviceName && c.Names) {
-          const parts = c.Names.split('-');
+          // Handle both string (Docker) and array (Podman) formats
+          const name = Array.isArray(c.Names) ? c.Names[0] : c.Names;
+          const parts = name.split('-');
           serviceName = parts.length > 1 ? parts.slice(0, -1).join('-') : parts[0];
         }
 
-        // Last resort: use container ID
+        // Last resort: use container ID (handle both ID and Id)
         if (!serviceName) {
-          serviceName = c.ID ? c.ID.substring(0, 12) : 'unknown';
+          const id = c.ID || c.Id;
+          serviceName = id ? id.substring(0, 12) : 'unknown';
         }
 
         return {
           name: serviceName,
           state: c.State || 'unknown',
           status: c.Status || '',
-          ports: c.Ports ? parseDockerPorts(c.Ports) : [],
+          ports: c.Ports ? parsePorts(c.Ports) : [],
           createdAt: c.CreatedAt || '' // Keep creation time for deduplication
         };
       })
@@ -164,29 +189,46 @@ function getDockerStatus(path, name) {
   }
 }
 
-function parseDockerPorts(portsString) {
-  if (!portsString) return [];
+function parsePorts(ports) {
+  if (!ports) return [];
 
-  // Parse Docker ports format: "0.0.0.0:5432->5432/tcp, :::5432->5432/tcp"
-  // Note: Docker returns both IPv4 and IPv6 bindings which we need to deduplicate
   const publishers = [];
   const seen = new Set(); // Track unique port mappings
-  const portMappings = portsString.split(',').map(p => p.trim());
 
-  for (const mapping of portMappings) {
-    const match = mapping.match(/(?:[\d.]+|:::)?:?(\d+)->(\d+)/);
-    if (match) {
-      const publishedPort = parseInt(match[1], 10);
-      const targetPort = parseInt(match[2], 10);
-      const key = `${publishedPort}->${targetPort}`;
+  // Handle Podman array format: [{host_port, container_port, ...}]
+  if (Array.isArray(ports)) {
+    for (const p of ports) {
+      if (p.host_port && p.container_port) {
+        const key = `${p.host_port}->${p.container_port}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          publishers.push({
+            PublishedPort: p.host_port,
+            TargetPort: p.container_port
+          });
+        }
+      }
+    }
+    return publishers;
+  }
 
-      // Only add if we haven't seen this port mapping before
-      if (!seen.has(key)) {
-        seen.add(key);
-        publishers.push({
-          PublishedPort: publishedPort,
-          TargetPort: targetPort
-        });
+  // Handle Docker string format: "0.0.0.0:5432->5432/tcp, :::5432->5432/tcp"
+  if (typeof ports === 'string') {
+    const portMappings = ports.split(',').map(p => p.trim());
+    for (const mapping of portMappings) {
+      const match = mapping.match(/(?:[\d.]+|:::)?:?(\d+)->(\d+)/);
+      if (match) {
+        const publishedPort = parseInt(match[1], 10);
+        const targetPort = parseInt(match[2], 10);
+        const key = `${publishedPort}->${targetPort}`;
+
+        if (!seen.has(key)) {
+          seen.add(key);
+          publishers.push({
+            PublishedPort: publishedPort,
+            TargetPort: targetPort
+          });
+        }
       }
     }
   }

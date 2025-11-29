@@ -460,6 +460,10 @@ function setupInstantTooltips() {
     btn.addEventListener('mouseleave', () => {
       tooltipDiv.style.display = 'none';
     });
+
+    btn.addEventListener('click', () => {
+      tooltipDiv.style.display = 'none';
+    });
   });
 }
 

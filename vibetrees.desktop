@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=VibeTrees
+Comment=Git worktree orchestration with AI agents
+Exec=/home/tim/apps/VibeTrees/scripts/vibetrees-app.sh
+Icon=/home/tim/apps/VibeTrees/scripts/worktree-web/public/favicon.svg
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+StartupWMClass=vibetrees
+Keywords=git;worktree;docker;ai;development;

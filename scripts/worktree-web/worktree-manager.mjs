@@ -409,7 +409,11 @@ export class WorktreeManager {
 
       worker.postMessage({
         portRegistry: portRegistryData,
-        rootDir: this.getProjectRoot()
+        rootDir: this.getProjectRoot(),
+        runtimeInfo: {
+          runtime: this.runtime.getRuntime(),
+          needsSudo: this.runtime.needsElevation()
+        }
       });
     });
   }
@@ -581,37 +585,67 @@ export class WorktreeManager {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
-      const containers = output.trim().split('\n')
-        .filter(line => line.trim())
-        .map(line => JSON.parse(line))
-        .filter(c => c.Names); // Basic filter - check Names exists
+      // Parse JSON - handle both Docker (newline-delimited) and Podman (single array) formats
+      const trimmed = output.trim();
+      let containers;
+      if (trimmed.startsWith('[')) {
+        // Podman returns a JSON array
+        containers = JSON.parse(trimmed);
+      } else {
+        // Docker returns newline-delimited JSON objects
+        containers = trimmed.split('\n')
+          .filter(line => line.trim())
+          .map(line => JSON.parse(line));
+      }
+      containers = containers.filter(c => c.Names); // Basic filter - check Names exists
 
       // Map containers to service objects with extracted service names
       const mapped = containers.map(c => {
-        // Extract service name from Labels string (Docker returns labels as comma-separated string)
+        // Extract service name from Labels
         let serviceName = null;
 
-        if (c.Labels && typeof c.Labels === 'string') {
-          const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
-          serviceName = serviceMatch ? serviceMatch[1] : null;
+        if (c.Labels) {
+          if (typeof c.Labels === 'string') {
+            // Docker returns labels as comma-separated string
+            const serviceMatch = c.Labels.match(/com\.docker\.compose\.service=([^,]+)/);
+            serviceName = serviceMatch ? serviceMatch[1] : null;
+          } else if (typeof c.Labels === 'object') {
+            // Podman returns labels as an object
+            serviceName = c.Labels['com.docker.compose.service'] || null;
+          }
         }
 
         // Fallback: parse from container name if label extraction failed
         if (!serviceName && c.Names) {
-          const parts = c.Names.split('-');
+          // Handle both string (Docker) and array (Podman) formats
+          const name = Array.isArray(c.Names) ? c.Names[0] : c.Names;
+          const parts = name.split('-');
           serviceName = parts.length > 1 ? parts.slice(0, -1).join('-') : parts[0];
         }
 
-        // Last resort: use container ID
+        // Last resort: use container ID (handle both ID and Id)
         if (!serviceName) {
-          serviceName = c.ID ? c.ID.substring(0, 12) : 'unknown';
+          const id = c.ID || c.Id;
+          serviceName = id ? id.substring(0, 12) : 'unknown';
+        }
+
+        // Parse ports - handle both Docker string and Podman array formats
+        let ports = [];
+        if (c.Ports) {
+          if (Array.isArray(c.Ports)) {
+            // Podman format: [{host_port, container_port, ...}]
+            ports = c.Ports.filter(p => p.host_port).map(p => `${p.host_port}:${p.container_port}`);
+          } else if (typeof c.Ports === 'string') {
+            // Docker format: "0.0.0.0:5432->5432/tcp"
+            ports = c.Ports.split(',').map(p => p.trim());
+          }
         }
 
         return {
           name: serviceName,
           state: c.State || 'unknown',
           status: c.Status || '',
-          ports: c.Ports ? c.Ports.split(',').map(p => p.trim()) : [],
+          ports,
           createdAt: c.CreatedAt || '' // Keep creation time for deduplication
         };
       }).filter(c => !c.name.includes('init')); // Filter out init containers

@@ -46,17 +46,15 @@ export class HealthChecker {
         timeout: 5000
       }).trim();
 
-      // Check if daemon is running (Docker only)
-      if (this.runtime.runtime === 'docker') {
-        try {
-          execSync('docker info', { encoding: 'utf8', timeout: 5000 });
-        } catch (error) {
-          return {
-            status: 'unhealthy',
-            message: 'Docker daemon is not running',
-            version
-          };
-        }
+      // Check if daemon is running
+      try {
+        execSync(`${this.runtime.runtime} info`, { encoding: 'utf8', timeout: 5000 });
+      } catch (error) {
+        return {
+          status: 'unhealthy',
+          message: `${this.runtime.runtime} daemon is not running`,
+          version
+        };
       }
 
       return {
@@ -186,15 +184,11 @@ export class HealthChecker {
         };
       }
 
-      // List running containers
-      const cmd = this.runtime.runtime === 'docker'
-        ? 'docker ps --format "{{.Names}}" --filter "label=vibe.worktree"'
-        : 'podman ps --format "{{.Names}}" --filter "label=vibe.worktree"';
-
-      const output = execSync(cmd, {
+      // List running containers using the runtime abstraction
+      const output = this.runtime.exec('ps --format "{{.Names}}" --filter "label=vibe.worktree"', {
         encoding: 'utf8',
         timeout: 5000
-      }).trim();
+      }).toString().trim();
 
       const containers = output ? output.split('\n').filter(Boolean) : [];
 
