@@ -174,7 +174,7 @@ class MCPConfigPanel {
 
         Object.entries(providers).forEach(([provider, config]) => {
           this.state.configs[provider] = {
-            configured: config.enabled && config.apiKey,
+            configured: Boolean(config.enabled && config.apiKey),
             apiKey: config.apiKey,
             error: null
           };
