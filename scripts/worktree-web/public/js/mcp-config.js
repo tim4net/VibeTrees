@@ -592,9 +592,8 @@ class MCPConfigPanel {
       statusBarSegment.classList.remove('unconfigured', 'partial', 'configured');
       if (configuredCount === 0) {
         statusBarSegment.classList.add('unconfigured');
-      } else if (configuredCount < totalCount) {
-        statusBarSegment.classList.add('partial');
       } else {
+        // Show green when any provider is configured (system is functional)
         statusBarSegment.classList.add('configured');
       }
     }
