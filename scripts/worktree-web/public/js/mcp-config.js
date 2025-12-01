@@ -555,7 +555,7 @@ class MCPConfigPanel {
     const statusText = this.statusSummary.querySelector('.mcp-status-text');
 
     if (statusText) {
-      // Show "X configured" instead of "X/Y configured"
+      // Show "X configured" - version will be added by updatePanelVersion
       if (configuredCount === 0) {
         statusText.textContent = 'No providers configured';
       } else if (configuredCount === 1) {
@@ -565,14 +565,13 @@ class MCPConfigPanel {
       }
     }
 
-    // Update status dot color
+    // Update status dot color - GREEN when any provider configured
     if (statusDot) {
       statusDot.classList.remove('unconfigured', 'partial', 'configured');
       if (configuredCount === 0) {
         statusDot.classList.add('unconfigured');
-      } else if (configuredCount < totalCount) {
-        statusDot.classList.add('partial');
       } else {
+        // Show green when any provider is configured
         statusDot.classList.add('configured');
       }
     }
@@ -583,29 +582,18 @@ class MCPConfigPanel {
       const zenMcpCount = statusBarSegment.querySelector('.zen-mcp-count');
       const fullText = statusBarSegment.querySelector('.text-full');
 
-      // Set version as count initially (will be updated by updateServerStatus)
+      // Hide count in status bar (just show "Zen MCP")
       if (zenMcpCount) {
-        zenMcpCount.textContent = configuredCount.toString();
+        zenMcpCount.textContent = '';
+        zenMcpCount.style.display = 'none';
       }
 
-      // Update full text to be grammatically correct
+      // Status bar just shows "Zen MCP"
       if (fullText) {
-        if (configuredCount === 1) {
-          fullText.textContent = 'AI provider';
-        } else {
-          fullText.textContent = 'AI providers';
-        }
+        fullText.textContent = 'Zen MCP';
       }
 
-      // Update status bar segment color - MUST show green when any provider configured
-      statusBarSegment.classList.remove('unconfigured', 'partial', 'configured');
-      if (configuredCount === 0) {
-        statusBarSegment.classList.add('unconfigured');
-      } else {
-        statusBarSegment.classList.add('configured');
-      }
-
-      // Fetch and display version asynchronously
+      // Fetch server status and update color based on running state
       this.updateServerStatus(statusBarSegment).catch(err => {
         console.error('[MCPConfigPanel] Error updating server status:', err);
       });
@@ -665,7 +653,7 @@ class MCPConfigPanel {
   }
 
   /**
-   * Update server status in the status bar
+   * Update server status in the status bar and panel
    * @param {HTMLElement} statusBarSegment - Status bar element
    */
   async updateServerStatus(statusBarSegment) {
@@ -676,18 +664,33 @@ class MCPConfigPanel {
       const response = await fetch('/api/zen-mcp/status');
       const data = await response.json();
 
-      if (data.success && data.server) {
+      if (data.success) {
         tooltip = this.buildStatusTooltip(data, configuredCount);
 
-        // Update status bar count to show version number
-        const zenMcpCount = statusBarSegment.querySelector('.zen-mcp-count');
-        if (zenMcpCount && data.version?.installed) {
-          zenMcpCount.textContent = `v${data.version.installed}`;
-          zenMcpCount.style.fontSize = '0.75rem'; // Smaller font for version
+        // Update status bar color based on server running status
+        statusBarSegment.classList.remove('unconfigured', 'partial', 'configured');
+        if (data.server?.running) {
+          statusBarSegment.classList.add('configured'); // Green when server running
+        } else {
+          statusBarSegment.classList.add('unconfigured'); // Gray when not running
+        }
+
+        // Add version to panel summary text
+        if (this.statusSummary && data.version?.installed) {
+          const statusText = this.statusSummary.querySelector('.mcp-status-text');
+          if (statusText && configuredCount > 0) {
+            const baseText = configuredCount === 1
+              ? '1 provider configured'
+              : `${configuredCount} providers configured`;
+            statusText.textContent = `${baseText} • v${data.version.installed}`;
+          }
         }
       }
     } catch (error) {
       console.error('[MCPConfigPanel] Failed to fetch server status:', error);
+      // On error, show gray (unconfigured state)
+      statusBarSegment.classList.remove('unconfigured', 'partial', 'configured');
+      statusBarSegment.classList.add('unconfigured');
     }
 
     statusBarSegment.title = tooltip;
