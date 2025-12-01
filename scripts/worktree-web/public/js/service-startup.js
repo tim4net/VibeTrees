@@ -74,6 +74,10 @@ export async function showServiceStartupModal(worktreeName, ports) {
         window.refreshWorktrees();
       }
 
+      // Auto-close modal after a brief delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      window.hideServiceStartupModal();
+
     } else {
       // Error - show error state
       header.textContent = 'Failed to start services';
