@@ -143,13 +143,55 @@ export class ZenMcpFacade {
   }
 
   /**
+   * Check if zen-mcp-server processes are running
+   * @returns {Object} { running: boolean, processCount: number, processes: Array }
+   */
+  checkServerProcesses() {
+    try {
+      const { execSync } = require('child_process');
+      // Look for zen-mcp-server processes - they run as Python with server.py
+      const output = execSync('ps aux', { encoding: 'utf8' });
+
+      // Filter for zen-mcp-server processes
+      const lines = output.split('\n').filter(line =>
+        line.includes('zen-mcp-server') && !line.includes('grep')
+      );
+
+      return {
+        running: lines.length > 0,
+        processCount: lines.length,
+        processes: lines.map(line => {
+          const parts = line.trim().split(/\s+/);
+          return {
+            pid: parts[1],
+            cpu: parts[2],
+            mem: parts[3],
+            command: parts.slice(10).join(' ')
+          };
+        })
+      };
+    } catch (error) {
+      // Error getting process list
+      console.error('Error checking zen-mcp-server processes:', error.message);
+      return {
+        running: false,
+        processCount: 0,
+        processes: []
+      };
+    }
+  }
+
+  /**
    * Get full system status
-   * Combines installation status, configuration status, and provider config
-   * @returns {Promise<Object>} Status object with ready, pythonVersion, uvxPath, configured, providers
+   * Combines installation status, configuration status, provider config, and running processes
+   * @returns {Promise<Object>} Status object with ready, pythonVersion, uvxPath, configured, providers, server
    */
   async getStatus() {
     // Check uvx/Python availability
     const installResult = await this.ensureReady();
+
+    // Check if server processes are running
+    const serverStatus = this.checkServerProcesses();
 
     // Combine all status info
     return {
@@ -164,7 +206,8 @@ export class ZenMcpFacade {
       supportedProviders: SUPPORTED_PROVIDERS.map(key => ({
         key,
         ...PROVIDERS[key]
-      }))
+      })),
+      server: serverStatus
     };
   }
 

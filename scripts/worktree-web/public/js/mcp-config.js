@@ -596,6 +596,9 @@ class MCPConfigPanel {
         // Show green when any provider is configured (system is functional)
         statusBarSegment.classList.add('configured');
       }
+
+      // Check server status asynchronously
+      this.updateServerStatus(statusBarSegment);
     }
 
     // Update toggle icon if all configured
@@ -604,6 +607,36 @@ class MCPConfigPanel {
       if (icon) {
         icon.textContent = '✓';
       }
+    }
+  }
+
+  /**
+   * Update server status in the status bar
+   * @param {HTMLElement} statusBarSegment - Status bar element
+   */
+  async updateServerStatus(statusBarSegment) {
+    try {
+      const response = await fetch('/api/zen-mcp/status');
+      const data = await response.json();
+
+      if (data.success && data.server) {
+        const { running, processCount } = data.server;
+
+        // Update tooltip to show server status
+        const configuredCount = Object.values(this.config.providers || {})
+          .filter(p => p.enabled).length;
+
+        let tooltip = `${configuredCount} AI provider${configuredCount !== 1 ? 's' : ''} configured`;
+        if (running) {
+          tooltip += `\nServer: ${processCount} process${processCount !== 1 ? 'es' : ''} running`;
+        } else {
+          tooltip += '\nServer: Not running (will start with Claude Code)';
+        }
+
+        statusBarSegment.setAttribute('title', tooltip);
+      }
+    } catch (error) {
+      console.error('Failed to fetch server status:', error);
     }
   }
 
