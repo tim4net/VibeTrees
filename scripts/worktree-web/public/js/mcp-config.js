@@ -583,6 +583,7 @@ class MCPConfigPanel {
       const zenMcpCount = statusBarSegment.querySelector('.zen-mcp-count');
       const fullText = statusBarSegment.querySelector('.text-full');
 
+      // Set version as count initially (will be updated by updateServerStatus)
       if (zenMcpCount) {
         zenMcpCount.textContent = configuredCount.toString();
       }
@@ -596,16 +597,15 @@ class MCPConfigPanel {
         }
       }
 
-      // Update status bar segment color
+      // Update status bar segment color - MUST show green when any provider configured
       statusBarSegment.classList.remove('unconfigured', 'partial', 'configured');
       if (configuredCount === 0) {
         statusBarSegment.classList.add('unconfigured');
       } else {
-        // Show green when any provider is configured (system is functional)
         statusBarSegment.classList.add('configured');
       }
 
-      // Check server status asynchronously (don't await to avoid blocking)
+      // Fetch and display version asynchronously
       this.updateServerStatus(statusBarSegment).catch(err => {
         console.error('[MCPConfigPanel] Error updating server status:', err);
       });
@@ -678,6 +678,13 @@ class MCPConfigPanel {
 
       if (data.success && data.server) {
         tooltip = this.buildStatusTooltip(data, configuredCount);
+
+        // Update status bar count to show version number
+        const zenMcpCount = statusBarSegment.querySelector('.zen-mcp-count');
+        if (zenMcpCount && data.version?.installed) {
+          zenMcpCount.textContent = `v${data.version.installed}`;
+          zenMcpCount.style.fontSize = '0.75rem'; // Smaller font for version
+        }
       }
     } catch (error) {
       console.error('[MCPConfigPanel] Failed to fetch server status:', error);

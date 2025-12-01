@@ -15,6 +15,8 @@
  *   const status = await facade.getStatus();  // Get full status
  */
 
+import { execSync } from 'child_process';
+import { homedir } from 'os';
 import { ZenMcpConfig, PROVIDERS, SUPPORTED_PROVIDERS } from './zen-mcp-config.mjs';
 import { ZenMcpInstaller } from './zen-mcp-installer.mjs';
 import { ZenMcpConnection } from './zen-mcp-connection.mjs';
@@ -148,13 +150,18 @@ export class ZenMcpFacade {
    */
   async getVersionInfo() {
     try {
-      const { execSync } = require('child_process');
-
       // Try to get installed version from pyproject.toml
       let installedVersion = null;
       try {
-        const homedir = require('os').homedir();
-        const pyproject = execSync(`find ${homedir}/.local -name "pyproject.toml" -path "*/zen-mcp-server/*" -exec grep "version = " {} \\; 2>/dev/null | head -1`, {
+        const home = homedir();
+        // Check common locations: ~/.local (uvx), ~/apps, current directory parents
+        const searchPaths = [
+          `${home}/.local`,
+          `${home}/apps`,
+          process.cwd()
+        ].join(' ');
+
+        const pyproject = execSync(`find ${searchPaths} -name "pyproject.toml" -path "*/zen-mcp-server/*" -exec grep "version = " {} \\; 2>/dev/null | head -1`, {
           encoding: 'utf8',
           timeout: 5000
         }).trim();
@@ -202,7 +209,6 @@ export class ZenMcpFacade {
    */
   checkServerProcesses() {
     try {
-      const { execSync } = require('child_process');
       // Look for zen-mcp-server processes - they run as Python with server.py
       const output = execSync('ps aux', { encoding: 'utf8' });
 
