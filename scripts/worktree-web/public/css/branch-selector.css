@@ -210,3 +210,71 @@
 .branch-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Branch list header with refresh button */
+.branch-list-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+  padding: 0 0.5rem;
+}
+
+.branch-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 6px;
+  color: rgba(52, 211, 153, 1);
+  font-size: 0.813rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.branch-refresh-btn:hover:not(:disabled) {
+  background: rgba(52, 211, 153, 0.15);
+  border-color: rgba(52, 211, 153, 0.5);
+  transform: translateY(-1px);
+}
+
+.branch-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.branch-refresh-btn .spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Loading state */
+.branch-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(52, 211, 153, 0.2);
+  border-top-color: rgba(52, 211, 153, 1);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

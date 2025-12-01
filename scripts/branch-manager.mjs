@@ -10,13 +10,17 @@ import { execSync } from 'child_process';
 export class BranchManager {
   /**
    * @param {string} repoPath - Path to git repository
+   * @param {Object} options - Configuration options
+   * @param {string} options.remoteName - Remote name (default: 'origin')
    */
-  constructor(repoPath) {
+  constructor(repoPath, options = {}) {
     this.repoPath = repoPath;
+    this.remoteName = options.remoteName || 'origin';
   }
 
   /**
-   * List all available branches with metadata and availability status
+   * List all available branches with metadata and availability status.
+   * Uses cached remote-tracking branches - call refreshFromRemote() first for current remote state.
    * @returns {Promise<Object>} { local: [...], remote: [...] }
    */
   async listAvailableBranches() {
@@ -44,8 +48,8 @@ export class BranchManager {
       };
     });
 
-    // List remote branches
-    const remoteBranches = this.getRemoteBranches();
+    // List remote branches from cache
+    const remoteBranches = this.getCachedRemoteBranches();
     const remote = remoteBranches.map(branch => {
       const localTracking = this.findLocalTrackingBranch(branch.name, localBranches);
       const isTracked = localTracking !== null;
@@ -63,6 +67,24 @@ export class BranchManager {
     });
 
     return { local, remote };
+  }
+
+  /**
+   * Updates local cache from remote.
+   * Explicit side effect - call when you need fresh data from GitHub.
+   * @returns {Promise<void>}
+   */
+  async refreshFromRemote() {
+    try {
+      execSync(`git fetch ${this.remoteName} --prune`, {
+        cwd: this.repoPath,
+        encoding: 'utf-8',
+        stdio: 'pipe'
+      });
+    } catch (error) {
+      console.error('Failed to fetch from remote:', error.message);
+      throw new Error(`Failed to refresh branches from ${this.remoteName}`);
+    }
   }
 
   /**
@@ -129,10 +151,11 @@ export class BranchManager {
   }
 
   /**
-   * Get all remote branches
+   * Get cached remote-tracking branches (from last fetch).
+   * Does not query remote - uses local cache only.
    * @private
    */
-  getRemoteBranches() {
+  getCachedRemoteBranches() {
     try {
       const output = execSync('git branch -r --format="%(refname:short)"', {
         cwd: this.repoPath,
@@ -142,10 +165,19 @@ export class BranchManager {
       return output
         .split('\n')
         .filter(Boolean)
-        .filter(name => !name.includes('HEAD'))
-        .map(name => ({ name: name.trim() }));
+        .map(name => name.trim())
+        .filter(name => {
+          // Filter out HEAD references and invalid entries
+          if (name.includes('HEAD')) return false;
+          // Filter out entries that are just the remote name (e.g., "origin" without a branch)
+          if (name === this.remoteName) return false;
+          // Ensure it has a slash (remote/branch format)
+          if (!name.includes('/')) return false;
+          return true;
+        })
+        .map(name => ({ name }));
     } catch (error) {
-      console.error('Failed to list remote branches:', error.message);
+      console.error('Failed to list cached remote branches:', error.message);
       return [];
     }
   }

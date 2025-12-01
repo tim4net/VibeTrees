@@ -41,14 +41,33 @@ class BranchSelector {
 
   /**
    * Load branches from API
+   * @param {boolean} refresh - If true, fetches latest from remote (slower)
    */
-  async load() {
+  async load(refresh = true) {
     try {
-      const response = await fetch('/api/branches');
+      // Show loading state
+      if (this.container) {
+        this.container.innerHTML = `
+          <div class="branch-loading">
+            <div class="loading-spinner"></div>
+            <div>${refresh ? 'Fetching latest branches from GitHub...' : 'Loading branches...'}</div>
+          </div>
+        `;
+      }
+
+      const url = refresh ? '/api/branches?refresh=true' : '/api/branches';
+      console.log('[BranchSelector] Fetching from:', url);
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch branches');
       }
       this.branches = await response.json();
+      console.log('[BranchSelector] Received data:', {
+        hasLocal: Array.isArray(this.branches.local),
+        hasRemote: Array.isArray(this.branches.remote),
+        localCount: this.branches.local?.length || 0,
+        remoteCount: this.branches.remote?.length || 0
+      });
       this.render();
     } catch (error) {
       console.error('Error loading branches:', error);
@@ -62,18 +81,45 @@ class BranchSelector {
   render() {
     if (!this.container) return;
 
-    const filteredLocal = this.filterBranches(this.branches.local);
-    const filteredRemote = this.filterBranches(this.branches.remote);
+    // Ensure branches arrays exist
+    const localBranches = this.branches?.local || [];
+    const remoteBranches = this.branches?.remote || [];
+
+    console.log('[BranchSelector] Rendering:', {
+      localCount: localBranches.length,
+      remoteCount: remoteBranches.length,
+      searchTerm: this.searchTerm
+    });
+
+    const filteredLocal = this.filterBranches(localBranches);
+    const filteredRemote = this.filterBranches(remoteBranches);
+
+    console.log('[BranchSelector] After filtering:', {
+      filteredLocal: filteredLocal.length,
+      filteredRemote: filteredRemote.length
+    });
 
     this.container.innerHTML = `
+      <div class="branch-list-header">
+        <button type="button" class="branch-refresh-btn" id="branch-refresh-btn" title="Fetch latest branches from GitHub">
+          <i data-lucide="refresh-cw" class="lucide-sm"></i>
+          Refresh from GitHub
+        </button>
+      </div>
       <div class="branch-list">
-        ${this.renderSection('Local Branches', filteredLocal, this.branches.local.length)}
-        ${this.renderSection('Remote Branches', filteredRemote, this.branches.remote.length)}
+        ${this.renderSection('Local Branches', filteredLocal, localBranches.length)}
+        ${this.renderSection('Remote Branches', filteredRemote, remoteBranches.length)}
       </div>
     `;
 
     // Attach click handlers
     this.attachClickHandlers();
+    this.attachRefreshHandler();
+
+    // Initialize Lucide icons
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
   }
 
   /**
@@ -220,6 +266,27 @@ class BranchSelector {
         this.selectBranch(branchName, branchType);
       });
     });
+  }
+
+  /**
+   * Attach refresh button handler
+   */
+  attachRefreshHandler() {
+    const refreshBtn = document.getElementById('branch-refresh-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async () => {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i data-lucide="loader-2" class="lucide-sm spinning"></i> Refreshing...';
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+
+        await this.load(true);
+
+        // Re-enable button after load completes
+        // Note: load() will re-render, so we don't need to re-enable manually
+      });
+    }
   }
 
   /**

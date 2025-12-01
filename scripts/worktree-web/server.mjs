@@ -814,9 +814,17 @@ function createApp() {
   });
 
   // List all available branches (Phase 2.7)
+  // Query param: ?refresh=true to fetch latest from remote
   app.get('/api/branches', async (req, res) => {
     try {
-      const branchManager = new BranchManager(process.cwd());
+      const branchManager = new BranchManager(rootDir);
+
+      // If refresh=true, fetch latest branches from remote first
+      const shouldRefresh = req.query.refresh === 'true';
+      if (shouldRefresh) {
+        await branchManager.refreshFromRemote();
+      }
+
       const branches = await branchManager.listAvailableBranches();
       res.json(branches);
     } catch (error) {
