@@ -621,17 +621,35 @@ class MCPConfigPanel {
 
       if (data.success && data.server) {
         const { running, processCount } = data.server;
+        const version = data.version || {};
 
         // Update tooltip to show server status
         const configuredCount = Object.values(this.config.providers || {})
           .filter(p => p.enabled).length;
 
         let tooltip = `${configuredCount} AI provider${configuredCount !== 1 ? 's' : ''} configured`;
+
+        // Add server status
         if (running) {
           tooltip += `\nServer: ${processCount} process${processCount !== 1 ? 'es' : ''} running`;
         } else {
-          tooltip += '\nServer: Not running (will start with Claude Code)';
+          tooltip += '\nServer: Not running (starts with Claude Code)';
         }
+
+        // Add version info
+        if (version.installed) {
+          tooltip += `\nVersion: ${version.installed}`;
+          if (version.latest && !version.upToDate) {
+            tooltip += ` (${version.latest} available)`;
+          } else if (version.upToDate) {
+            tooltip += ' (up to date)';
+          }
+        } else if (version.latest) {
+          tooltip += `\nLatest version: ${version.latest}`;
+        }
+
+        // Add note about auto-update
+        tooltip += '\nuvx auto-updates on restart';
 
         statusBarSegment.setAttribute('title', tooltip);
       }

@@ -143,6 +143,60 @@ export class ZenMcpFacade {
   }
 
   /**
+   * Get zen-mcp-server version information
+   * @returns {Promise<Object>} { installed: string|null, latest: string|null, upToDate: boolean }
+   */
+  async getVersionInfo() {
+    try {
+      const { execSync } = require('child_process');
+
+      // Try to get installed version from pyproject.toml
+      let installedVersion = null;
+      try {
+        const homedir = require('os').homedir();
+        const pyproject = execSync(`find ${homedir}/.local -name "pyproject.toml" -path "*/zen-mcp-server/*" -exec grep "version = " {} \\; 2>/dev/null | head -1`, {
+          encoding: 'utf8',
+          timeout: 5000
+        }).trim();
+
+        const match = pyproject.match(/version\s*=\s*"([^"]+)"/);
+        if (match) {
+          installedVersion = match[1];
+        }
+      } catch (error) {
+        // Could not find installed version
+      }
+
+      // Get latest version from GitHub
+      let latestVersion = null;
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/BeehiveInnovations/zen-mcp-server/main/pyproject.toml');
+        if (response.ok) {
+          const text = await response.text();
+          const match = text.match(/version\s*=\s*"([^"]+)"/);
+          if (match) {
+            latestVersion = match[1];
+          }
+        }
+      } catch (error) {
+        // Could not fetch latest version
+      }
+
+      return {
+        installed: installedVersion,
+        latest: latestVersion,
+        upToDate: installedVersion && latestVersion && installedVersion === latestVersion
+      };
+    } catch (error) {
+      return {
+        installed: null,
+        latest: null,
+        upToDate: null
+      };
+    }
+  }
+
+  /**
    * Check if zen-mcp-server processes are running
    * @returns {Object} { running: boolean, processCount: number, processes: Array }
    */
@@ -183,8 +237,8 @@ export class ZenMcpFacade {
 
   /**
    * Get full system status
-   * Combines installation status, configuration status, provider config, and running processes
-   * @returns {Promise<Object>} Status object with ready, pythonVersion, uvxPath, configured, providers, server
+   * Combines installation status, configuration status, provider config, running processes, and version info
+   * @returns {Promise<Object>} Status object with ready, pythonVersion, uvxPath, configured, providers, server, version
    */
   async getStatus() {
     // Check uvx/Python availability
@@ -193,8 +247,11 @@ export class ZenMcpFacade {
     // Check if server processes are running
     const serverStatus = this.checkServerProcesses();
 
+    // Get version information (don't await to avoid blocking)
+    const versionPromise = this.getVersionInfo();
+
     // Combine all status info
-    return {
+    const status = {
       ready: installResult.success,
       uvxAvailable: installResult.success,
       uvxPath: installResult.uvxPath,
@@ -209,6 +266,15 @@ export class ZenMcpFacade {
       })),
       server: serverStatus
     };
+
+    // Add version info (wait for it)
+    try {
+      status.version = await versionPromise;
+    } catch (error) {
+      status.version = { installed: null, latest: null, upToDate: null };
+    }
+
+    return status;
   }
 
   /**
