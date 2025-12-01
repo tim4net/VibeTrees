@@ -534,12 +534,20 @@ class MCPConfigPanel {
   }
 
   /**
+   * Get count of configured providers
+   * @returns {number} Number of configured providers
+   */
+  getConfiguredProviderCount() {
+    return Object.values(this.state.configs || {}).filter(c => c.configured).length;
+  }
+
+  /**
    * Update status summary (X/6 configured) and status bar
    */
   updateStatusSummary() {
     if (!this.statusSummary) return;
 
-    const configuredCount = Object.values(this.state.configs).filter(c => c.configured).length;
+    const configuredCount = this.getConfiguredProviderCount();
     const totalCount = Object.keys(this.providers).length;
 
     // Update panel summary
@@ -613,68 +621,69 @@ class MCPConfigPanel {
   }
 
   /**
+   * Build status tooltip from server data
+   * @param {Object} serverData - Server status data
+   * @param {number} configuredCount - Number of configured providers
+   * @returns {string} Formatted tooltip text
+   */
+  buildStatusTooltip(serverData, configuredCount) {
+    const parts = [];
+
+    // Provider count
+    const providerText = configuredCount === 1 ? 'provider' : 'providers';
+    parts.push(`${configuredCount} AI ${providerText} configured`);
+
+    // Server status
+    if (serverData.server) {
+      const { running, processCount } = serverData.server;
+      if (running) {
+        const processText = processCount === 1 ? 'process' : 'processes';
+        parts.push(`Server: ${processCount} ${processText} running`);
+      } else {
+        parts.push('Server: Not running (starts with Claude Code)');
+      }
+    }
+
+    // Version info
+    const version = serverData.version || {};
+    if (version.installed) {
+      let versionText = `Version: ${version.installed}`;
+      if (version.latest && !version.upToDate) {
+        versionText += ` (${version.latest} available)`;
+      } else if (version.upToDate) {
+        versionText += ' (up to date)';
+      }
+      parts.push(versionText);
+    } else if (version.latest) {
+      parts.push(`Latest version: ${version.latest}`);
+    }
+
+    // Auto-update note
+    parts.push('uvx auto-updates on restart');
+
+    return parts.join('\n');
+  }
+
+  /**
    * Update server status in the status bar
    * @param {HTMLElement} statusBarSegment - Status bar element
    */
   async updateServerStatus(statusBarSegment) {
+    const configuredCount = this.getConfiguredProviderCount();
+    let tooltip = `${configuredCount} AI ${configuredCount === 1 ? 'provider' : 'providers'} configured\nClick to configure`;
+
     try {
-      console.log('[MCPConfigPanel] Fetching server status...');
       const response = await fetch('/api/zen-mcp/status');
       const data = await response.json();
 
-      console.log('[MCPConfigPanel] Server status received:', {
-        hasServer: !!data.server,
-        hasVersion: !!data.version,
-        running: data.server?.running,
-        processCount: data.server?.processCount,
-        installed: data.version?.installed,
-        latest: data.version?.latest
-      });
-
       if (data.success && data.server) {
-        const { running, processCount } = data.server;
-        const version = data.version || {};
-
-        // Update tooltip to show server status
-        const configuredCount = Object.values(this.state.configs || {})
-          .filter(c => c.configured).length;
-
-        let tooltip = `${configuredCount} AI provider${configuredCount !== 1 ? 's' : ''} configured`;
-
-        // Add server status
-        if (running) {
-          tooltip += `\nServer: ${processCount} process${processCount !== 1 ? 'es' : ''} running`;
-        } else {
-          tooltip += '\nServer: Not running (starts with Claude Code)';
-        }
-
-        // Add version info
-        if (version.installed) {
-          tooltip += `\nVersion: ${version.installed}`;
-          if (version.latest && !version.upToDate) {
-            tooltip += ` (${version.latest} available)`;
-          } else if (version.upToDate) {
-            tooltip += ' (up to date)';
-          }
-        } else if (version.latest) {
-          tooltip += `\nLatest version: ${version.latest}`;
-        }
-
-        // Add note about auto-update
-        tooltip += '\nuvx auto-updates on restart';
-
-        console.log('[MCPConfigPanel] Setting tooltip:', tooltip);
-        statusBarSegment.setAttribute('title', tooltip);
-        statusBarSegment.title = tooltip; // Set both ways to ensure it works
+        tooltip = this.buildStatusTooltip(data, configuredCount);
       }
     } catch (error) {
       console.error('[MCPConfigPanel] Failed to fetch server status:', error);
-      // Set a fallback tooltip on error
-      const configuredCount = Object.values(this.state.configs || {})
-        .filter(c => c.configured).length;
-      statusBarSegment.setAttribute('title',
-        `${configuredCount} AI provider${configuredCount !== 1 ? 's' : ''} configured\nClick to configure`);
     }
+
+    statusBarSegment.title = tooltip;
   }
 
   /**
