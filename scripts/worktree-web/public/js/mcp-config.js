@@ -597,8 +597,10 @@ class MCPConfigPanel {
         statusBarSegment.classList.add('configured');
       }
 
-      // Check server status asynchronously
-      this.updateServerStatus(statusBarSegment);
+      // Check server status asynchronously (don't await to avoid blocking)
+      this.updateServerStatus(statusBarSegment).catch(err => {
+        console.error('[MCPConfigPanel] Error updating server status:', err);
+      });
     }
 
     // Update toggle icon if all configured
@@ -616,16 +618,26 @@ class MCPConfigPanel {
    */
   async updateServerStatus(statusBarSegment) {
     try {
+      console.log('[MCPConfigPanel] Fetching server status...');
       const response = await fetch('/api/zen-mcp/status');
       const data = await response.json();
+
+      console.log('[MCPConfigPanel] Server status received:', {
+        hasServer: !!data.server,
+        hasVersion: !!data.version,
+        running: data.server?.running,
+        processCount: data.server?.processCount,
+        installed: data.version?.installed,
+        latest: data.version?.latest
+      });
 
       if (data.success && data.server) {
         const { running, processCount } = data.server;
         const version = data.version || {};
 
         // Update tooltip to show server status
-        const configuredCount = Object.values(this.config.providers || {})
-          .filter(p => p.enabled).length;
+        const configuredCount = Object.values(this.state.configs || {})
+          .filter(c => c.configured).length;
 
         let tooltip = `${configuredCount} AI provider${configuredCount !== 1 ? 's' : ''} configured`;
 
@@ -651,10 +663,17 @@ class MCPConfigPanel {
         // Add note about auto-update
         tooltip += '\nuvx auto-updates on restart';
 
+        console.log('[MCPConfigPanel] Setting tooltip:', tooltip);
         statusBarSegment.setAttribute('title', tooltip);
+        statusBarSegment.title = tooltip; // Set both ways to ensure it works
       }
     } catch (error) {
-      console.error('Failed to fetch server status:', error);
+      console.error('[MCPConfigPanel] Failed to fetch server status:', error);
+      // Set a fallback tooltip on error
+      const configuredCount = Object.values(this.state.configs || {})
+        .filter(c => c.configured).length;
+      statusBarSegment.setAttribute('title',
+        `${configuredCount} AI provider${configuredCount !== 1 ? 's' : ''} configured\nClick to configure`);
     }
   }
 
