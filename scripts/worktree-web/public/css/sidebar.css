@@ -107,10 +107,13 @@
 }
 
 .worktree-card.active {
-  background: linear-gradient(135deg, #1c2128 0%, #21262d 100%);
+  background: linear-gradient(135deg, #1a2332 0%, #1c2736 100%);
   border-color: #58a6ff;
   border-left-color: #58a6ff;
-  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(88, 166, 255, 0.3),
+    0 4px 16px rgba(88, 166, 255, 0.2),
+    inset 0 1px 0 rgba(88, 166, 255, 0.1);
 }
 
 /* Git Status Colors */
