@@ -34,12 +34,17 @@ export async function refreshWorktrees() {
     const worktrees = await response.json();
     console.log('[refreshWorktrees] Received worktrees:', worktrees.length, 'items');
 
+    // Mark loading as complete on first successful fetch
+    appState.isLoadingWorktrees = false;
+
     // Update state which triggers sidebar re-render via events
     appState.updateWorktrees(worktrees);
 
     console.log('[refreshWorktrees] State updated, sidebar will re-render');
   } catch (error) {
     console.error('[refreshWorktrees] Error:', error);
+    // Still mark loading as false on error so UI doesn't stay stuck
+    appState.isLoadingWorktrees = false;
   }
 }
 

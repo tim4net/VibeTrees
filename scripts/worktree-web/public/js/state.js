@@ -9,6 +9,7 @@ class AppState {
     this.selectedWorktreeId = null;
     this.sidebarCollapsed = this.loadSidebarState();
     this.worktrees = [];
+    this.isLoadingWorktrees = true; // Start in loading state
     this.tabs = new Map(); // tabId -> { worktree, command, isWebUI, isLogs, etc. }
     this.lastActiveTabPerWorktree = new Map(); // worktreeName -> tabId
 

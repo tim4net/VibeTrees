@@ -86,13 +86,24 @@ export function renderWorktrees() {
   if (!container) return;
 
   if (worktrees.length === 0) {
-    container.innerHTML = `
-      <div style="text-align: center; padding: 40px; color: #8b949e;">
-        <div style="font-size: 48px; margin-bottom: 16px;">🌲</div>
-        <h3>No worktrees yet</h3>
-        <p>Create your first worktree to get started</p>
-      </div>
-    `;
+    // Show loading state if still loading, otherwise show empty state
+    if (appState.isLoadingWorktrees) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #8b949e;">
+          <div style="font-size: 32px; margin-bottom: 16px;"><i data-lucide="loader-2" class="spin" style="width: 32px; height: 32px;"></i></div>
+          <p>Loading worktrees...</p>
+        </div>
+      `;
+      if (window.lucide) window.lucide.createIcons();
+    } else {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #8b949e;">
+          <div style="font-size: 48px; margin-bottom: 16px;">🌲</div>
+          <h3>No worktrees yet</h3>
+          <p>Create your first worktree to get started</p>
+        </div>
+      `;
+    }
     return;
   }
 
