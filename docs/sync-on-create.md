@@ -1,57 +1,24 @@
-# Sync-on-Create Feature
+# Git Sync
 
-Ensures you never create worktrees from stale 'main' branch.
+Worktree creation is never blocked. Create first, sync later if needed.
 
-## How It Works
+## How it works
 
-When creating a worktree from 'main':
+Click the sync button on any worktree card to pull remote changes. VibeTrees will:
+1. Fetch and merge from remote
+2. Try to auto-resolve conflicts
+3. Reinstall dependencies if package files changed
+4. Restart services if needed
 
-1. **Staleness Check**: Automatically checks if main is behind origin/main
-2. **User Prompt**: If behind, shows modal: "main is X commits behind. Sync first?"
-   - **Sync & Create**: Syncs main, then creates worktree
-   - **Create Anyway**: Creates worktree from current main (stale)
-   - **Cancel**: Aborts operation
-3. **Conflict Handling**: If sync has conflicts, tries AI auto-resolution
-4. **Creation**: Proceeds with worktree creation from fresh main
+## API
 
-## Safety Checks
-
-- **Uncommitted changes**: Blocks sync if main has uncommitted changes
-- **Conflict detection**: Returns detailed error if AI can't resolve conflicts
-- **Branch scope**: Only checks 'main' (feature branches not affected)
-
-## API Usage
-
-**Check and create:**
 ```bash
-POST /api/worktrees
-{ "branchName": "feature-xyz", "fromBranch": "main" }
+# Sync a worktree
+POST /api/worktrees/:name/sync
 
-# Returns 409 if sync needed:
-{
-  "needsSync": true,
-  "commitsBehind": 5,
-  "hasDirtyState": false,
-  "message": "main is 5 commits behind origin/main"
-}
+# Check how far behind
+GET /api/worktrees/:name/check-updates
+# Returns: { "behind": 5, "ahead": 2 }
 ```
 
-**Force create (skip check):**
-```bash
-POST /api/worktrees?force=true
-{ "branchName": "feature-xyz", "fromBranch": "main" }
-```
-
-## Troubleshooting
-
-**"main has uncommitted changes"**
-- Commit or stash changes in main worktree before creating new worktrees
-
-**"Could not auto-resolve conflicts"**
-- Manually resolve conflicts in main worktree
-- Run: `cd .worktrees/main && git status`
-- Resolve conflicts, commit, then retry
-
-**Sync taking too long**
-- Large repos may take time to fetch
-- Consider using `?force=true` if you know you want current state
+If auto-resolve fails, you'll need to manually fix conflicts in the worktree directory.
