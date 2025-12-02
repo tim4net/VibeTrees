@@ -395,103 +395,107 @@ export async function startServices(name) {
  * Stop all services for a worktree
  */
 export async function stopServices(name) {
-  try {
-    // Show loading indicator
-    const button = event?.target?.closest('button');
-    const originalText = button?.innerHTML;
-    if (button) {
-      button.disabled = true;
-      button.innerHTML = '<i data-lucide="loader-2" class="lucide-sm animate-spin"></i> Stopping...';
-      if (window.lucide) window.lucide.createIcons();
-    }
+  // Update badge to show stopping
+  updateStatusBadge(name, 'stopping');
 
+  // Show toast feedback
+  if (window.showToast) {
+    window.showToast(`Stopping services for ${name}...`, 5000);
+  }
+
+  try {
     const response = await fetch(`/api/worktrees/${name}/services/stop`, {
       method: 'POST'
     });
 
     const result = await response.json();
 
+    // Clear pending state
+    updateStatusBadge(name, null);
+
     if (result.success) {
-      // Show success feedback
-      if (button) {
-        button.innerHTML = '<i data-lucide="check" class="lucide-sm"></i> Stopped!';
-        if (window.lucide) window.lucide.createIcons();
-        setTimeout(() => {
-          button.disabled = false;
-          if (originalText) button.innerHTML = originalText;
-          if (window.lucide) window.lucide.createIcons();
-        }, 2000);
+      if (window.showToast) {
+        window.showToast(`Services stopped for ${name}`, 3000);
       }
       window.refreshWorktrees?.();
     } else {
-      if (button) {
-        button.disabled = false;
-        if (originalText) button.innerHTML = originalText;
-        if (window.lucide) window.lucide.createIcons();
+      if (window.showToast) {
+        window.showToast(`Failed to stop services: ${result.error}`, 5000);
       }
-      alert('Failed to stop services: ' + result.error);
+      window.refreshWorktrees?.();
     }
   } catch (error) {
-    const button = event?.target?.closest('button');
-    const originalText = button?.innerHTML;
-    if (button) {
-      button.disabled = false;
-      if (originalText) button.innerHTML = originalText;
-      if (window.lucide) window.lucide.createIcons();
+    updateStatusBadge(name, null);
+    if (window.showToast) {
+      window.showToast(`Failed to stop services: ${error.message}`, 5000);
     }
-    alert('Failed to stop services: ' + error.message);
+    window.refreshWorktrees?.();
   }
+}
+
+/**
+ * Update the status badge for a worktree
+ * @param {string} worktreeName - Name of the worktree
+ * @param {string} status - 'starting', 'stopping', 'restarting', or null to clear
+ */
+function updateStatusBadge(worktreeName, status) {
+  const card = document.querySelector(`.worktree-card[data-name="${worktreeName}"]`);
+  if (!card) return;
+
+  const badge = card.querySelector('.status-badge');
+  if (!badge) return;
+
+  if (status) {
+    badge.classList.remove('status-running', 'status-stopped', 'status-mixed');
+    badge.classList.add('status-creating'); // Reuse creating style for animation
+    const textMap = { starting: 'Starting', stopping: 'Stopping', restarting: 'Restarting' };
+    const text = textMap[status] || status;
+    badge.innerHTML = `${text} <i data-lucide="loader-2" class="status-badge-chevron spin"></i>`;
+    // Re-init lucide for the new icon
+    if (window.lucide) window.lucide.createIcons();
+  }
+  // Badge will be restored on next refresh when status is null
 }
 
 /**
  * Restart all services for a worktree
  */
 export async function restartServices(name) {
-  try {
-    // Show loading indicator
-    const button = event?.target?.closest('button');
-    const originalText = button?.innerHTML;
-    if (button) {
-      button.disabled = true;
-      button.innerHTML = '<i data-lucide="loader-2" class="lucide-sm animate-spin"></i> Restarting...';
-      if (window.lucide) window.lucide.createIcons();
-    }
+  // Update badge to show restarting
+  updateStatusBadge(name, 'restarting');
 
+  // Show toast feedback
+  if (window.showToast) {
+    window.showToast(`Restarting services for ${name}...`, 5000);
+  }
+
+  try {
     const response = await fetch(`/api/worktrees/${name}/services/restart`, {
       method: 'POST'
     });
 
     const result = await response.json();
 
+    // Clear pending state
+    updateStatusBadge(name, null);
+
     if (result.success) {
-      // Show success feedback
-      if (button) {
-        button.innerHTML = '<i data-lucide="check" class="lucide-sm"></i> Restarted!';
-        if (window.lucide) window.lucide.createIcons();
-        setTimeout(() => {
-          button.disabled = false;
-          if (originalText) button.innerHTML = originalText;
-          if (window.lucide) window.lucide.createIcons();
-        }, 2000);
+      if (window.showToast) {
+        window.showToast(`Services restarted for ${name}`, 3000);
       }
       window.refreshWorktrees?.();
     } else {
-      if (button) {
-        button.disabled = false;
-        if (originalText) button.innerHTML = originalText;
-        if (window.lucide) window.lucide.createIcons();
+      if (window.showToast) {
+        window.showToast(`Failed to restart services: ${result.error}`, 5000);
       }
-      alert('Failed to restart services: ' + result.error);
+      window.refreshWorktrees?.();
     }
   } catch (error) {
-    const button = event?.target?.closest('button');
-    const originalText = button?.innerHTML;
-    if (button) {
-      button.disabled = false;
-      if (originalText) button.innerHTML = originalText;
-      if (window.lucide) window.lucide.createIcons();
+    updateStatusBadge(name, null);
+    if (window.showToast) {
+      window.showToast(`Failed to restart services: ${error.message}`, 5000);
     }
-    alert('Failed to restart services: ' + error.message);
+    window.refreshWorktrees?.();
   }
 }
 

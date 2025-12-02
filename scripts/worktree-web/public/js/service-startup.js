@@ -1,45 +1,45 @@
 /**
- * Service Startup Progress Modal
- * Shows real-time progress when starting Docker services
+ * Service Startup - Toast-based feedback with status badge updates
+ * Shows toast notifications when starting/stopping Docker services
  */
 
 /**
- * Show the service startup modal and start services
+ * Update the status badge for a worktree
  * @param {string} worktreeName - Name of the worktree
- * @param {Object} ports - Discovered ports for services
+ * @param {string} status - 'starting', 'stopping', or null to clear
+ */
+function updateStatusBadge(worktreeName, status) {
+  const card = document.querySelector(`.worktree-card[data-name="${worktreeName}"]`);
+  if (!card) return;
+
+  const badge = card.querySelector('.status-badge');
+  if (!badge) return;
+
+  if (status) {
+    badge.classList.remove('status-running', 'status-stopped', 'status-mixed');
+    badge.classList.add('status-creating'); // Reuse creating style for animation
+    const text = status === 'starting' ? 'Starting' : 'Stopping';
+    badge.innerHTML = `${text} <i data-lucide="loader-2" class="status-badge-chevron spin"></i>`;
+    // Re-init lucide for the new icon
+    if (window.lucide) window.lucide.createIcons();
+  }
+  // Badge will be restored on next refresh when status is null
+}
+
+/**
+ * Start services for a worktree with toast feedback
+ * @param {string} worktreeName - Name of the worktree
+ * @param {Object} ports - Discovered ports for services (unused, kept for API compatibility)
  */
 export async function showServiceStartupModal(worktreeName, ports) {
-  const modal = document.getElementById('service-startup-modal');
-  const header = document.getElementById('service-startup-header');
-  const list = document.getElementById('service-startup-list');
-  const logs = document.getElementById('service-startup-logs');
-  const doneBtn = document.getElementById('service-startup-done-btn');
-  const closeBtn = document.getElementById('service-startup-close');
+  // Update badge to show starting
+  updateStatusBadge(worktreeName, 'starting');
 
-  // Show modal
-  modal.classList.add('active');
-  header.textContent = `Starting services for ${worktreeName}...`;
-  list.innerHTML = '';
-  logs.innerHTML = '';
-  logs.style.display = 'none';
-  doneBtn.style.display = 'none';
-  closeBtn.style.display = 'none';
-
-  // Populate service list
-  const services = Object.entries(ports);
-  for (const [serviceName, port] of services) {
-    const item = document.createElement('div');
-    item.className = 'service-startup-item pending';
-    item.setAttribute('data-service', serviceName);
-    item.innerHTML = `
-      <div class="service-status-icon"></div>
-      <div class="service-name">${serviceName}</div>
-      <div class="service-port">:${port}</div>
-    `;
-    list.appendChild(item);
+  // Show immediate feedback
+  if (window.showToast) {
+    window.showToast(`Starting services for ${worktreeName}...`, 5000);
   }
 
-  // Start the services
   try {
     const response = await fetch(`/api/worktrees/${worktreeName}/services/start`, {
       method: 'POST'
@@ -47,86 +47,46 @@ export async function showServiceStartupModal(worktreeName, ports) {
 
     const result = await response.json();
 
+    // Clear pending state
+    updateStatusBadge(worktreeName, null);
+
     if (result.success) {
-      // Success - mark all services as completed
-      header.textContent = 'All services started successfully!';
-
-      // Animate each service starting (staggered)
-      for (let i = 0; i < services.length; i++) {
-        const [serviceName] = services[i];
-        const item = list.querySelector(`[data-service="${serviceName}"]`);
-
-        await new Promise(resolve => setTimeout(resolve, 150));
-        item.classList.remove('pending');
-        item.classList.add('starting');
-
-        await new Promise(resolve => setTimeout(resolve, 300));
-        item.classList.remove('starting');
-        item.classList.add('completed');
+      // Success toast
+      if (window.showToast) {
+        window.showToast(`Services started for ${worktreeName}`, 3000);
       }
 
-      // Show done button
-      doneBtn.style.display = 'block';
-      closeBtn.style.display = 'flex';
-
-      // Notify other parts of app
+      // Refresh worktree list to show updated status
       if (window.refreshWorktrees) {
         window.refreshWorktrees();
       }
-
-      // Auto-close modal after a brief delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      window.hideServiceStartupModal();
-
     } else {
-      // Error - show error state
-      header.textContent = 'Failed to start services';
-      header.style.color = 'var(--error)';
-
-      // Mark all as error
-      const items = list.querySelectorAll('.service-startup-item');
-      items.forEach(item => {
-        item.classList.remove('pending', 'starting');
-        item.classList.add('error');
-      });
-
-      // Show error logs
-      logs.style.display = 'block';
-      logs.innerHTML = `<div class="progress-output-line" style="color: var(--error);">${result.error}</div>`;
-
-      doneBtn.style.display = 'block';
-      closeBtn.style.display = 'flex';
+      // Error toast
+      if (window.showToast) {
+        window.showToast(`Failed to start services: ${result.error}`, 5000);
+      }
+      // Refresh to restore correct state
+      if (window.refreshWorktrees) {
+        window.refreshWorktrees();
+      }
     }
 
   } catch (error) {
-    header.textContent = 'Error starting services';
-    header.style.color = 'var(--error)';
-
-    // Mark all as error
-    const items = list.querySelectorAll('.service-startup-item');
-    items.forEach(item => {
-      item.classList.remove('pending', 'starting');
-      item.classList.add('error');
-    });
-
-    logs.style.display = 'block';
-    logs.innerHTML = `<div class="progress-output-line" style="color: var(--error);">${error.message}</div>`;
-
-    doneBtn.style.display = 'block';
-    closeBtn.style.display = 'flex';
+    updateStatusBadge(worktreeName, null);
+    if (window.showToast) {
+      window.showToast(`Error starting services: ${error.message}`, 5000);
+    }
+    if (window.refreshWorktrees) {
+      window.refreshWorktrees();
+    }
   }
 }
 
 /**
- * Hide the service startup modal
+ * Hide the service startup modal (no-op for backwards compatibility)
  */
 window.hideServiceStartupModal = function() {
-  const modal = document.getElementById('service-startup-modal');
-  const header = document.getElementById('service-startup-header');
-  modal.classList.remove('active');
-
-  // Reset header color
-  header.style.color = '';
+  // No-op - kept for backwards compatibility
 };
 
 // Export to global scope
