@@ -93,9 +93,9 @@
   background: linear-gradient(135deg, #161b22 0%, #1a1f26 100%);
   border: 1px solid #30363d;
   border-left: 3px solid #30363d;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 8px;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -121,56 +121,94 @@
 .worktree-card.git-uncommitted:hover { border-left-color: #e5a935; box-shadow: 0 2px 8px rgba(229, 169, 53, 0.2); }
 .worktree-card.git-unpushed:hover { border-left-color: #58a6ff; box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2); }
 
+/* Card Header - Two-row layout for better hierarchy */
 .worktree-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+/* Primary row: Name takes full width */
+.worktree-header-primary {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  min-width: 0;
 }
 
-.worktree-header > :first-child {
-  flex: 1;
-  min-width: 0; /* Critical for text ellipsis */
+/* Secondary row: Branch and status */
+.worktree-header-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
 }
 
-.worktree-header > :last-child {
-  flex-shrink: 0;
-}
-
+/* Worktree Title - More prominent */
 .worktree-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  line-height: 20px;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 22px;
   font-weight: 600;
   color: #79c0ff;
   text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
   margin: 0;
-  overflow: hidden;
+  min-width: 0;
+  flex: 1;
 }
 
-.worktree-title > span,
+.worktree-title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
 .worktree-title > a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-decoration: none;
+  color: inherit;
 }
 
 .worktree-title i,
-.worktree-title a {
+.worktree-title a > i {
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
 }
 
+/* Branch info - now in secondary row */
 .worktree-branch {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
-  line-height: 14px;
+  line-height: 16px;
   color: #8b949e;
-  margin-top: 2px;
+  min-width: 0;
+  flex: 1;
+  max-width: calc(100% - 80px); /* Leave room for status badge */
+}
+
+.worktree-branch i {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.worktree-branch > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .worktree-branch.clickable {
@@ -184,13 +222,14 @@
   text-decoration: underline;
 }
 
+/* Status Badge - Compact but readable */
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  height: 20px;
-  border-radius: 10px;
+  padding: 3px 10px;
+  height: 22px;
+  border-radius: 11px;
   font-size: 10px;
   line-height: 16px;
   font-weight: 600;
@@ -242,23 +281,26 @@
   box-shadow: 0 2px 8px rgba(210, 153, 34, 0.3);
 }
 
+/* Service Ports - Grid layout for better density */
 .ports {
-  margin: 8px 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 6px;
+  margin-top: 2px;
 }
 
+/* Individual service port - Touch-friendly */
 .port {
   background: linear-gradient(135deg, #21262d 0%, #2d333b 100%);
   border: 1px solid #30363d;
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-family: 'Courier New', monospace;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 6px;
+  min-height: 32px; /* Touch-friendly but compact */
 }
 
 .port.clickable {
@@ -272,9 +314,17 @@
   box-shadow: 0 2px 6px rgba(88, 166, 255, 0.2);
 }
 
+.port.clickable:active {
+  transform: scale(0.98);
+}
+
 .port-label {
-  color: #8b949e;
-  margin-right: 4px;
+  color: #c9d1d9;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 .port-value {
@@ -282,16 +332,17 @@
   font-weight: 600;
 }
 
+/* Worktree Actions - For containerless apps */
 .worktree-actions {
   display: flex;
-  gap: 4px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 2px;
   flex-wrap: wrap;
 }
 
 .worktree-actions button {
   flex: 1;
-  min-width: 60px;
+  min-width: 70px;
 }
 
 /* Status Indicators */
@@ -371,27 +422,24 @@
   writing-mode: horizontal-tb;
 }
 
-/* Worktree Actions for Containerless Apps */
-.worktree-actions {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  flex-wrap: wrap;
-}
-
+/* Worktree Action Buttons - Touch-friendly (44px min) */
 .worktree-action-btn {
   background: #21262d;
   border: 1px solid #30363d;
   color: #c9d1d9;
-  padding: 6px 10px;
-  border-radius: 4px;
+  padding: 8px 12px;
+  min-height: 36px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   transition: all 0.2s;
   white-space: nowrap;
+  flex: 1;
+  min-width: 70px;
 }
 
 .worktree-action-btn:hover {
@@ -401,15 +449,28 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+.worktree-action-btn:active {
+  transform: translateY(0);
+}
+
+.worktree-action-btn:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+
 .worktree-action-btn.danger {
   background: transparent;
   border-color: #30363d;
   color: #8b949e;
+  flex: 0;
+  min-width: 36px;
+  padding: 8px;
 }
 
 .worktree-action-btn.danger:hover {
   border-color: #f85149;
   color: #f85149;
+  background: rgba(248, 81, 73, 0.1);
 }
 
 /* Creating and Error States */

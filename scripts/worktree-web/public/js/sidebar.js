@@ -127,16 +127,19 @@ function renderWorktreeCards(worktrees, container) {
       return `
         <div class="worktree-card creating ${isActive ? 'active selected' : ''}" data-name="${wt.name}" onclick="selectWorktree('${wt.name}')">
           <div class="worktree-header">
-            <div>
+            <div class="worktree-header-primary">
               <div class="worktree-title">
-                <i data-lucide="loader" class="spin" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px; color: #58a6ff;"></i>
+                <i data-lucide="loader" class="spin"></i>
                 <span>${wt.name}</span>
               </div>
-              <div class="worktree-branch" style="font-size: 11px; color: #8b949e; margin-left: 24px; margin-top: 2px;">
-                <i data-lucide="git-branch" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${wt.branch}
-              </div>
             </div>
-            <span class="status-badge status-creating">Creating...</span>
+            <div class="worktree-header-secondary">
+              <div class="worktree-branch">
+                <i data-lucide="git-branch"></i>
+                <span>${wt.branch}</span>
+              </div>
+              <span class="status-badge status-creating">Creating...</span>
+            </div>
           </div>
           ${progressHtml}
         </div>
@@ -149,13 +152,16 @@ function renderWorktreeCards(worktrees, container) {
       return `
         <div class="worktree-card error ${isActive ? 'active selected' : ''}" data-name="${wt.name}">
           <div class="worktree-header">
-            <div>
+            <div class="worktree-header-primary">
               <div class="worktree-title">
-                <i data-lucide="x-circle" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px; color: #f85149;"></i>
+                <i data-lucide="x-circle" style="color: #f85149;"></i>
                 <span>${wt.name}</span>
               </div>
             </div>
-            <span class="status-badge status-error">Failed</span>
+            <div class="worktree-header-secondary">
+              <span></span>
+              <span class="status-badge status-error">Failed</span>
+            </div>
           </div>
           <div class="error-message">${wt.error || 'Unknown error'}</div>
         </div>
@@ -271,21 +277,22 @@ function renderWorktreeCards(worktrees, container) {
 
     // Show branch as subheading if it differs from worktree name
     const branchSubheading = wt.branch && wt.branch !== wt.name
-      ? `<div class="worktree-branch" style="font-size: 11px; color: #8b949e; margin-left: 24px; margin-top: 2px;">
-           <i data-lucide="git-branch" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${wt.branch}
+      ? `<div class="worktree-branch">
+           <i data-lucide="git-branch"></i>
+           <span>${wt.branch}</span>
          </div>`
       : '';
 
     return `
       <div class="worktree-card ${isActive ? 'active selected' : ''} ${gitStatusClass}" data-name="${wt.name}" onclick="selectWorktree('${wt.name}')">
         <div class="worktree-header">
-          <div>
+          <div class="worktree-header-primary">
             <div class="worktree-title" oncontextmenu="showWorktreeContextMenu(event, '${wt.name}', ${isMain}); event.stopPropagation();" style="cursor: context-menu;">
               ${iconHtml}<span>${wt.name}</span>
             </div>
-            ${branchSubheading}
           </div>
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+          <div class="worktree-header-secondary">
+            ${branchSubheading}
             ${statusBadge}
           </div>
         </div>
