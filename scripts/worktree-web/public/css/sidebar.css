@@ -121,29 +121,22 @@
 .worktree-card.git-uncommitted:hover { border-left-color: #e5a935; box-shadow: 0 2px 8px rgba(229, 169, 53, 0.2); }
 .worktree-card.git-unpushed:hover { border-left-color: #58a6ff; box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2); }
 
-/* Card Header - Two-row layout for better hierarchy */
+/* Card Header - Status badge anchored top-right */
 .worktree-header {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-/* Primary row: Name takes full width */
-.worktree-header-primary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* Secondary row: Branch and status */
-.worktree-header-secondary {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  min-height: 20px;
+  margin-bottom: 6px;
+}
+
+/* Left side: name and branch stacked */
+.worktree-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 /* Worktree Title - More prominent */
@@ -184,17 +177,16 @@
   height: 18px;
 }
 
-/* Branch info - now in secondary row */
+/* Branch info - compact, below name */
 .worktree-branch {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  line-height: 16px;
+  gap: 3px;
+  font-size: 10px;
+  line-height: 14px;
   color: #8b949e;
   min-width: 0;
-  flex: 1;
-  max-width: calc(100% - 80px); /* Leave room for status badge */
+  max-width: 100%;
 }
 
 .worktree-branch i {
@@ -222,17 +214,18 @@
   text-decoration: underline;
 }
 
-/* Status Badge - Compact but readable */
+/* Status Badge - Compact pill */
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  height: 22px;
-  border-radius: 11px;
-  font-size: 10px;
-  line-height: 16px;
-  font-weight: 600;
+  gap: 3px;
+  padding: 2px 6px;
+  height: 18px;
+  border-radius: 9px;
+  font-size: 9px;
+  line-height: 14px;
+  font-weight: 500;
+  text-transform: none;
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s;
@@ -255,11 +248,11 @@
 }
 
 .status-badge-chevron {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   flex-shrink: 0;
   opacity: 0.7;
-  margin-left: 2px;
+  margin-left: 1px;
   vertical-align: middle;
 }
 
@@ -281,26 +274,26 @@
   box-shadow: 0 2px 8px rgba(210, 153, 34, 0.3);
 }
 
-/* Service Ports - Grid layout for better density */
+/* Service Ports - Compact flex layout */
 .ports {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   margin-top: 2px;
 }
 
-/* Individual service port - Touch-friendly */
+/* Individual service port - Compact pills */
 .port {
-  background: linear-gradient(135deg, #21262d 0%, #2d333b 100%);
+  background: #21262d;
   border: 1px solid #30363d;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 32px; /* Touch-friendly but compact */
+  gap: 4px;
+  height: 20px;
 }
 
 .port.clickable {

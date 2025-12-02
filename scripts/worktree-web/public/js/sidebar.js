@@ -191,7 +191,7 @@ function renderWorktreeCards(worktrees, container) {
       ? `<span class="status-badge ${statusClass}" onclick="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})" oncontextmenu="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})">${statusText} <i data-lucide="chevron-down" class="status-badge-chevron"></i></span>`
       : '';
 
-    // Show ports section for services, or action buttons for containerless worktrees
+    // Show service pills when containers exist
     const portsHtml = wt.dockerStatus.length > 0
       ? wt.dockerStatus.map(container => {
           const portValue = wt.ports[container.name];
@@ -206,25 +206,7 @@ function renderWorktreeCards(worktrees, container) {
             </div>
           `;
         }).join('')
-      : `
-        <div class="worktree-actions">
-          <button class="worktree-action-btn" onclick="event.stopPropagation(); window.openShell('${wt.name}')" title="Open Shell">
-            <i data-lucide="terminal" style="width: 14px; height: 14px;"></i>
-            <span>Shell</span>
-          </button>
-          <button class="worktree-action-btn" onclick="event.stopPropagation(); window.openTerminal('${wt.name}', 'claude')" title="Open Claude">
-            <img src="/icons/anthropic.svg" style="width: 14px; height: 14px; filter: brightness(0) invert(1);" />
-            <span>Claude</span>
-          </button>
-          <button class="worktree-action-btn" onclick="event.stopPropagation(); window.openTerminal('${wt.name}', 'codex')" title="Open Codex">
-            <img src="/icons/openai.svg" style="width: 14px; height: 14px; filter: brightness(0) invert(1);" />
-            <span>Codex</span>
-          </button>
-          <button class="worktree-action-btn danger" onclick="event.stopPropagation(); showWorktreeContextMenu(event, '${wt.name}', ${isMain})" title="More actions">
-            <i data-lucide="more-horizontal" style="width: 14px; height: 14px;"></i>
-          </button>
-        </div>
-      `;
+      : '';
 
     // Determine icon based on whether this is the main worktree or has commits
     // Main worktree or worktrees with at least 1 commit get tree-pine
@@ -286,17 +268,15 @@ function renderWorktreeCards(worktrees, container) {
     return `
       <div class="worktree-card ${isActive ? 'active selected' : ''} ${gitStatusClass}" data-name="${wt.name}" onclick="selectWorktree('${wt.name}')">
         <div class="worktree-header">
-          <div class="worktree-header-primary">
+          <div class="worktree-info">
             <div class="worktree-title" oncontextmenu="showWorktreeContextMenu(event, '${wt.name}', ${isMain}); event.stopPropagation();" style="cursor: context-menu;">
               ${iconHtml}<span>${wt.name}</span>
             </div>
-          </div>
-          <div class="worktree-header-secondary">
             ${branchSubheading}
-            ${statusBadge}
           </div>
+          ${statusBadge}
         </div>
-        <div class="ports">${portsHtml}</div>
+        ${portsHtml ? `<div class="ports">${portsHtml}</div>` : ''}
       </div>
     `;
   }).join('');
