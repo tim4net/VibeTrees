@@ -27,20 +27,30 @@ window.appState = appState;
  * Fetch worktrees from API and update state
  */
 export async function refreshWorktrees() {
+  const startTime = performance.now();
   console.log('[refreshWorktrees] Starting...');
   try {
+    const fetchStart = performance.now();
     const response = await fetch('/api/worktrees');
-    console.log('[refreshWorktrees] Fetch response status:', response.status);
+    const fetchEnd = performance.now();
+    console.log(`[refreshWorktrees] Fetch took ${(fetchEnd - fetchStart).toFixed(0)}ms, status: ${response.status}`);
+
+    const parseStart = performance.now();
     const worktrees = await response.json();
-    console.log('[refreshWorktrees] Received worktrees:', worktrees.length, 'items');
+    const parseEnd = performance.now();
+    console.log(`[refreshWorktrees] JSON parse took ${(parseEnd - parseStart).toFixed(0)}ms, received ${worktrees.length} items`);
 
     // Mark loading as complete on first successful fetch
     appState.isLoadingWorktrees = false;
 
     // Update state which triggers sidebar re-render via events
+    const updateStart = performance.now();
     appState.updateWorktrees(worktrees);
+    const updateEnd = performance.now();
 
-    console.log('[refreshWorktrees] State updated, sidebar will re-render');
+    const totalTime = performance.now() - startTime;
+    console.log(`[refreshWorktrees] State update took ${(updateEnd - updateStart).toFixed(0)}ms`);
+    console.log(`[refreshWorktrees] Total time: ${totalTime.toFixed(0)}ms`);
   } catch (error) {
     console.error('[refreshWorktrees] Error:', error);
     // Still mark loading as false on error so UI doesn't stay stuck
@@ -52,7 +62,8 @@ export async function refreshWorktrees() {
  * Initialize application
  */
 function initApp() {
-  console.log('[main] Initializing application...');
+  const initStart = performance.now();
+  console.log(`[main] Initializing application at ${initStart.toFixed(0)}ms since page load...`);
 
   // Initialize all modules
   initContextMenus();
@@ -94,8 +105,9 @@ function initApp() {
   console.log('[main] WebSocket connected');
 
   // Initial data load
+  console.log(`[main] Starting initial data load at ${(performance.now() - initStart).toFixed(0)}ms since init`);
   window.refreshWorktrees();
-  console.log('[main] Initial data load complete');
+  console.log(`[main] Initial data load started at ${performance.now().toFixed(0)}ms`);
 
   // Start automatic polling
   pollingManager.start();

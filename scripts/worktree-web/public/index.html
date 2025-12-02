@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VibeTrees</title>
+  <script>window.__pageStart = performance.now(); console.log('[timing] Page start');</script>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
   <!-- PWA Manifest -->
@@ -24,7 +25,8 @@
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.min.js"></script>
 
   <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script>console.log('[timing] CDN scripts loaded at', performance.now().toFixed(0) + 'ms');</script>
 
   <!-- Application Styles -->
   <link rel="stylesheet" href="/css/theme.css?v=2">
@@ -1182,7 +1184,8 @@
   <script type="module" src="/js/initialization.js"></script>
 
   <!-- Application JavaScript (ES6 Module) -->
-  <script type="module" src="/js/main.js?v=8"></script>
+  <script>console.log('[timing] About to load main.js at', performance.now().toFixed(0) + 'ms');</script>
+  <script type="module" src="/js/main.js?v=9"></script>
 
   <!-- MCP Configuration -->
   <script src="/js/mcp-config.js"></script>
