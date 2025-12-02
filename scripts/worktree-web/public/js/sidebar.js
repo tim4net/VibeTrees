@@ -187,9 +187,9 @@ function renderWorktreeCards(worktrees, container) {
     // servicesTotal === 0 keeps default 'Stopped'
 
     // Show status badge when compose file exists (even if no containers running)
-    const countText = servicesTotal > 0 ? ` ${servicesRunning}/${servicesTotal}` : '';
+    const titleText = servicesTotal > 0 ? `${servicesRunning}/${servicesTotal} services` : 'No services configured';
     const statusBadge = wt.hasComposeFile
-      ? `<span class="status-badge ${statusClass}" onclick="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})" oncontextmenu="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})">${statusText}${countText} <i data-lucide="chevron-down" class="status-badge-chevron"></i></span>`
+      ? `<span class="status-badge ${statusClass}" title="${titleText}" onclick="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})" oncontextmenu="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})">${statusText} <i data-lucide="chevron-down" class="status-badge-chevron"></i></span>`
       : '';
 
     // Show service pills when containers exist
