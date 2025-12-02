@@ -566,8 +566,15 @@ export class WorktreeManager {
   getDockerStatus(worktreePath, worktreeName) {
     const statuses = [];
 
-    // Check if docker-compose.yml exists in this worktree
-    const composeFiles = ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml'];
+    // Check if any compose file exists in this worktree
+    const composeFiles = [
+      'docker-compose.yml',
+      'docker-compose.yaml',
+      'compose.yml',
+      'compose.yaml',
+      'podman-compose.yml',
+      'podman-compose.yaml'
+    ];
     const hasComposeFile = composeFiles.some(file =>
       fs.existsSync(path.join(worktreePath, file))
     );
@@ -579,8 +586,11 @@ export class WorktreeManager {
     // Get Docker container statuses using label-based filtering
     // This works even if COMPOSE_PROJECT_NAME has changed since containers were started
     try {
+      // Normalize path - ensure no trailing slash for consistent matching
+      const normalizedPath = worktreePath.replace(/\/+$/, '');
+
       // Use docker ps with label filter to find containers by working directory
-      const output = this.runtime.exec(`ps -a --filter "label=com.docker.compose.project.working_dir=${worktreePath}" --format json`, {
+      const output = this.runtime.exec(`ps -a --filter "label=com.docker.compose.project.working_dir=${normalizedPath}" --format json`, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -682,8 +692,9 @@ export class WorktreeManager {
       });
 
       statuses.push(...deduplicated);
-    } catch {
-      // Docker services might not be running or docker not available
+    } catch (error) {
+      // Log error for debugging - helps identify why containers aren't detected
+      console.error(`[getDockerStatus] Failed for ${worktreeName}:`, error.message);
     }
 
     return statuses;

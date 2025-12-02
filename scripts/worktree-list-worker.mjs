@@ -5,7 +5,18 @@
 
 import { parentPort } from 'worker_threads';
 import { execSync } from 'child_process';
-import { basename } from 'path';
+import { existsSync } from 'fs';
+import { basename, join } from 'path';
+
+// Compose files to check for container configuration
+const COMPOSE_FILES = [
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  'compose.yml',
+  'compose.yaml',
+  'podman-compose.yml',
+  'podman-compose.yaml'
+];
 
 parentPort.on('message', ({ portRegistry, rootDir, runtimeInfo }) => {
   try {
@@ -49,6 +60,11 @@ function processWorktree(worktree, portRegistry, rootDir, runtimeInfo) {
   worktree.name = (isRootWorktree || worktree.branch === 'main') ? 'main' : basename(worktree.path);
   worktree.ports = portRegistry[worktree.name] || {};
 
+  // Check if compose file exists
+  worktree.hasComposeFile = COMPOSE_FILES.some(file =>
+    existsSync(join(worktree.path, file))
+  );
+
   // Get Docker/Podman status
   worktree.dockerStatus = getDockerStatus(worktree.path, worktree.name, runtimeInfo);
 
@@ -73,30 +89,54 @@ function processWorktree(worktree, portRegistry, rootDir, runtimeInfo) {
   worktree.lastCommit = getLastCommit(worktree.path);
 }
 
-function getDockerStatus(path, name, runtimeInfo = {}) {
+function getDockerStatus(worktreePath, name, runtimeInfo = {}) {
   try {
+    // Check if any compose file exists in this worktree
+    const hasComposeFile = COMPOSE_FILES.some(file =>
+      existsSync(join(worktreePath, file))
+    );
+
+    if (!hasComposeFile) {
+      return []; // No compose file, no containers to check
+    }
+
     // Use label-based filtering to find containers by working directory
     // This works even if COMPOSE_PROJECT_NAME has changed since containers were started
     const runtime = runtimeInfo.runtime || 'docker';
     const needsSudo = runtimeInfo.needsSudo ?? false;
 
+    // Skip if runtime is 'none' (NullRuntime - Docker unavailable)
+    if (runtime === 'none') {
+      return [];
+    }
+
+    // Normalize path - ensure no trailing slash for consistent matching
+    const normalizedPath = worktreePath.replace(/\/+$/, '');
+
     // Build the command based on detected runtime
-    const baseCmd = `${runtime} ps -a --filter "label=com.docker.compose.project.working_dir=${path}" --format json`;
+    const baseCmd = `${runtime} ps -a --filter "label=com.docker.compose.project.working_dir=${normalizedPath}" --format json`;
     const cmd = needsSudo ? `sudo ${baseCmd}` : baseCmd;
 
     let output;
     try {
-      output = execSync(`${cmd} 2>/dev/null`, {
+      output = execSync(cmd, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
-    } catch {
+    } catch (cmdError) {
       // Fallback: try without sudo if sudo failed, or with sudo if non-sudo failed
       const fallbackCmd = needsSudo ? baseCmd : `sudo ${baseCmd}`;
-      output = execSync(`${fallbackCmd} 2>/dev/null`, {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
+      try {
+        output = execSync(fallbackCmd, {
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+      } catch (fallbackError) {
+        // Both attempts failed - log details for debugging
+        console.error(`[getDockerStatus] Primary cmd failed for ${name}:`, cmdError.message);
+        console.error(`[getDockerStatus] Fallback cmd failed for ${name}:`, fallbackError.message);
+        throw fallbackError;
+      }
     }
 
     // Parse JSON - handle both Docker (newline-delimited) and Podman (single array) formats
@@ -185,6 +225,8 @@ function getDockerStatus(path, name, runtimeInfo = {}) {
       return rest;
     });
   } catch (error) {
+    // Log error for debugging - helps identify why containers aren't detected
+    console.error(`[getDockerStatus] Failed for ${name}:`, error.message);
     return [];
   }
 }

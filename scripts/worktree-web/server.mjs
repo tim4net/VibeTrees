@@ -693,6 +693,11 @@ function createApp() {
   app.get('/api/worktrees', async (req, res) => {
     // Use async worker thread version to avoid blocking event loop
     const worktrees = await manager.listWorktreesAsync();
+
+    // Debug: log container detection results
+    const containersFound = worktrees.reduce((sum, wt) => sum + (wt.dockerStatus?.length || 0), 0);
+    console.log(`[/api/worktrees] ${worktrees.length} worktrees, ${containersFound} containers detected`);
+
     res.json(worktrees);
   });
 

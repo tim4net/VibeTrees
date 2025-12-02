@@ -171,18 +171,17 @@ function renderWorktreeCards(worktrees, container) {
     let statusClass = 'status-stopped';
     let statusText = 'Stopped';
 
-    if (servicesTotal === 0) {
-      statusText = 'No Services';
-    } else if (servicesRunning === servicesTotal) {
+    if (servicesRunning === servicesTotal && servicesTotal > 0) {
       statusClass = 'status-running';
       statusText = 'Running';
     } else if (servicesRunning > 0) {
       statusClass = 'status-mixed';
       statusText = 'Partial';
     }
+    // servicesTotal === 0 keeps default 'Stopped'
 
-    // Hide status badge completely when there are no services
-    const statusBadge = servicesTotal > 0
+    // Show status badge when compose file exists (even if no containers running)
+    const statusBadge = wt.hasComposeFile
       ? `<span class="status-badge ${statusClass}" onclick="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})" oncontextmenu="showStatusContextMenu(event, '${wt.name}', ${servicesRunning}, ${servicesTotal})">${statusText} <i data-lucide="chevron-down" class="status-badge-chevron"></i></span>`
       : '';
 
