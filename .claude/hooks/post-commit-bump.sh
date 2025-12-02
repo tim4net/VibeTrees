@@ -1,5 +1,5 @@
 #!/bin/bash
-# Post-commit hook to automatically bump version after commits
+# Post-commit hook to bump version, create tag, and release
 # Skips if commit message contains [skip-version]
 
 set -e
@@ -28,4 +28,11 @@ NEW_VERSION=$(node -p "require('./package.json').version")
 git add package.json package-lock.json 2>/dev/null
 git commit -m "chore: bump version to $NEW_VERSION [skip-version]" > /dev/null 2>&1
 
-echo "Version bumped: $CURRENT_VERSION -> $NEW_VERSION"
+# Create and push tag
+git tag "v$NEW_VERSION" > /dev/null 2>&1 || true
+git push origin "v$NEW_VERSION" > /dev/null 2>&1 || true
+
+# Create GitHub release with commit message as notes
+gh release create "v$NEW_VERSION" --title "Release $NEW_VERSION" --notes "$LAST_COMMIT_MSG" > /dev/null 2>&1 || true
+
+echo "Version bumped: $CURRENT_VERSION -> $NEW_VERSION (tagged and released)"
