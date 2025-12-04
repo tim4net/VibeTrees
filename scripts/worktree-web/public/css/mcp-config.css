@@ -62,6 +62,27 @@
   font-size: 16px;
 }
 
+/* PAL MCP Logo */
+.pal-mcp-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.mcp-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcp-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .mcp-panel-toggle-content {
   flex: 1;
   min-width: 0;
@@ -100,6 +121,12 @@
 /* ===================================
    Status Indicators
    =================================== */
+
+.mcp-status-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .mcp-status-dot {
   display: inline-block;

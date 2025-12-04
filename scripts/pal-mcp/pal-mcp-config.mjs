@@ -20,6 +20,7 @@ import { join } from 'path';
 
 const DEFAULT_CONFIG_DIR = join(homedir(), '.vibetrees');
 const DEFAULT_CONFIG_FILE = 'pal-mcp-config.json';
+const LEGACY_CONFIG_FILE = 'zen-mcp-config.json'; // Backwards compatibility
 
 /**
  * Provider configuration with display names, environment keys, and key prefixes
@@ -138,6 +139,7 @@ export class PalMcpConfig {
 
   /**
    * Load configuration from file or create default if missing
+   * Includes backwards compatibility migration from legacy zen-mcp-config.json
    * @returns {Object} Configuration object with version, providers, options, and lastUpdated
    */
   load() {
@@ -147,6 +149,7 @@ export class PalMcpConfig {
     }
 
     const configPath = join(this.configDir, this.configFile);
+    const legacyConfigPath = join(this.configDir, LEGACY_CONFIG_FILE);
 
     // If config file exists, parse it
     if (this.fs.existsSync(configPath)) {
@@ -155,7 +158,21 @@ export class PalMcpConfig {
         this._cache = JSON.parse(content);
         return this._cache;
       } catch (error) {
-        // If parse fails, return default config
+        // If parse fails, continue to check legacy or create default
+      }
+    }
+
+    // Backwards compatibility: migrate from legacy zen-mcp-config.json
+    if (this.fs.existsSync(legacyConfigPath)) {
+      try {
+        const legacyContent = this.fs.readFileSync(legacyConfigPath, 'utf-8');
+        const legacyConfig = JSON.parse(legacyContent);
+        // Save migrated config to new location
+        this.save(legacyConfig);
+        this._cache = legacyConfig;
+        return this._cache;
+      } catch (error) {
+        // If legacy parse fails, create default config
       }
     }
 

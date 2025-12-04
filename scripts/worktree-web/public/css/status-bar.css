@@ -121,6 +121,14 @@
   font-size: 11px;
 }
 
+/* PAL MCP Logo (status bar) */
+.pal-mcp-logo-sm {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 /* Responsive text visibility - Narrow (< 1000px) */
 @media (max-width: 999px) {
   .status-segment .text-full {
