@@ -12,14 +12,14 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 
 import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
-import { ZenMcpConfig } from './zen-mcp/zen-mcp-config.mjs';
+import { PalMcpFacade } from './pal-mcp/index.mjs';
 
 export class McpManager {
   constructor(projectRoot, runtime, options = {}) {
     this.projectRoot = projectRoot;
     this.runtime = runtime;
     this.mcpCacheDir = join(homedir(), '.vibe-worktrees', 'mcp-cache');
-    this.zenMcp = options.zenMcp || new ZenMcpConfig();
+    this.palMcp = options.palMcp || new PalMcpFacade();
     this._ensureCacheDir();
   }
 
@@ -276,12 +276,12 @@ export class McpManager {
       };
     }
 
-    // Add Zen MCP if configured
-    if (this.zenMcp.isConfigured()) {
-      mcpServers['zen'] = {
+    // Add PAL MCP if configured
+    if (this.palMcp.isConfigured()) {
+      mcpServers['pal'] = {
         command: 'bash',
-        args: this.zenMcp.installer.getCommand(),
-        env: this.zenMcp.getEnvVars()
+        args: this.palMcp.installer.getCommand(),
+        env: this.palMcp.getEnvVars()
       };
     }
 

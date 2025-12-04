@@ -1,14 +1,15 @@
 /**
- * Tests for ZenMcpFacade - Unified interface for Zen MCP integration
- * Composition of ZenMcpConfig, ZenMcpInstaller, and ZenMcpConnection
+ * Tests for PalMcpFacade - Unified interface for PAL MCP integration
+ * Composition of PalMcpConfig, PalMcpInstaller, and PalMcpConnection
  *
- * Updated for BeehiveInnovations zen-mcp-server with uvx-based installation
+ * PAL MCP (Provider Abstraction Layer) was formerly known as Zen MCP.
+ * Updated for BeehiveInnovations pal-mcp-server with uvx-based installation
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ZenMcpFacade, PROVIDERS, SUPPORTED_PROVIDERS } from './index.mjs';
+import { PalMcpFacade, PROVIDERS, SUPPORTED_PROVIDERS } from './index.mjs';
 
-describe('ZenMcpFacade', () => {
+describe('PalMcpFacade', () => {
   let facade;
   let mockConfig;
   let mockInstaller;
@@ -53,11 +54,11 @@ describe('ZenMcpFacade', () => {
       }),
       getCommand: vi.fn().mockReturnValue([
         '-c',
-        'for p in $(which uvx 2>/dev/null) $HOME/.local/bin/uvx /opt/homebrew/bin/uvx /usr/local/bin/uvx uvx; do [ -x "$p" ] && exec "$p" --from git+https://github.com/BeehiveInnovations/zen-mcp-server.git zen-mcp-server; done; echo \'uvx not found\' >&2; exit 1'
+        'for p in $(which uvx 2>/dev/null) $HOME/.local/bin/uvx /opt/homebrew/bin/uvx /usr/local/bin/uvx uvx; do [ -x "$p" ] && exec "$p" --from git+https://github.com/BeehiveInnovations/pal-mcp-server.git pal-mcp-server; done; echo \'uvx not found\' >&2; exit 1'
       ]),
       update: vi.fn().mockResolvedValue({
         success: true,
-        message: 'zen-mcp-server auto-updates via uvx on each launch'
+        message: 'pal-mcp-server auto-updates via uvx on each launch'
       })
     };
 
@@ -71,7 +72,7 @@ describe('ZenMcpFacade', () => {
     };
 
     // Create facade with injected dependencies
-    facade = new ZenMcpFacade({
+    facade = new PalMcpFacade({
       config: mockConfig,
       installer: mockInstaller,
       connection: mockConnection
@@ -94,7 +95,7 @@ describe('ZenMcpFacade', () => {
 
   describe('constructor', () => {
     it('should create default instances when no options provided', () => {
-      const newFacade = new ZenMcpFacade();
+      const newFacade = new PalMcpFacade();
 
       expect(newFacade.config).toBeDefined();
       expect(newFacade.installer).toBeDefined();
@@ -102,25 +103,25 @@ describe('ZenMcpFacade', () => {
     });
 
     it('should accept injected config instance', () => {
-      const newFacade = new ZenMcpFacade({ config: mockConfig });
+      const newFacade = new PalMcpFacade({ config: mockConfig });
 
       expect(newFacade.config).toBe(mockConfig);
     });
 
     it('should accept injected installer instance', () => {
-      const newFacade = new ZenMcpFacade({ installer: mockInstaller });
+      const newFacade = new PalMcpFacade({ installer: mockInstaller });
 
       expect(newFacade.installer).toBe(mockInstaller);
     });
 
     it('should accept injected connection instance', () => {
-      const newFacade = new ZenMcpFacade({ connection: mockConnection });
+      const newFacade = new PalMcpFacade({ connection: mockConnection });
 
       expect(newFacade.connection).toBe(mockConnection);
     });
 
     it('should accept all injected instances', () => {
-      const newFacade = new ZenMcpFacade({
+      const newFacade = new PalMcpFacade({
         config: mockConfig,
         installer: mockInstaller,
         connection: mockConnection
@@ -271,7 +272,7 @@ describe('ZenMcpFacade', () => {
       expect(config.args).toHaveLength(2);
       expect(config.args[0]).toBe('-c');
       expect(config.args[1]).toContain('uvx');
-      expect(config.args[1]).toContain('BeehiveInnovations/zen-mcp-server');
+      expect(config.args[1]).toContain('BeehiveInnovations/pal-mcp-server');
       expect(config.env).toBeDefined();
       expect(config.env.PATH).toBeDefined();
     });
@@ -499,8 +500,8 @@ describe('ZenMcpFacade', () => {
   });
 
   describe('class availability', () => {
-    it('should have ZenMcpFacade available', () => {
-      expect(ZenMcpFacade).toBeDefined();
+    it('should have PalMcpFacade available', () => {
+      expect(PalMcpFacade).toBeDefined();
     });
   });
 

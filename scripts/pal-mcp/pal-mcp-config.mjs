@@ -1,8 +1,11 @@
 /**
- * ZenMcpConfig - Configuration management for Zen MCP integration
+ * PalMcpConfig - Configuration management for PAL MCP integration
  * Handles API key storage, retrieval, and environment variable generation
  *
- * Supports all providers from BeehiveInnovations zen-mcp-server:
+ * PAL MCP (Provider Abstraction Layer) was formerly known as Zen MCP.
+ * See: https://github.com/BeehiveInnovations/pal-mcp-server
+ *
+ * Supports all providers from BeehiveInnovations pal-mcp-server:
  * - Gemini (Google AI)
  * - OpenAI
  * - OpenRouter (200+ models)
@@ -16,7 +19,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 const DEFAULT_CONFIG_DIR = join(homedir(), '.vibetrees');
-const DEFAULT_CONFIG_FILE = 'zen-mcp-config.json';
+const DEFAULT_CONFIG_FILE = 'pal-mcp-config.json';
 
 /**
  * Provider configuration with display names, environment keys, and key prefixes
@@ -73,9 +76,9 @@ const PROVIDER_ENV_KEYS = Object.fromEntries(
 );
 
 /**
- * Optional configuration options for zen-mcp-server
+ * Optional configuration options for pal-mcp-server
  */
-export const ZEN_OPTIONS = {
+export const PAL_OPTIONS = {
   DISABLED_TOOLS: {
     default: '',
     description: 'Comma-separated list of tools to disable (e.g., "analyze,refactor,testgen")'
@@ -99,12 +102,12 @@ export const ZEN_OPTIONS = {
 };
 
 /**
- * Configuration management class for Zen MCP integration
+ * Configuration management class for PAL MCP integration
  * Handles API key storage with file-based persistence and environment variable generation
  */
-export class ZenMcpConfig {
+export class PalMcpConfig {
   /**
-   * Create a new ZenMcpConfig instance
+   * Create a new PalMcpConfig instance
    * @param {Object} options - Configuration options
    * @param {string} options.configDir - Directory to store config file (default: ~/.vibetrees)
    * @param {Object} options.fs - Filesystem implementation for testing (default: fs module)

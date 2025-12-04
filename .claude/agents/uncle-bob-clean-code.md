@@ -74,7 +74,7 @@ Acknowledge good patterns—reinforcement matters.
 
 ## When to Escalate
 
-For complex architectural decisions or when you need deeper analysis, you will consult with the smartest thinking and coding agents available via the Zen MCP server. Escalate when:
+For complex architectural decisions or when you need deeper analysis, you will consult with the smartest thinking and coding agents available via the PAL MCP server. Escalate when:
 - The design decision has system-wide implications
 - You need to trace through complex dependency chains
 - The problem requires understanding multiple interconnected modules

@@ -1,36 +1,39 @@
 /**
- * ZenMcpInstaller
+ * PalMcpInstaller
  *
- * Manages installation verification for the Zen MCP server.
- * The BeehiveInnovations zen-mcp-server is a Python package that runs via uvx.
+ * Manages installation verification for the PAL MCP server.
+ * PAL MCP (Provider Abstraction Layer) was formerly known as Zen MCP.
+ * See: https://github.com/BeehiveInnovations/pal-mcp-server
+ *
+ * The BeehiveInnovations pal-mcp-server is a Python package that runs via uvx.
  *
  * Installation is handled automatically by uvx at runtime - this class
  * just verifies that uvx is available and can run the server.
  *
  * Usage:
- *   const installer = new ZenMcpInstaller();
+ *   const installer = new PalMcpInstaller();
  *   const result = await installer.ensureReady();
  *   if (!result.success) {
  *     console.error('uvx not available:', result.error);
  *   }
  *
  * Result types:
- *   - success=true: uvx is available, zen-mcp can be launched
+ *   - success=true: uvx is available, pal-mcp can be launched
  *   - success=false, error='UVX_NOT_FOUND': uvx not installed
  *   - success=false, error='PYTHON_NOT_FOUND': Python not available
  */
 
 import { execSync as defaultExecSync } from 'child_process';
 
-export class ZenMcpInstaller {
+export class PalMcpInstaller {
   /**
-   * Create a new ZenMcpInstaller
+   * Create a new PalMcpInstaller
    * @param {Object} options - Configuration options
    * @param {string} options.repoUrl - GitHub repository URL (default: BeehiveInnovations)
    * @param {Function} options.execSync - Custom execSync function for dependency injection
    */
   constructor(options = {}) {
-    this.repoUrl = options.repoUrl || 'git+https://github.com/BeehiveInnovations/zen-mcp-server.git';
+    this.repoUrl = options.repoUrl || 'git+https://github.com/BeehiveInnovations/pal-mcp-server.git';
     this.execSync = options.execSync || defaultExecSync;
   }
 
@@ -85,19 +88,19 @@ export class ZenMcpInstaller {
   }
 
   /**
-   * Get the uvx command for launching zen-mcp-server
+   * Get the uvx command for launching pal-mcp-server
    * Returns the bash command used in MCP settings
    * @returns {string[]} Command args for MCP configuration
    */
   getCommand() {
     return [
       '-c',
-      `for p in $(which uvx 2>/dev/null) $HOME/.local/bin/uvx /opt/homebrew/bin/uvx /usr/local/bin/uvx uvx; do [ -x "$p" ] && exec "$p" --from ${this.repoUrl} zen-mcp-server; done; echo 'uvx not found' >&2; exit 1`
+      `for p in $(which uvx 2>/dev/null) $HOME/.local/bin/uvx /opt/homebrew/bin/uvx /usr/local/bin/uvx uvx; do [ -x "$p" ] && exec "$p" --from ${this.repoUrl} pal-mcp-server; done; echo 'uvx not found' >&2; exit 1`
     ];
   }
 
   /**
-   * Ensure uvx is available and zen-mcp can be launched
+   * Ensure uvx is available and pal-mcp can be launched
    * @returns {Promise<Object>} Result object with structure:
    *   { success: true, uvxPath: '/path/to/uvx', pythonVersion: '3.12' }
    *   { success: false, error: 'UVX_NOT_FOUND'|'PYTHON_NOT_FOUND', message: string }
@@ -109,7 +112,7 @@ export class ZenMcpInstaller {
       return {
         success: false,
         error: 'PYTHON_NOT_FOUND',
-        message: pythonCheck.error || 'Python 3.10+ is required for zen-mcp-server',
+        message: pythonCheck.error || 'Python 3.10+ is required for pal-mcp-server',
         recoverable: false
       };
     }
@@ -165,7 +168,7 @@ export class ZenMcpInstaller {
   async update() {
     return {
       success: true,
-      message: 'zen-mcp-server auto-updates via uvx on each launch'
+      message: 'pal-mcp-server auto-updates via uvx on each launch'
     };
   }
 }

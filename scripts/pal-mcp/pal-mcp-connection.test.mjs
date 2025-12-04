@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ZenMcpConnection } from './zen-mcp-connection.mjs';
+import { PalMcpConnection } from './pal-mcp-connection.mjs';
 
-describe('ZenMcpConnection', () => {
+describe('PalMcpConnection', () => {
   let connection;
   let mockFetch;
 
   beforeEach(() => {
     mockFetch = vi.fn();
-    connection = new ZenMcpConnection({ fetch: mockFetch });
+    connection = new PalMcpConnection({ fetch: mockFetch });
   });
 
   afterEach(() => {
@@ -16,23 +16,23 @@ describe('ZenMcpConnection', () => {
 
   describe('constructor', () => {
     it('should use default timeout of 10000ms', () => {
-      const conn = new ZenMcpConnection();
+      const conn = new PalMcpConnection();
       expect(conn.timeout).toBe(10000);
     });
 
     it('should accept custom timeout', () => {
-      const conn = new ZenMcpConnection({ timeout: 5000 });
+      const conn = new PalMcpConnection({ timeout: 5000 });
       expect(conn.timeout).toBe(5000);
     });
 
     it('should use provided fetch function', () => {
       const customFetch = vi.fn();
-      const conn = new ZenMcpConnection({ fetch: customFetch });
+      const conn = new PalMcpConnection({ fetch: customFetch });
       expect(conn.fetch).toBe(customFetch);
     });
 
     it('should use globalThis.fetch if not provided', () => {
-      const conn = new ZenMcpConnection();
+      const conn = new PalMcpConnection();
       expect(conn.fetch).toBeDefined();
     });
   });
@@ -464,7 +464,7 @@ describe('ZenMcpConnection', () => {
       });
 
       const customTimeout = 5000;
-      const conn = new ZenMcpConnection({ fetch: mockFetch, timeout: customTimeout });
+      const conn = new PalMcpConnection({ fetch: mockFetch, timeout: customTimeout });
       await conn.testProvider('openai', 'key');
 
       expect(capturedSignal).toBeDefined();

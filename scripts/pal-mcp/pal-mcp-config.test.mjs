@@ -1,10 +1,10 @@
 /**
- * Tests for ZenMcpConfig - Configuration management for Zen MCP integration
- * Updated for BeehiveInnovations zen-mcp-server with all providers
+ * Tests for PalMcpConfig - Configuration management for PAL MCP integration
+ * Updated for BeehiveInnovations pal-mcp-server with all providers
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ZenMcpConfig, PROVIDERS, SUPPORTED_PROVIDERS, ZEN_OPTIONS } from './zen-mcp-config.mjs';
+import { PalMcpConfig, PROVIDERS, SUPPORTED_PROVIDERS, PAL_OPTIONS } from './pal-mcp-config.mjs';
 
 // Mock filesystem
 vi.mock('fs', () => ({
@@ -22,7 +22,7 @@ vi.mock('os', () => ({
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 
-describe('ZenMcpConfig', () => {
+describe('PalMcpConfig', () => {
   let config;
   let mockFs;
 
@@ -36,7 +36,7 @@ describe('ZenMcpConfig', () => {
     mkdirSync.mockImplementation(() => {});
 
     mockFs = { existsSync, readFileSync, writeFileSync, mkdirSync };
-    config = new ZenMcpConfig({ fs: mockFs });
+    config = new PalMcpConfig({ fs: mockFs });
   });
 
   describe('exports', () => {
@@ -68,22 +68,22 @@ describe('ZenMcpConfig', () => {
       expect(SUPPORTED_PROVIDERS).toHaveLength(6);
     });
 
-    it('should export ZEN_OPTIONS with configuration options', () => {
-      expect(ZEN_OPTIONS).toHaveProperty('DISABLED_TOOLS');
-      expect(ZEN_OPTIONS).toHaveProperty('DEFAULT_MODEL');
-      expect(ZEN_OPTIONS).toHaveProperty('LOG_LEVEL');
+    it('should export PAL_OPTIONS with configuration options', () => {
+      expect(PAL_OPTIONS).toHaveProperty('DISABLED_TOOLS');
+      expect(PAL_OPTIONS).toHaveProperty('DEFAULT_MODEL');
+      expect(PAL_OPTIONS).toHaveProperty('LOG_LEVEL');
     });
   });
 
   describe('static methods', () => {
     it('getSupportedProviders should return provider list', () => {
-      const providers = ZenMcpConfig.getSupportedProviders();
+      const providers = PalMcpConfig.getSupportedProviders();
 
       expect(providers).toEqual(SUPPORTED_PROVIDERS);
     });
 
     it('getProviderInfo should return provider metadata', () => {
-      const info = ZenMcpConfig.getProviderInfo('gemini');
+      const info = PalMcpConfig.getProviderInfo('gemini');
 
       expect(info.name).toBe('Google Gemini');
       expect(info.envKey).toBe('GEMINI_API_KEY');
@@ -91,7 +91,7 @@ describe('ZenMcpConfig', () => {
     });
 
     it('getProviderInfo should return null for unknown provider', () => {
-      const info = ZenMcpConfig.getProviderInfo('unknown');
+      const info = PalMcpConfig.getProviderInfo('unknown');
 
       expect(info).toBeNull();
     });
@@ -100,23 +100,23 @@ describe('ZenMcpConfig', () => {
   describe('constructor', () => {
     it('should initialize with default configDir from homedir', () => {
       expect(config.configDir).toBe('/home/testuser/.vibetrees');
-      expect(config.configFile).toBe('zen-mcp-config.json');
+      expect(config.configFile).toBe('pal-mcp-config.json');
     });
 
     it('should accept custom configDir', () => {
-      config = new ZenMcpConfig({ configDir: '/custom/path', fs: mockFs });
+      config = new PalMcpConfig({ configDir: '/custom/path', fs: mockFs });
 
       expect(config.configDir).toBe('/custom/path');
     });
 
     it('should use provided fs implementation', () => {
-      config = new ZenMcpConfig({ fs: mockFs });
+      config = new PalMcpConfig({ fs: mockFs });
 
       expect(config.fs).toBe(mockFs);
     });
 
     it('should not create directory in constructor', () => {
-      new ZenMcpConfig({ fs: mockFs });
+      new PalMcpConfig({ fs: mockFs });
 
       expect(mkdirSync).not.toHaveBeenCalled();
     });
@@ -200,7 +200,7 @@ describe('ZenMcpConfig', () => {
       config.load();
 
       expect(readFileSync).toHaveBeenCalledWith(
-        '/home/testuser/.vibetrees/zen-mcp-config.json',
+        '/home/testuser/.vibetrees/pal-mcp-config.json',
         'utf-8'
       );
     });
@@ -219,7 +219,7 @@ describe('ZenMcpConfig', () => {
       config.save(testConfig);
 
       expect(writeFileSync).toHaveBeenCalledWith(
-        '/home/testuser/.vibetrees/zen-mcp-config.json',
+        '/home/testuser/.vibetrees/pal-mcp-config.json',
         JSON.stringify(testConfig, null, 2),
         { mode: 0o600 }
       );

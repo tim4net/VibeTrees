@@ -1,10 +1,13 @@
 /**
- * Zen MCP Configuration Panel
+ * PAL MCP Configuration Panel
  * Manages API key configuration for AI model providers
+ *
+ * PAL MCP (Provider Abstraction Layer) was formerly known as Zen MCP.
+ * See: https://github.com/BeehiveInnovations/pal-mcp-server
  */
 
 /**
- * MCPConfigPanel class - manages Zen MCP configuration UI
+ * MCPConfigPanel class - manages PAL MCP configuration UI
  */
 class MCPConfigPanel {
   constructor() {
@@ -14,8 +17,8 @@ class MCPConfigPanel {
     this.content = null;
     this.statusSummary = null;
 
-    // Provider configuration - matches zen-mcp-server supported providers
-    // See: https://github.com/BeehiveInnovations/zen-mcp-server
+    // Provider configuration - matches pal-mcp-server supported providers
+    // See: https://github.com/BeehiveInnovations/pal-mcp-server
     this.providers = {
       gemini: {
         name: 'Google Gemini',
@@ -158,7 +161,7 @@ class MCPConfigPanel {
    */
   async loadConfigurations() {
     try {
-      const response = await fetch('/api/zen-mcp/config');
+      const response = await fetch('/api/pal-mcp/config');
 
       if (!response.ok) {
         throw new Error(`Failed to fetch config: ${response.statusText}`);
@@ -348,7 +351,7 @@ class MCPConfigPanel {
     this.clearMessages(provider);
 
     try {
-      const response = await fetch('/api/zen-mcp/test', {
+      const response = await fetch('/api/pal-mcp/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider, apiKey })
@@ -414,7 +417,7 @@ class MCPConfigPanel {
     this.clearMessages(provider);
 
     try {
-      const response = await fetch('/api/zen-mcp/config', {
+      const response = await fetch('/api/pal-mcp/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider, apiKey })
@@ -577,20 +580,20 @@ class MCPConfigPanel {
     }
 
     // Update status bar segment
-    const statusBarSegment = document.getElementById('zen-mcp-status');
+    const statusBarSegment = document.getElementById('pal-mcp-status');
     if (statusBarSegment) {
-      const zenMcpCount = statusBarSegment.querySelector('.zen-mcp-count');
+      const palMcpCount = statusBarSegment.querySelector('.pal-mcp-count');
       const fullText = statusBarSegment.querySelector('.text-full');
 
-      // Hide count in status bar (just show "Zen MCP")
-      if (zenMcpCount) {
-        zenMcpCount.textContent = '';
-        zenMcpCount.style.display = 'none';
+      // Hide count in status bar (just show "PAL MCP")
+      if (palMcpCount) {
+        palMcpCount.textContent = '';
+        palMcpCount.style.display = 'none';
       }
 
-      // Status bar just shows "Zen MCP"
+      // Status bar just shows "PAL MCP"
       if (fullText) {
-        fullText.textContent = 'Zen MCP';
+        fullText.textContent = 'PAL MCP';
       }
 
       // Fetch server status and update color based on running state
@@ -661,7 +664,7 @@ class MCPConfigPanel {
     let tooltip = `${configuredCount} AI ${configuredCount === 1 ? 'provider' : 'providers'} configured\nClick to configure`;
 
     try {
-      const response = await fetch('/api/zen-mcp/status');
+      const response = await fetch('/api/pal-mcp/status');
       const data = await response.json();
 
       if (data.success) {

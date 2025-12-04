@@ -1,5 +1,5 @@
 /**
- * Tests for ZenMcpInstaller
+ * Tests for PalMcpInstaller
  *
  * Tests cover:
  * - uvx detection across common paths
@@ -9,9 +9,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ZenMcpInstaller } from './zen-mcp-installer.mjs';
+import { PalMcpInstaller } from './pal-mcp-installer.mjs';
 
-describe('ZenMcpInstaller', () => {
+describe('PalMcpInstaller', () => {
   let installer;
   let mockExecSync;
 
@@ -22,25 +22,25 @@ describe('ZenMcpInstaller', () => {
 
   describe('constructor', () => {
     it('should initialize with default repository URL', () => {
-      installer = new ZenMcpInstaller();
-      expect(installer.repoUrl).toBe('git+https://github.com/BeehiveInnovations/zen-mcp-server.git');
+      installer = new PalMcpInstaller();
+      expect(installer.repoUrl).toBe('git+https://github.com/BeehiveInnovations/pal-mcp-server.git');
     });
 
     it('should accept custom repository URL via options', () => {
-      installer = new ZenMcpInstaller({ repoUrl: 'git+https://github.com/custom/repo.git' });
+      installer = new PalMcpInstaller({ repoUrl: 'git+https://github.com/custom/repo.git' });
       expect(installer.repoUrl).toBe('git+https://github.com/custom/repo.git');
     });
 
     it('should accept custom execSync via dependency injection', () => {
       const customExec = vi.fn();
-      installer = new ZenMcpInstaller({ execSync: customExec });
+      installer = new PalMcpInstaller({ execSync: customExec });
       expect(installer.execSync).toBe(customExec);
     });
   });
 
   describe('findUvx', () => {
     beforeEach(() => {
-      installer = new ZenMcpInstaller({ execSync: mockExecSync });
+      installer = new PalMcpInstaller({ execSync: mockExecSync });
     });
 
     it('should return uvx path when found in PATH', () => {
@@ -94,7 +94,7 @@ describe('ZenMcpInstaller', () => {
 
   describe('checkPython', () => {
     beforeEach(() => {
-      installer = new ZenMcpInstaller({ execSync: mockExecSync });
+      installer = new PalMcpInstaller({ execSync: mockExecSync });
     });
 
     it('should return available=true for Python 3.12', () => {
@@ -148,19 +148,19 @@ describe('ZenMcpInstaller', () => {
 
   describe('getCommand', () => {
     it('should return bash command array for MCP config', () => {
-      installer = new ZenMcpInstaller();
+      installer = new PalMcpInstaller();
 
       const command = installer.getCommand();
 
       expect(command).toHaveLength(2);
       expect(command[0]).toBe('-c');
       expect(command[1]).toContain('uvx');
-      expect(command[1]).toContain('BeehiveInnovations/zen-mcp-server');
-      expect(command[1]).toContain('zen-mcp-server');
+      expect(command[1]).toContain('BeehiveInnovations/pal-mcp-server');
+      expect(command[1]).toContain('pal-mcp-server');
     });
 
     it('should use custom repository URL in command', () => {
-      installer = new ZenMcpInstaller({ repoUrl: 'git+https://github.com/custom/repo.git' });
+      installer = new PalMcpInstaller({ repoUrl: 'git+https://github.com/custom/repo.git' });
 
       const command = installer.getCommand();
 
@@ -170,7 +170,7 @@ describe('ZenMcpInstaller', () => {
 
   describe('ensureInstalled', () => {
     beforeEach(() => {
-      installer = new ZenMcpInstaller({ execSync: mockExecSync });
+      installer = new PalMcpInstaller({ execSync: mockExecSync });
     });
 
     it('should return success when Python and uvx are available', async () => {
@@ -240,7 +240,7 @@ describe('ZenMcpInstaller', () => {
 
   describe('ensureReady', () => {
     it('should be an alias for ensureInstalled', async () => {
-      installer = new ZenMcpInstaller({ execSync: mockExecSync });
+      installer = new PalMcpInstaller({ execSync: mockExecSync });
       mockExecSync.mockImplementation((cmd) => {
         if (cmd === 'python3 --version') return 'Python 3.12.0';
         if (cmd === 'uvx --version') return 'uv 0.5.0';
@@ -255,7 +255,7 @@ describe('ZenMcpInstaller', () => {
 
   describe('getStatus', () => {
     beforeEach(() => {
-      installer = new ZenMcpInstaller({ execSync: mockExecSync });
+      installer = new PalMcpInstaller({ execSync: mockExecSync });
     });
 
     it('should return full status when everything is available', async () => {
@@ -306,7 +306,7 @@ describe('ZenMcpInstaller', () => {
 
   describe('update', () => {
     it('should return success since uvx auto-updates', async () => {
-      installer = new ZenMcpInstaller({ execSync: mockExecSync });
+      installer = new PalMcpInstaller({ execSync: mockExecSync });
 
       const result = await installer.update();
 

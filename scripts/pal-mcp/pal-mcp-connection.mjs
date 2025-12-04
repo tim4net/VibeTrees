@@ -1,5 +1,8 @@
 /**
- * ZenMcpConnection - API connection testing for Zen MCP providers
+ * PalMcpConnection - API connection testing for PAL MCP providers
+ *
+ * PAL MCP (Provider Abstraction Layer) was formerly known as Zen MCP.
+ * See: https://github.com/BeehiveInnovations/pal-mcp-server
  *
  * Handles:
  * - Connection testing with latency measurement
@@ -7,7 +10,7 @@
  * - Timeout management with AbortController
  * - Error mapping to user-friendly messages
  *
- * Supports all BeehiveInnovations zen-mcp-server providers:
+ * Supports all BeehiveInnovations pal-mcp-server providers:
  * - Gemini (Google AI)
  * - OpenAI
  * - OpenRouter (200+ models)
@@ -50,9 +53,9 @@ const PROVIDER_AUTH_HEADERS = {
   }),
 };
 
-export class ZenMcpConnection {
+export class PalMcpConnection {
   /**
-   * Create a new ZenMcpConnection instance
+   * Create a new PalMcpConnection instance
    * @param {Object} options - Configuration options
    * @param {Function} options.fetch - Fetch function to use (defaults to globalThis.fetch)
    * @param {number} options.timeout - Request timeout in ms (default: 10000)

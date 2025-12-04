@@ -181,11 +181,11 @@ describe('McpManager', () => {
       expect(mkdirSync).toHaveBeenCalledWith('/test/worktree/.claude', { recursive: true });
     });
 
-    it('should include Zen MCP when configured', () => {
+    it('should include PAL MCP when configured', () => {
       existsSync.mockReturnValue(false);
 
-      // Mock Zen MCP as configured
-      const mockZenMcp = {
+      // Mock PAL MCP as configured
+      const mockPalMcp = {
         isConfigured: vi.fn(() => true),
         getEnvVars: vi.fn(() => ({
           OPENROUTER_API_KEY: 'sk-or-test-key',
@@ -194,12 +194,12 @@ describe('McpManager', () => {
         installer: {
           getCommand: vi.fn(() => [
             '-c',
-            'for p in $(which uvx 2>/dev/null) $HOME/.local/bin/uvx /opt/homebrew/bin/uvx /usr/local/bin/uvx uvx; do [ -x "$p" ] && exec "$p" --from git+https://github.com/BeehiveInnovations/zen-mcp-server.git zen-mcp-server; done; echo \'uvx not found\' >&2; exit 1'
+            'for p in $(which uvx 2>/dev/null) $HOME/.local/bin/uvx /opt/homebrew/bin/uvx /usr/local/bin/uvx uvx; do [ -x "$p" ] && exec "$p" --from git+https://github.com/BeehiveInnovations/pal-mcp-server.git pal-mcp-server; done; echo \'uvx not found\' >&2; exit 1'
           ])
         }
       };
 
-      mcpManager.zenMcp = mockZenMcp;
+      mcpManager.palMcp = mockPalMcp;
 
       const servers = [
         {
@@ -213,26 +213,26 @@ describe('McpManager', () => {
 
       const writtenContent = JSON.parse(writeFileSync.mock.calls[0][1]);
 
-      expect(writtenContent.mcpServers).toHaveProperty('zen');
-      expect(writtenContent.mcpServers.zen.command).toBe('bash');
-      expect(writtenContent.mcpServers.zen.args[0]).toBe('-c');
-      expect(writtenContent.mcpServers.zen.args[1]).toContain('BeehiveInnovations/zen-mcp-server');
-      expect(writtenContent.mcpServers.zen.env).toEqual({
+      expect(writtenContent.mcpServers).toHaveProperty('pal');
+      expect(writtenContent.mcpServers.pal.command).toBe('bash');
+      expect(writtenContent.mcpServers.pal.args[0]).toBe('-c');
+      expect(writtenContent.mcpServers.pal.args[1]).toContain('BeehiveInnovations/pal-mcp-server');
+      expect(writtenContent.mcpServers.pal.env).toEqual({
         OPENROUTER_API_KEY: 'sk-or-test-key',
         OPENAI_API_KEY: 'sk-test-key'
       });
     });
 
-    it('should not include Zen MCP when not configured', () => {
+    it('should not include PAL MCP when not configured', () => {
       existsSync.mockReturnValue(false);
 
-      // Mock Zen MCP as not configured
-      const mockZenMcp = {
+      // Mock PAL MCP as not configured
+      const mockPalMcp = {
         isConfigured: vi.fn(() => false),
         getEnvVars: vi.fn(() => ({}))
       };
 
-      mcpManager.zenMcp = mockZenMcp;
+      mcpManager.palMcp = mockPalMcp;
 
       const servers = [
         {
@@ -246,9 +246,9 @@ describe('McpManager', () => {
 
       const writtenContent = JSON.parse(writeFileSync.mock.calls[0][1]);
 
-      expect(writtenContent.mcpServers).not.toHaveProperty('zen');
-      expect(mockZenMcp.isConfigured).toHaveBeenCalled();
-      expect(mockZenMcp.getEnvVars).not.toHaveBeenCalled();
+      expect(writtenContent.mcpServers).not.toHaveProperty('pal');
+      expect(mockPalMcp.isConfigured).toHaveBeenCalled();
+      expect(mockPalMcp.getEnvVars).not.toHaveBeenCalled();
     });
 
     it('should generate settings.json with discovered MCP servers', () => {

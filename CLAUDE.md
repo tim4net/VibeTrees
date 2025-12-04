@@ -38,7 +38,7 @@ Web UI / CLI → Core Orchestration → Infrastructure
 - `pty-session-manager.mjs` - Terminal persistence
 - `mcp-manager.mjs` - MCP server discovery
 - `agents/` - Pluggable AI agent system
-- `zen-mcp/` - Multi-model AI provider integration
+- `pal-mcp/` - Multi-model AI provider integration (PAL MCP)
 
 ## Development Workflow
 
@@ -126,19 +126,19 @@ API: `GET /api/agents`, `GET /api/agents/:name`, `GET /api/agents/availability`
 
 See [docs/adding-agents.md](docs/adding-agents.md) for custom agents.
 
-### Zen MCP Integration
-Multi-model AI access via Zen MCP. Configured providers are auto-injected into worktree MCP settings.
+### PAL MCP Integration
+Multi-model AI access via PAL MCP (Provider Abstraction Layer, formerly Zen MCP). Configured providers are auto-injected into worktree MCP settings.
 
-**Configuration**: `~/.vibetrees/zen-mcp-config.json`
+**Configuration**: `~/.vibetrees/pal-mcp-config.json`
 
 **Supported providers**: OpenRouter, OpenAI, Anthropic, Google AI
 
 **API**:
-- `GET/POST /api/zen-mcp/config` - Configuration CRUD
-- `POST /api/zen-mcp/test` - Test provider connection
-- `GET /api/zen-mcp/status` - Installation status
+- `GET/POST /api/pal-mcp/config` - Configuration CRUD
+- `POST /api/pal-mcp/test` - Test provider connection
+- `GET /api/pal-mcp/status` - Installation status
 
-See [docs/zen-mcp-integration.md](docs/zen-mcp-integration.md) for details.
+See [docs/pal-mcp-integration.md](docs/pal-mcp-integration.md) for details.
 
 ### Dependency Management
 Automatic dependency installation with smart fallback.
@@ -277,6 +277,6 @@ See [docs/performance-optimization.md](docs/performance-optimization.md) for det
 - `docs/database-workflow.md` - Database operations
 - `docs/terminal-persistence.md` - Terminal session recovery
 - `docs/performance-optimization.md` - Performance profiling
-- `docs/zen-mcp-integration.md` - Zen MCP configuration guide
+- `docs/pal-mcp-integration.md` - PAL MCP configuration guide
 
 **IMPORTANT**: DO NOT KILL PROCESSES YOU DID NOT SPAWN

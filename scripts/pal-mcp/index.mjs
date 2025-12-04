@@ -1,15 +1,18 @@
 /**
- * ZenMcpFacade - Unified interface for Zen MCP integration
+ * PalMcpFacade - Unified interface for PAL MCP integration
+ *
+ * PAL MCP (Provider Abstraction Layer) was formerly known as Zen MCP.
+ * See: https://github.com/BeehiveInnovations/pal-mcp-server
  *
  * Composes three core components:
- * - ZenMcpConfig: Configuration and API key management
- * - ZenMcpInstaller: uvx/Python availability checking
- * - ZenMcpConnection: Provider API connection testing
+ * - PalMcpConfig: Configuration and API key management
+ * - PalMcpInstaller: uvx/Python availability checking
+ * - PalMcpConnection: Provider API connection testing
  *
  * Provides lazy initialization, status aggregation, and simplified API.
  *
  * Usage:
- *   const facade = new ZenMcpFacade();
+ *   const facade = new PalMcpFacade();
  *   await facade.ensureReady();  // Check uvx is available
  *   await facade.saveApiKey('openai', 'sk-...');  // Test then save key
  *   const status = await facade.getStatus();  // Get full status
@@ -17,28 +20,28 @@
 
 import { execSync } from 'child_process';
 import { homedir } from 'os';
-import { ZenMcpConfig, PROVIDERS, SUPPORTED_PROVIDERS } from './zen-mcp-config.mjs';
-import { ZenMcpInstaller } from './zen-mcp-installer.mjs';
-import { ZenMcpConnection } from './zen-mcp-connection.mjs';
+import { PalMcpConfig, PROVIDERS, SUPPORTED_PROVIDERS } from './pal-mcp-config.mjs';
+import { PalMcpInstaller } from './pal-mcp-installer.mjs';
+import { PalMcpConnection } from './pal-mcp-connection.mjs';
 
 /**
- * Unified facade for Zen MCP configuration, installation, and connection management
+ * Unified facade for PAL MCP configuration, installation, and connection management
  * Implements lazy initialization, dependency injection, and status aggregation
  */
-export class ZenMcpFacade {
+export class PalMcpFacade {
   /**
-   * Create a new ZenMcpFacade instance
+   * Create a new PalMcpFacade instance
    * @param {Object} options - Configuration options
-   * @param {ZenMcpConfig} options.config - Config instance (created if not provided)
-   * @param {ZenMcpInstaller} options.installer - Installer instance (created if not provided)
-   * @param {ZenMcpConnection} options.connection - Connection instance (created if not provided)
+   * @param {PalMcpConfig} options.config - Config instance (created if not provided)
+   * @param {PalMcpInstaller} options.installer - Installer instance (created if not provided)
+   * @param {PalMcpConnection} options.connection - Connection instance (created if not provided)
    * @param {*} options.* - Other options passed to default constructors
    */
   constructor(options = {}) {
     // Initialize dependencies - use provided instances or create defaults
-    this.config = options.config || new ZenMcpConfig(options);
-    this.installer = options.installer || new ZenMcpInstaller(options);
-    this.connection = options.connection || new ZenMcpConnection(options);
+    this.config = options.config || new PalMcpConfig(options);
+    this.installer = options.installer || new PalMcpInstaller(options);
+    this.connection = options.connection || new PalMcpConnection(options);
 
     // Cache for lazy initialization
     this._installPromise = null;
@@ -145,7 +148,7 @@ export class ZenMcpFacade {
   }
 
   /**
-   * Get zen-mcp-server version information
+   * Get pal-mcp-server version information
    * @returns {Promise<Object>} { installed: string|null, latest: string|null, upToDate: boolean }
    */
   async getVersionInfo() {
@@ -161,7 +164,7 @@ export class ZenMcpFacade {
           process.cwd()
         ].join(' ');
 
-        const pyproject = execSync(`find ${searchPaths} -name "pyproject.toml" -path "*/zen-mcp-server/*" -exec grep "version = " {} \\; 2>/dev/null | head -1`, {
+        const pyproject = execSync(`find ${searchPaths} -name "pyproject.toml" -path "*/pal-mcp-server/*" -exec grep "version = " {} \\; 2>/dev/null | head -1`, {
           encoding: 'utf8',
           timeout: 5000
         }).trim();
@@ -177,7 +180,7 @@ export class ZenMcpFacade {
       // Get latest version from GitHub
       let latestVersion = null;
       try {
-        const response = await fetch('https://raw.githubusercontent.com/BeehiveInnovations/zen-mcp-server/main/pyproject.toml');
+        const response = await fetch('https://raw.githubusercontent.com/BeehiveInnovations/pal-mcp-server/main/pyproject.toml');
         if (response.ok) {
           const text = await response.text();
           const match = text.match(/version\s*=\s*"([^"]+)"/);
@@ -204,17 +207,17 @@ export class ZenMcpFacade {
   }
 
   /**
-   * Check if zen-mcp-server processes are running
+   * Check if pal-mcp-server processes are running
    * @returns {Object} { running: boolean, processCount: number, processes: Array }
    */
   checkServerProcesses() {
     try {
-      // Look for zen-mcp-server processes - they run as Python with server.py
+      // Look for pal-mcp-server processes - they run as Python with server.py
       const output = execSync('ps aux', { encoding: 'utf8' });
 
-      // Filter for zen-mcp-server processes
+      // Filter for pal-mcp-server processes
       const lines = output.split('\n').filter(line =>
-        line.includes('zen-mcp-server') && !line.includes('grep')
+        line.includes('pal-mcp-server') && !line.includes('grep')
       );
 
       return {
@@ -232,7 +235,7 @@ export class ZenMcpFacade {
       };
     } catch (error) {
       // Error getting process list
-      console.error('Error checking zen-mcp-server processes:', error.message);
+      console.error('Error checking pal-mcp-server processes:', error.message);
       return {
         running: false,
         processCount: 0,
@@ -294,4 +297,4 @@ export class ZenMcpFacade {
 }
 
 // Export individual classes for direct use if needed
-export { ZenMcpConfig, ZenMcpInstaller, ZenMcpConnection, PROVIDERS, SUPPORTED_PROVIDERS };
+export { PalMcpConfig, PalMcpInstaller, PalMcpConnection, PROVIDERS, SUPPORTED_PROVIDERS };

@@ -98,16 +98,16 @@
   color: #6e7681;
 }
 
-/* Zen MCP status colors */
-.status-segment.zen-mcp.configured {
+/* PAL MCP status colors */
+.status-segment.pal-mcp.configured {
   color: #2ea043;
 }
 
-.status-segment.zen-mcp.partial {
+.status-segment.pal-mcp.partial {
   color: #e5a935;
 }
 
-.status-segment.zen-mcp.unconfigured {
+.status-segment.pal-mcp.unconfigured {
   color: #6e7681;
 }
 
@@ -116,7 +116,7 @@
 .behind-count,
 .change-count,
 .service-count,
-.zen-mcp-count {
+.pal-mcp-count {
   font-weight: 600;
   font-size: 11px;
 }
