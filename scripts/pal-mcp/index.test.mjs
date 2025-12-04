@@ -436,8 +436,10 @@ describe('PalMcpFacade', () => {
     it('should combine install and config status', async () => {
       mockInstaller.ensureInstalled.mockResolvedValueOnce({
         success: true,
-        uvxPath: '/home/user/.local/bin/uvx',
-        pythonVersion: '3.12'
+        method: 'uvx',
+        path: '/home/user/.local/bin/uvx',
+        pythonVersion: '3.12',
+        autoUpdates: true
       });
       mockConfig.isConfigured.mockReturnValue(true);
       mockConfig.getConfigForApi.mockReturnValue({
@@ -450,6 +452,8 @@ describe('PalMcpFacade', () => {
       const status = await facade.getStatus();
 
       expect(status.ready).toBe(true);
+      expect(status.installMethod).toBe('uvx');
+      expect(status.installPath).toBe('/home/user/.local/bin/uvx');
       expect(status.uvxAvailable).toBe(true);
       expect(status.uvxPath).toBe('/home/user/.local/bin/uvx');
       expect(status.pythonVersion).toBe('3.12');

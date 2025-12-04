@@ -247,10 +247,10 @@ export class PalMcpFacade {
   /**
    * Get full system status
    * Combines installation status, configuration status, provider config, running processes, and version info
-   * @returns {Promise<Object>} Status object with ready, pythonVersion, uvxPath, configured, providers, server, version
+   * @returns {Promise<Object>} Status object with ready, pythonVersion, method, configured, providers, server, version
    */
   async getStatus() {
-    // Check uvx/Python availability
+    // Check installation availability (uvx/pipx/pip)
     const installResult = await this.ensureReady();
 
     // Check if server processes are running
@@ -262,8 +262,13 @@ export class PalMcpFacade {
     // Combine all status info
     const status = {
       ready: installResult.success,
-      uvxAvailable: installResult.success,
-      uvxPath: installResult.uvxPath,
+      // New multi-method fields
+      installMethod: installResult.method || null,
+      installPath: installResult.path || null,
+      autoUpdates: installResult.autoUpdates || false,
+      // Legacy uvx fields for backward compatibility
+      uvxAvailable: installResult.method === 'uvx',
+      uvxPath: installResult.method === 'uvx' ? installResult.path : null,
       pythonVersion: installResult.pythonVersion,
       installError: installResult.error,
       installMessage: installResult.message,
@@ -278,9 +283,19 @@ export class PalMcpFacade {
 
     // Add version info (wait for it)
     try {
-      status.version = await versionPromise;
+      const versionInfo = await versionPromise;
+      // If installed via pip/pipx, we already have the version from installResult
+      if (installResult.version && !versionInfo.installed) {
+        versionInfo.installed = installResult.version;
+        versionInfo.upToDate = versionInfo.latest ? installResult.version === versionInfo.latest : null;
+      }
+      status.version = versionInfo;
     } catch (error) {
-      status.version = { installed: null, latest: null, upToDate: null };
+      status.version = {
+        installed: installResult.version || null,
+        latest: null,
+        upToDate: null
+      };
     }
 
     return status;

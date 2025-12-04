@@ -147,10 +147,10 @@ describe('PalMcpInstaller', () => {
   });
 
   describe('getCommand', () => {
-    it('should return bash command array for MCP config', () => {
+    it('should return uvx command when method is uvx', () => {
       installer = new PalMcpInstaller();
 
-      const command = installer.getCommand();
+      const command = installer.getCommand('uvx');
 
       expect(command).toHaveLength(2);
       expect(command[0]).toBe('-c');
@@ -159,12 +159,32 @@ describe('PalMcpInstaller', () => {
       expect(command[1]).toContain('pal-mcp-server');
     });
 
-    it('should use custom repository URL in command', () => {
+    it('should use custom repository URL in uvx command', () => {
       installer = new PalMcpInstaller({ repoUrl: 'git+https://github.com/custom/repo.git' });
 
-      const command = installer.getCommand();
+      const command = installer.getCommand('uvx');
 
       expect(command[1]).toContain('custom/repo');
+    });
+
+    it('should return pip command when method is pip', () => {
+      installer = new PalMcpInstaller();
+
+      const command = installer.getCommand('pip');
+
+      expect(command).toHaveLength(2);
+      expect(command[0]).toBe('-c');
+      expect(command[1]).toContain('python3 -m pal_mcp_server');
+    });
+
+    it('should return pipx command when method is pipx', () => {
+      installer = new PalMcpInstaller();
+
+      const command = installer.getCommand('pipx');
+
+      expect(command).toHaveLength(2);
+      expect(command[0]).toBe('-c');
+      expect(command[1]).toBe('pal-mcp-server');
     });
   });
 
@@ -187,7 +207,8 @@ describe('PalMcpInstaller', () => {
       const result = await installer.ensureInstalled();
 
       expect(result.success).toBe(true);
-      expect(result.uvxPath).toBe('uvx');
+      expect(result.method).toBe('uvx');
+      expect(result.path).toBe('uvx');
       expect(result.pythonVersion).toBe('3.12');
       expect(result.command).toBeDefined();
     });
@@ -221,20 +242,36 @@ describe('PalMcpInstaller', () => {
       expect(result.error).toBe('PYTHON_NOT_FOUND');
     });
 
-    it('should fail when uvx is not available', async () => {
+    it('should fail when no installer is available', async () => {
       mockExecSync.mockImplementation((cmd) => {
         if (cmd === 'python3 --version') {
           return 'Python 3.12.0';
         }
+        // All installers fail
+        throw new Error('command not found');
+      });
+
+      const result = await installer.ensureInstalled(false); // Don't try to install
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('NO_INSTALLER');
+      expect(result.message).toContain('No package manager found');
+      expect(result.recoverable).toBe(false);
+    });
+
+    it('should succeed with pip when uvx unavailable but pip installed', async () => {
+      mockExecSync.mockImplementation((cmd) => {
+        if (cmd === 'python3 --version') return 'Python 3.12.0';
+        if (cmd === 'pip3 --version') return 'pip 24.0';
+        if (cmd === 'pip3 show pal-mcp-server') return 'Name: pal-mcp-server\nVersion: 9.4.0';
         throw new Error('command not found');
       });
 
       const result = await installer.ensureInstalled();
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('UVX_NOT_FOUND');
-      expect(result.message).toContain('Install uv');
-      expect(result.recoverable).toBe(false);
+      expect(result.success).toBe(true);
+      expect(result.method).toBe('pip');
+      expect(result.version).toBe('9.4.0');
     });
   });
 
@@ -258,7 +295,7 @@ describe('PalMcpInstaller', () => {
       installer = new PalMcpInstaller({ execSync: mockExecSync });
     });
 
-    it('should return full status when everything is available', async () => {
+    it('should return full status when uvx is available', async () => {
       mockExecSync.mockImplementation((cmd) => {
         if (cmd === 'python3 --version') return 'Python 3.12.0';
         if (cmd === 'uvx --version') return 'uv 0.5.0';
@@ -269,6 +306,7 @@ describe('PalMcpInstaller', () => {
 
       expect(status.pythonAvailable).toBe(true);
       expect(status.pythonVersion).toBe('3.12');
+      expect(status.method).toBe('uvx');
       expect(status.uvxAvailable).toBe(true);
       expect(status.uvxPath).toBe('uvx');
       expect(status.ready).toBe(true);
@@ -290,7 +328,23 @@ describe('PalMcpInstaller', () => {
       expect(status.ready).toBe(false);
     });
 
-    it('should return ready=false when uvx missing', async () => {
+    it('should return ready=true with pip when uvx missing but pip installed', async () => {
+      mockExecSync.mockImplementation((cmd) => {
+        if (cmd === 'python3 --version') return 'Python 3.12.0';
+        if (cmd === 'pip3 --version') return 'pip 24.0';
+        if (cmd === 'pip3 show pal-mcp-server') return 'Name: pal-mcp-server\nVersion: 9.4.0';
+        throw new Error('not found');
+      });
+
+      const status = await installer.getStatus();
+
+      expect(status.pythonAvailable).toBe(true);
+      expect(status.method).toBe('pip');
+      expect(status.uvxAvailable).toBe(false);
+      expect(status.ready).toBe(true);
+    });
+
+    it('should return ready=false when nothing installed', async () => {
       mockExecSync.mockImplementation((cmd) => {
         if (cmd === 'python3 --version') return 'Python 3.12.0';
         throw new Error('not found');
@@ -299,19 +353,51 @@ describe('PalMcpInstaller', () => {
       const status = await installer.getStatus();
 
       expect(status.pythonAvailable).toBe(true);
-      expect(status.uvxAvailable).toBe(false);
+      expect(status.method).toBe(null);
       expect(status.ready).toBe(false);
     });
   });
 
   describe('update', () => {
-    it('should return success since uvx auto-updates', async () => {
+    beforeEach(() => {
       installer = new PalMcpInstaller({ execSync: mockExecSync });
+    });
+
+    it('should return success with auto-updates message for uvx', async () => {
+      mockExecSync.mockImplementation((cmd) => {
+        if (cmd === 'uvx --version') return 'uv 0.5.0';
+        throw new Error('not found');
+      });
 
       const result = await installer.update();
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('auto-updates');
+    });
+
+    it('should update via pip when installed via pip', async () => {
+      mockExecSync.mockImplementation((cmd) => {
+        if (cmd === 'pip3 --version') return 'pip 24.0';
+        if (cmd === 'pip3 show pal-mcp-server') return 'Name: pal-mcp-server\nVersion: 9.4.2';
+        if (cmd.includes('pip3 install --user --upgrade')) return '';
+        throw new Error('not found');
+      });
+
+      const result = await installer.update();
+
+      expect(result.success).toBe(true);
+      expect(result.version).toBe('9.4.2');
+    });
+
+    it('should fail when not installed', async () => {
+      mockExecSync.mockImplementation(() => {
+        throw new Error('not found');
+      });
+
+      const result = await installer.update();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('NOT_INSTALLED');
     });
   });
 });
